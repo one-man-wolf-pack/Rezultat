@@ -30,6 +30,17 @@ Console.WriteLine($"optimized consumer and Rezultat: {optimized}");
     ("TryGetValue Error<int>", Kernels.TryGetErrorInt, false),
     ("TryGetValue Ok<string>", Kernels.TryGetOkString, false),
     ("TryGetValue Error<string>", Kernels.TryGetErrorString, false),
+    ("Maybe Some<int> construction", Kernels.SomeInt, false),
+    ("Maybe Some<string> construction", Kernels.SomeString, false),
+    ("Maybe Some<Unit> construction", Kernels.SomeUnit, false),
+    ("Maybe None<int> construction", Kernels.NoneInt, false),
+    ("Maybe None<string> construction", Kernels.NoneString, false),
+    ("Maybe IsSome int", Kernels.IsSomeInt, false),
+    ("Maybe IsSome string", Kernels.IsSomeString, false),
+    ("Maybe TryGetValue Some<int>", Kernels.TryGetSomeInt, false),
+    ("Maybe TryGetValue None<int>", Kernels.TryGetNoneInt, false),
+    ("Maybe TryGetValue Some<string>", Kernels.TryGetSomeString, false),
+    ("Maybe TryGetValue None<string>", Kernels.TryGetNoneString, false),
 ];
 
 var failures = optimized ? 0 : 1;
@@ -65,9 +76,17 @@ internal static class Kernels
     private static readonly Result<string, string> _uninitialized = default;
     private static readonly Result<string, string> _errorString = Result<string, string>.Error("error");
 
+    private static readonly Maybe<int> _someInt = Maybe<int>.Some(3);
+    private static readonly Maybe<int> _noneInt = Maybe<int>.None;
+    private static readonly Maybe<string> _someString = Maybe<string>.Some("some");
+    private static readonly Maybe<string> _noneString = default;
+
     private static Result<int, int> _intSink;
     private static Result<string, string> _stringSink;
     private static Result<Unit, string> _unitSink;
+    private static Maybe<int> _maybeIntSink;
+    private static Maybe<string> _maybeStringSink;
+    private static Maybe<Unit> _maybeUnitSink;
     private static object? _objectSink;
     private static long _counter;
 
@@ -199,6 +218,107 @@ internal static class Kernels
         }
     }
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void SomeInt(int n)
+    {
+        for (var i = 0; i < n; i++)
+        {
+            _maybeIntSink = Maybe<int>.Some(i);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void SomeString(int n)
+    {
+        for (var i = 0; i < n; i++)
+        {
+            _maybeStringSink = Maybe<string>.Some(_text);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void SomeUnit(int n)
+    {
+        for (var i = 0; i < n; i++)
+        {
+            _maybeUnitSink = Maybe<Unit>.Some(Unit.Value);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void NoneInt(int n)
+    {
+        for (var i = 0; i < n; i++)
+        {
+            _maybeIntSink = (i & 1) == 0 ? Maybe<int>.None : default;
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void NoneString(int n)
+    {
+        for (var i = 0; i < n; i++)
+        {
+            _maybeStringSink = (i & 1) == 0 ? Maybe<string>.None : default;
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void IsSomeInt(int n)
+    {
+        for (var i = 0; i < n; i++)
+        {
+            var maybe = (i & 1) == 0 ? _someInt : _noneInt;
+            _counter += maybe.IsSome ? 1 : 0;
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void IsSomeString(int n)
+    {
+        for (var i = 0; i < n; i++)
+        {
+            var maybe = (i & 1) == 0 ? _someString : _noneString;
+            _counter += maybe.IsSome ? 1 : 0;
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void TryGetSomeInt(int n)
+    {
+        for (var i = 0; i < n; i++)
+        {
+            _counter += _someInt.TryGetValue(out var value) ? value : -1;
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void TryGetNoneInt(int n)
+    {
+        for (var i = 0; i < n; i++)
+        {
+            _counter += _noneInt.TryGetValue(out var value) ? value : -1;
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void TryGetSomeString(int n)
+    {
+        for (var i = 0; i < n; i++)
+        {
+            _counter += _someString.TryGetValue(out var value) ? value.Length : -1;
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void TryGetNoneString(int n)
+    {
+        for (var i = 0; i < n; i++)
+        {
+            _counter += _noneString.TryGetValue(out var value) ? value.Length : -1;
+        }
+    }
+
     public static void Consume() =>
-        Console.WriteLine($"sinks: {_counter} {_intSink} {_stringSink} {_unitSink} {_objectSink is not null}");
+        Console.WriteLine($"sinks: {_counter} {_intSink} {_stringSink} {_unitSink} {_maybeIntSink} {_maybeStringSink} {_maybeUnitSink} {_objectSink is not null}");
 }

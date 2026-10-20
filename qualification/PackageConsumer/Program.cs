@@ -107,6 +107,76 @@ checks.Throws<InvalidOperationException>("zip default other", () => ParseNumber(
 checks.Throws<ArgumentNullException>("ensure null predicate on error", () => ParseNumber("x").Ensure(null!, static _ => "e"));
 checks.Throws<InvalidOperationException>("default receiver map", () => default(Result<int, string>).Map<int>(null!));
 
+Maybe<string> foundName = Maybe.FromNullable(FindName(1));
+checks.That("from nullable reference strips nullable", foundName.TryGetValue(out var name) && name.Length == 3);
+checks.That("from null reference is none", !Maybe.FromNullable(FindName(2)).IsSome);
+Maybe<int> foundAge = Maybe.FromNullable(FindAge(1));
+checks.That("from nullable value strips nullable", foundAge.TryGetValue(out var age) && age + 1 == 1);
+checks.That("from empty nullable value is none", Maybe.FromNullable(FindAge(2)) == Maybe<int>.None);
+checks.That("explicit generic from null", Maybe.FromNullable<string>(null) == default && Maybe.FromNullable<int>(null) == default);
+
+var presentNull = Maybe<string?>.Some(null);
+checks.That("some null is present", presentNull.IsSome && presentNull != Maybe<string?>.None);
+checks.That("some null observed", presentNull.TryGetValue(out var maybeNull) && maybeNull is null);
+checks.That("some empty nullable", Maybe<int?>.Some(null).TryGetValue(out var emptyNullable) && !emptyNullable.HasValue);
+checks.That("default is none", !default(Maybe<int>).IsSome && default(Maybe<int>) == Maybe<int>.None && new Maybe<int>() == default);
+checks.That("none observation outputs default", !Maybe<int>.None.TryGetValue(out var inactive) && inactive == 0);
+checks.That("upcast some", Maybe<IEnumerable<char>>.Some("ab").ValueOr([]).Count() == 2);
+
+if (Maybe<string>.Some("value").TryGetValue(out var someValue))
+{
+    checks.Text("active maybe value used without null check", "VALUE", someValue.ToUpperInvariant());
+}
+else
+{
+    checks.Fail("unexpected none");
+}
+
+checks.Text("maybe match", "3", Maybe<int>.Some(3).Match(FormatNumber, static () => "none"));
+checks.Text("maybe match none", "none", Maybe<int>.None.Match(FormatNumber, static () => "none"));
+checks.That("maybe match nullable result", Maybe<int>.None.Match<string?>(static _ => "x", static () => null) is null);
+checks.Text("maybe match nullable input", "null", presentNull.Match(static v => v ?? "null", static () => "none"));
+checks.Throws<ArgumentNullException>("maybe null handler on other branch", () => Maybe<int>.Some(1).Match(FormatNumber, null!));
+checks.Text("value or", "fallback", Maybe<string>.None.ValueOr("fallback"));
+checks.Text("value or else method group", "anonymous", Maybe<string>.None.ValueOrElse(Anonymous));
+checks.That("value or keeps present null", Maybe<string?>.Some(null).ValueOr("fallback") is null);
+checks.That("value or nullable fallback", Maybe<string?>.None.ValueOr(null) is null);
+checks.Throws<ArgumentNullException>("value or else null factory on some", () => Maybe<int>.Some(1).ValueOrElse(null!));
+checks.Text("conditional fallback", "Ada", GreetingName(Maybe<string>.Some("Ada"), "guest"));
+
+checks.Text("maybe none text", "Maybe.None", default(Maybe<Point>).ToString());
+checks.Text("maybe some text", "Maybe.Some(Point { X = 1, Y = 2 })", Maybe<Point>.Some(new Point(1, 2)).ToString());
+checks.Text("maybe some null text", "Maybe.Some(null)", presentNull.ToString());
+checks.Text("nested maybe text", "Maybe.Some(Maybe.None)", Maybe<Maybe<int>>.Some(Maybe<int>.None).ToString());
+checks.Text("maybe of result text", "Maybe.Some(Result.Ok(()))", Maybe<Result<Unit, string>>.Some(Result<Unit, string>.Ok(Unit.Value)).ToString());
+checks.That("nested none differs", Maybe<Maybe<int>>.Some(Maybe<int>.None) != Maybe<Maybe<int>>.None);
+checks.That("maybe NaN equality", Maybe<double>.Some(double.NaN) == Maybe<double>.Some(double.NaN));
+checks.That("maybe array reference equality", Maybe<int[]>.Some([1]) != Maybe<int[]>.Some([1]));
+checks.That("boxed none is not null", !((object)Maybe<int>.None).Equals(null) && ((object)Maybe<int>.None).Equals(Maybe<int>.None));
+
+var maybeKeys = new HashSet<Maybe<string>>(new IgnoreCaseMaybeComparer())
+{
+    Maybe<string>.Some("Ada"),
+    Maybe<string>.Some("ADA"),
+    Maybe<string>.None,
+    default,
+};
+checks.That("external maybe comparer", maybeKeys.Count == 2);
+var maybeLookup = new Dictionary<Maybe<string?>, string>
+{
+    [Maybe<string?>.None] = "none",
+    [Maybe<string?>.Some(null)] = "null",
+};
+checks.Text("maybe dictionary key", "null", maybeLookup[Maybe<string?>.Some(null)]);
+checks.Text("public-only maybe extension", "Maybe.Some(4)", Maybe<int>.Some(2).Squared().ToString());
+checks.Text("public-only maybe extension none", "Maybe.None", Maybe<int>.None.Squared().ToString());
+checks.Throws<InvalidOperationException>("public-only throwing unwrap", () => Maybe<int>.None.OrThrow());
+
+var loaded = await LoadAsync(found: true);
+checks.That("awaited maybe some", loaded.TryGetValue(out var loadedName) && loadedName == "loaded");
+checks.That("awaited maybe none", !(await LoadAsync(found: false)).IsSome);
+checks.That("value task maybe", (await new ValueTask<Maybe<int>>(Maybe<int>.Some(1))).ValueOr(0) == 1);
+
 return checks.Complete();
 
 static Result<int, string> ParseNumber(string text) =>
@@ -160,6 +230,20 @@ static IEnumerable<string> TrackedNumbers(DisposalTracker tracker)
     }
 }
 
+static string? FindName(int id) => id == 1 ? "Ada" : null;
+
+static int? FindAge(int id) => id == 1 ? 0 : null;
+
+static string Anonymous() => "anonymous";
+
+static string GreetingName(Maybe<string> name, string guest) => name.TryGetValue(out var value) ? value : guest;
+
+static async Task<Maybe<string>> LoadAsync(bool found)
+{
+    await Task.Yield();
+    return found ? Maybe<string>.Some("loaded") : Maybe<string>.None;
+}
+
 internal readonly record struct Point(int X, int Y);
 
 internal sealed record Failure(int Code);
@@ -175,6 +259,28 @@ internal static class ConsumerExtensions
 {
     public static Result<int, TError> Twice<TError>(this Result<int, TError> result) =>
         result.Match(value => Result<int, TError>.Ok(value * 2), Result<int, TError>.Error);
+}
+
+internal static class MaybeConsumerExtensions
+{
+    public static Maybe<int> Squared(this Maybe<int> maybe) =>
+        maybe.TryGetValue(out var value) ? Maybe<int>.Some(value * value) : Maybe<int>.None;
+
+    public static T OrThrow<T>(this Maybe<T> maybe) =>
+        maybe.TryGetValue(out var value) ? value : throw new InvalidOperationException("none");
+}
+
+internal sealed class IgnoreCaseMaybeComparer : IEqualityComparer<Maybe<string>>
+{
+    public bool Equals(Maybe<string> x, Maybe<string> y)
+    {
+        var xSome = x.TryGetValue(out var xValue);
+        var ySome = y.TryGetValue(out var yValue);
+        return xSome == ySome && (!xSome || StringComparer.OrdinalIgnoreCase.Equals(xValue, yValue));
+    }
+
+    public int GetHashCode(Maybe<string> obj) =>
+        obj.TryGetValue(out var value) ? StringComparer.OrdinalIgnoreCase.GetHashCode(value) : 0;
 }
 
 internal sealed class IgnoreCaseErrorComparer : IEqualityComparer<Result<int, string>>
