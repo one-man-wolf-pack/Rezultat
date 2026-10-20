@@ -9,11 +9,11 @@ public sealed class PublicSurfaceTests
         BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
 
     [Fact]
-    public void Assembly_exports_only_result_result_extensions_and_unit()
+    public void Assembly_exports_only_result_maybe_and_unit_types()
     {
         var exported = typeof(Unit).Assembly.GetExportedTypes().Select(type => type.FullName).Order(StringComparer.Ordinal);
 
-        Assert.Equal(["Rezultat.ResultExtensions", "Rezultat.Result`2", "Rezultat.Unit"], exported);
+        Assert.Equal(["Rezultat.Maybe", "Rezultat.Maybe`1", "Rezultat.ResultExtensions", "Rezultat.Result`2", "Rezultat.Unit"], exported);
     }
 
     [Fact]
@@ -102,6 +102,75 @@ public sealed class PublicSurfaceTests
 
         Assert.False(parameters[0].GetCustomAttribute<MaybeNullWhenAttribute>()!.ReturnValue);
         Assert.True(parameters[1].GetCustomAttribute<MaybeNullWhenAttribute>()!.ReturnValue);
+    }
+
+    [Fact]
+    public void Maybe_declares_only_rfc_members()
+    {
+        string[] expected =
+        [
+            "Boolean Equals(Rezultat.Maybe`1[T])",
+            "Boolean Equals(System.Object)",
+            "Boolean IsSome",
+            "Boolean TryGetValue(T ByRef)",
+            "Boolean get_IsSome()",
+            "Boolean op_Equality(Rezultat.Maybe`1[T], Rezultat.Maybe`1[T])",
+            "Boolean op_Inequality(Rezultat.Maybe`1[T], Rezultat.Maybe`1[T])",
+            "Int32 GetHashCode()",
+            "Rezultat.Maybe`1[T] None",
+            "Rezultat.Maybe`1[T] Some(T)",
+            "Rezultat.Maybe`1[T] get_None()",
+            "System.String ToString()",
+            "T ValueOr(T)",
+            "T ValueOrElse(System.Func`1[T])",
+            "TResult Match[TResult](System.Func`2[T,TResult], System.Func`1[TResult])",
+        ];
+
+        Assert.Equal(expected.Order(StringComparer.Ordinal), DeclaredMembers(typeof(Maybe<>)));
+        Assert.Equal(GenericParameterAttributes.None, typeof(Maybe<>).GetGenericArguments()[0].GenericParameterAttributes);
+        Assert.All(
+            typeof(Maybe<>).GetMethods(DeclaredPublic).SelectMany(method => method.GetGenericArguments()),
+            argument => Assert.Equal(GenericParameterAttributes.None, argument.GenericParameterAttributes));
+        Assert.Equal([typeof(IEquatable<Maybe<int>>)], typeof(Maybe<int>).GetInterfaces());
+        Assert.True(typeof(Maybe<>).IsValueType);
+        Assert.False(typeof(Maybe<>).IsByRefLike);
+        Assert.NotNull(typeof(Maybe<>).GetCustomAttribute<System.Runtime.CompilerServices.IsReadOnlyAttribute>());
+        Assert.Empty(typeof(Maybe<>).GetConstructors());
+    }
+
+    [Fact]
+    public void Maybe_companion_is_static_and_declares_only_constrained_FromNullable()
+    {
+        var type = typeof(Maybe);
+        var overloads = type.GetMethods(DeclaredPublic).OrderBy(method => method.GetParameters()[0].ParameterType.IsGenericType).ToArray();
+
+        Assert.True(type.IsAbstract && type.IsSealed);
+        Assert.Equal(
+            ["Rezultat.Maybe`1[T] FromNullable[T](System.Nullable`1[T])", "Rezultat.Maybe`1[T] FromNullable[T](T)"],
+            DeclaredMembers(type));
+        Assert.Equal(GenericParameterAttributes.ReferenceTypeConstraint, overloads[0].GetGenericArguments()[0].GenericParameterAttributes);
+        Assert.Equal(
+            GenericParameterAttributes.NotNullableValueTypeConstraint | GenericParameterAttributes.DefaultConstructorConstraint,
+            overloads[1].GetGenericArguments()[0].GenericParameterAttributes);
+    }
+
+    [Fact]
+    public void FromNullable_accepts_nullable_reference_and_returns_non_null_payload()
+    {
+        var method = typeof(Maybe).GetMethods(DeclaredPublic).Single(method => !method.GetParameters()[0].ParameterType.IsGenericType);
+        var context = new NullabilityInfoContext();
+
+        Assert.Equal(NullabilityState.Nullable, context.Create(method.GetParameters()[0]).ReadState);
+        Assert.Equal(NullabilityState.NotNull, context.Create(method.ReturnParameter).GenericTypeArguments[0].ReadState);
+    }
+
+    [Fact]
+    public void Maybe_TryGetValue_output_is_maybe_null_only_when_false()
+    {
+        var output = typeof(Maybe<>).GetMethod(nameof(Maybe<int>.TryGetValue))!.GetParameters()[0];
+
+        Assert.False(output.GetCustomAttribute<MaybeNullWhenAttribute>()!.ReturnValue);
+        Assert.Null(output.GetCustomAttribute<NotNullWhenAttribute>());
     }
 
     private static string[] DeclaredMembers(Type type) =>
