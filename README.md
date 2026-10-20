@@ -1,8 +1,11 @@
 # Rezultat
 
 Implementation of the Rezultat core library: the `Rezultat` NuGet package with `Result<T, TError>`,
-`Maybe<T>` and `Unit` for `net10.0`, including synchronous Result composition,
-`ResultExtensions.Traverse` and explicit nullable adaptation through `Maybe.FromNullable`.
+`Maybe<T>` and `Unit` for `net10.0`, including synchronous Result and Maybe composition,
+collection operations (`ResultExtensions.Traverse`; `MaybeExtensions` lookups `FirstOrNone`,
+`LastOrNone`, `SingleOrNone`, `ElementAtOrNone`, `GetOrNone`, plus `Traverse` and lazy `Choose`),
+Maybe/Result bridges (`ToResult`, `ToResultElse`, `ToMaybe`, Maybe-receiver `Traverse`) and
+explicit nullable adaptation through `Maybe.FromNullable`.
 
 Contracts, decisions and policies live in the specification repository
 (`../rezultat-specification`): carrier behavior in `rfc/`, technical mapping in `realization/`,

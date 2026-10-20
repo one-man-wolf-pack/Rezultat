@@ -6,6 +6,14 @@ namespace Rezultat;
 public static class ResultExtensions
 {
     /// <summary>
+    /// Ok becomes Some, including a <see langword="null"/> payload; Error becomes None, intentionally discarding the
+    /// error without observing it.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The Result is uninitialized; it does not become None.</exception>
+    public static Maybe<T> ToMaybe<T, TError>(this Result<T, TError> result) =>
+        result.TryGetValue(out var value, out _) ? Maybe<T>.Some(value) : Maybe<T>.None;
+
+    /// <summary>
     /// Enumerates <paramref name="source"/> once, in order, invoking <paramref name="selector"/> once per visited
     /// element. Stops at the first failure and returns its error; the rest of the sequence is not enumerated and
     /// no partial array is returned. On success returns a new array of the values in source order.

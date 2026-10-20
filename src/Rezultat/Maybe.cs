@@ -67,6 +67,72 @@ public readonly struct Maybe<T> : IEquatable<Maybe<T>>
         return _isSome ? _value : fallback();
     }
 
+    /// <exception cref="ArgumentNullException">The selector is null, even for None.</exception>
+    public Maybe<TResult> Map<TResult>(Func<T, TResult> selector)
+    {
+        ArgumentNullException.ThrowIfNull(selector);
+        return _isSome ? Maybe<TResult>.Some(selector(_value)) : Maybe<TResult>.None;
+    }
+
+    /// <summary>
+    /// Returns the Maybe chosen by <paramref name="next"/> as is; a <c>default</c> result is a valid None.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"><paramref name="next"/> is null, even for None.</exception>
+    public Maybe<TResult> AndThen<TResult>(Func<T, Maybe<TResult>> next)
+    {
+        ArgumentNullException.ThrowIfNull(next);
+        return _isSome ? next(_value) : Maybe<TResult>.None;
+    }
+
+    /// <summary>
+    /// Keeps this Some, including a present <see langword="null"/>; for None returns the result of
+    /// <paramref name="fallback"/> as is, which may itself be None.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"><paramref name="fallback"/> is null, even for Some.</exception>
+    public Maybe<T> OrElse(Func<Maybe<T>> fallback)
+    {
+        ArgumentNullException.ThrowIfNull(fallback);
+        return _isSome ? this : fallback();
+    }
+
+    /// <summary>
+    /// On <see langword="true"/> returns the Some observed before <paramref name="predicate"/> ran, so
+    /// reassigning the receiver variable from the predicate does not change the result.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"><paramref name="predicate"/> is null, even for None.</exception>
+    public Maybe<T> Filter(Func<T, bool> predicate)
+    {
+        ArgumentNullException.ThrowIfNull(predicate);
+        var self = this;
+        return self._isSome && predicate(self._value) ? self : None;
+    }
+
+    /// <summary>
+    /// Combines two already computed Maybe values; <paramref name="other"/> is evaluated by the caller even when
+    /// this is None. Use <see cref="AndThen{TResult}"/> to compute the second value only for Some.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">The selector is null, regardless of the alternatives.</exception>
+    public Maybe<TResult> Zip<TOther, TResult>(Maybe<TOther> other, Func<T, TOther, TResult> selector)
+    {
+        ArgumentNullException.ThrowIfNull(selector);
+        return _isSome && other.TryGetValue(out var otherValue)
+            ? Maybe<TResult>.Some(selector(_value, otherValue))
+            : Maybe<TResult>.None;
+    }
+
+    /// <summary>
+    /// Keeps <paramref name="error"/> as an ordinary payload, never invoking it even when it is a delegate.
+    /// </summary>
+    public Result<T, TError> ToResult<TError>(TError error) =>
+        _isSome ? Result<T, TError>.Ok(_value) : Result<T, TError>.Error(error);
+
+    /// <exception cref="ArgumentNullException"><paramref name="errorFactory"/> is null, even for Some.</exception>
+    public Result<T, TError> ToResultElse<TError>(Func<TError> errorFactory)
+    {
+        ArgumentNullException.ThrowIfNull(errorFactory);
+        return _isSome ? Result<T, TError>.Ok(_value) : Result<T, TError>.Error(errorFactory());
+    }
+
     public bool Equals(Maybe<T> other)
     {
         if (_isSome != other._isSome)
