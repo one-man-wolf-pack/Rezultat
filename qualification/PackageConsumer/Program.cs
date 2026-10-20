@@ -62,6 +62,51 @@ var lookup = new Dictionary<Result<Unit, Unit>, string>
 };
 checks.Text("dictionary key", "error", lookup[Result<Unit, Unit>.Error(default)]);
 
+checks.Text("map", "Result.Ok(6)", ParseNumber("3").Map(static n => n * 2).ToString());
+checks.Text("map method group", "Result.Ok(3)", ParseNumber("3").Map(FormatNumber).ToString());
+checks.Text("map error", "Result.Error(15)", ParseNumber("x").MapError(static e => e.Length).ToString());
+checks.Text("map error method group", "Result.Error(not a number: x)", ParseNumber("x").MapError(FormatError).ToString());
+checks.Text("contextual map error", "Result.Error(field: not a number: x)",
+    ParseNumber("x").MapError("field", static (e, field) => $"{field}: {e}").ToString());
+checks.Text("contextual map error explicit target", "Result.Error(Failure { Code = 404 })",
+    ParseNumber("x").MapError<Failure, int>(404, static (_, code) => new Failure(code)).ToString());
+checks.Text("and then", "Result.Ok(5)", ParseNumber("2").AndThen(a => ParseNumber("3").Map(b => a + b)).ToString());
+checks.Text("and then method group", "Result.Error(not a number: y)", Result<string, string>.Ok("y").AndThen(ParseNumber).ToString());
+checks.Text("and then mapped error", "Result.Error(Failure { Code = 1 })",
+    ParseNumber("x").MapError(static _ => new Failure(1)).AndThen(static n => Validate(n)).ToString());
+checks.Text("ensure", "Result.Error(negative: -1)", ParseNumber("-1").Ensure(static n => n >= 0, static n => $"negative: {n}").ToString());
+checks.Text("ensure passes", "Result.Ok(1)", ParseNumber("1").Ensure(static n => n >= 0, static n => $"negative: {n}").ToString());
+checks.Text("or else", "Result.Ok(0)", ParseNumber("x").OrElse(static _ => Result<int, Failure>.Ok(0)).ToString());
+checks.Text("or else method group", "Result.Error(Failure { Code = 15 })", ParseNumber("x").OrElse(Fallback).ToString());
+checks.Text("zip", "Result.Ok(2x3)", ParseNumber("2").Zip(Result<string, string>.Ok("3"), static (a, b) => $"{a}x{b}").ToString());
+checks.Text("zip tuple", "Result.Ok((2, 3))", ParseNumber("2").Zip(ParseNumber("3"), static (a, b) => (a, b)).ToString());
+checks.Text("zip first error", "Result.Error(not a number: a)", ParseNumber("a").Zip(ParseNumber("b"), static (a, b) => a + b).ToString());
+checks.Text("unit flow", "Result.Ok(())", ParseNumber("1").AndThen(static _ => Result<Unit, string>.Ok(Unit.Value)).ToString());
+
+var parsed = new[] { "1", "2", "3" }.Traverse(ParseNumber);
+checks.That("traverse value payload", parsed.TryGetValue(out var numbers, out _) && numbers.Sum() == 6);
+checks.Text("traverse first error", "Result.Error(not a number: b)", new[] { "1", "b", "c" }.Traverse(ParseNumber).Map(static a => a.Length).ToString());
+var words = new[] { "a", "bb" }.Traverse(static w => Result<string, int>.Ok(w.ToUpperInvariant()));
+checks.That("traverse reference payload", words.TryGetValue(out var upper, out _) && string.Concat(upper) == "ABB");
+checks.That("traverse ready outcomes", new[] { ParseNumber("4"), ParseNumber("5") }.Traverse(static r => r).Map(static a => a.Length) == Result<int, string>.Ok(2));
+var tracked = new DisposalTracker();
+checks.That("traverse early exit", !TrackedNumbers(tracked).Traverse(ParseNumber).IsSuccess && tracked.Disposed && tracked.Produced == 2);
+checks.Throws<InvalidOperationException>("traverse visited default", () => new[] { 1 }.Traverse(static _ => default(Result<int, string>)));
+checks.Throws<ArgumentNullException>("traverse null selector", () => new[] { 1 }.Traverse<int, int, string>(null!));
+
+var awaited = (await SaveAsync(succeed: true)).Map(static _ => "saved");
+checks.Text("await before map", "Result.Ok(saved)", awaited.ToString());
+var pending = ParseNumber("7").Map(static async n => { await Task.Yield(); return n + 1; });
+checks.That("map async payload stays ok", pending.TryGetValue(out var task, out _) && await task == 8);
+var faulted = ParseNumber("7").Map(static n => Task.FromException<int>(new InvalidOperationException($"{n}")));
+checks.That("faulted payload keeps branch", faulted.IsSuccess);
+var nested = ParseNumber("1").Map(static _ => default(Result<int, string>));
+checks.That("nested default payload", nested.TryGetValue(out var inner, out _) && !inner.IsInitialized);
+checks.Throws<InvalidOperationException>("and then default outcome", () => ParseNumber("1").AndThen(static _ => default(Result<int, string>)));
+checks.Throws<InvalidOperationException>("zip default other", () => ParseNumber("x").Zip(default(Result<int, string>), static (a, b) => a + b));
+checks.Throws<ArgumentNullException>("ensure null predicate on error", () => ParseNumber("x").Ensure(null!, static _ => "e"));
+checks.Throws<InvalidOperationException>("default receiver map", () => default(Result<int, string>).Map<int>(null!));
+
 return checks.Complete();
 
 static Result<int, string> ParseNumber(string text) =>
@@ -94,7 +139,37 @@ static string FormatNumber(int number) => number.ToString(CultureInfo.InvariantC
 
 static string FormatError(string error) => error;
 
+static Result<int, Failure> Validate(int number) =>
+    number > 0 ? Result<int, Failure>.Ok(number) : Result<int, Failure>.Error(new Failure(0));
+
+static Result<int, Failure> Fallback(string error) => Result<int, Failure>.Error(new Failure(error.Length));
+
+static IEnumerable<string> TrackedNumbers(DisposalTracker tracker)
+{
+    try
+    {
+        foreach (var text in new[] { "1", "x", "3" })
+        {
+            tracker.Produced++;
+            yield return text;
+        }
+    }
+    finally
+    {
+        tracker.Disposed = true;
+    }
+}
+
 internal readonly record struct Point(int X, int Y);
+
+internal sealed record Failure(int Code);
+
+internal sealed class DisposalTracker
+{
+    public int Produced { get; set; }
+
+    public bool Disposed { get; set; }
+}
 
 internal static class ConsumerExtensions
 {
