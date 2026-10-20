@@ -1,7 +1,8 @@
 # Rezultat
 
-Implementation of the Rezultat core library: the `Rezultat` NuGet package with `Result<T, TError>`
-and `Unit` for `net10.0`, including synchronous Result composition and `ResultExtensions.Traverse`.
+Implementation of the Rezultat core library: the `Rezultat` NuGet package with `Result<T, TError>`,
+`Maybe<T>` and `Unit` for `net10.0`, including synchronous Result composition,
+`ResultExtensions.Traverse` and explicit nullable adaptation through `Maybe.FromNullable`.
 
 Contracts, decisions and policies live in the specification repository
 (`../rezultat-specification`): carrier behavior in `rfc/`, technical mapping in `realization/`,

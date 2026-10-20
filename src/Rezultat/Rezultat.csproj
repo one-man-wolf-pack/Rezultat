@@ -16,10 +16,10 @@
     <PackageId>Rezultat</PackageId>
     <AssemblyName>Rezultat</AssemblyName>
     <RootNamespace>Rezultat</RootNamespace>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
     <Authors>Zada Zorg</Authors>
     <Copyright>Copyright (c) 2026 Zada Zorg</Copyright>
-    <Description>Result and Unit carriers with synchronous Result composition.</Description>
+    <Description>Result, Maybe and Unit carriers with synchronous Result composition and explicit nullable adaptation.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <IsPackable>true</IsPackable>
     <DebugType>portable</DebugType>
