@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../Shared/Checks.cs" Link="Checks.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Rezultat" Version="$(RezultatPackageVersion)" />
+  </ItemGroup>
+
+</Project>

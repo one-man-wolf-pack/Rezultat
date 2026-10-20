@@ -1,0 +1,17 @@
+# case                        kind     diagnostics
+ImplicitPayloadConversion     error    CS0029
+PayloadConstructor            error    CS1729
+ParameterlessOk               error    CS7036
+MissingIsFailure              error    CS1061
+MissingValueAccessor          error    CS1061
+NoDeconstruct                 error    CS0411,CS8129
+RawPayloadEquality            error    CS0019
+NoNonGenericFactory           error    CS0305
+UnitArithmetic                error    CS0019
+ReadOnlyState                 error    CS0200
+InactiveValueDereference      warning  CS8602
+InactiveErrorDereference      warning  CS8602
+NullableActiveValue           warning  CS8602
+NullableHandlerParameter      warning  CS8602
+NullForNonNullablePayload     warning  CS8625
+NullableMatchResult           warning  CS8603
