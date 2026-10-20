@@ -1,4 +1,4 @@
-# case                        kind     diagnostics
+# case                        kind     diagnostics  [langversion]
 ImplicitPayloadConversion     error    CS0029
 PayloadConstructor            error    CS1729
 ParameterlessOk               error    CS7036
@@ -46,8 +46,6 @@ MaybeNoInferringSome                   error    CS0117
 MaybeNoCompanionNone                   error    CS0117
 MaybeMissingValueAccessor              error    CS1061
 MaybeMissingIsNone                     error    CS1061
-MaybeNoMap                             error    CS1061
-MaybeNoToResult                        error    CS1061
 MaybeNoValueOrElseState                error    CS1501
 MaybeNoDeconstruct                     error    CS0411,CS8129,CS8130
 MaybeRawPayloadEquality                error    CS0019
@@ -65,3 +63,31 @@ MaybeNullFallbackForNonNullable        warning  CS8625
 MaybeNullForNonNullablePayload         warning  CS8625
 MaybeNullableSomeIsNotNonNull          warning  CS8619
 FromNullableStripsReferenceNullability warning  CS8619
+MaybeNoBindAlias                       error    CS1061
+MaybeNoSelectAlias                     error    CS1929
+MaybeNoWhereAlias                      error    CS1929
+MaybeNoQuerySyntax                     error    CS1936
+MaybeNoEnumeration                     error    CS1579
+MaybeNoReadyOr                         error    CS1061
+MaybeNoSequence                        error    CS1061
+MaybeNoValues                          error    CS1061
+MaybeNoFlatten                         error    CS1061
+MaybeNoTryFirst                        error    CS1061
+MaybeNoResultReceiverTraverse          error    CS1929
+FilterPredicateDelegate                error    CS1503
+MaybeAndThenAsyncNext                  error    CS0411
+MaybeOrElseAsyncFallback               error    CS4010
+MaybeZipUntypedNullSelectorResult      error    CS0411
+ChooseUntypedDefault                   error    CS0411
+MaybeTraverseUntypedDefault            error    CS0411
+ElementAtOrNoneNoIndex                 error    CS1503
+GetOrNoneCSharp12Ambiguity             error    CS0121   12
+MaybeMapNullableSelectorInput          warning  CS8602
+FilterNoNullableNarrowing              warning  CS8602
+ZipMaybeNullableSelectorInput          warning  CS8602
+ChooseNoNullableNarrowing              warning  CS8602
+FirstOrNoneNullablePayload             warning  CS8602
+GetOrNoneNullableValue                 warning  CS8602
+ToMaybeNullablePayload                 warning  CS8602
+MaybeTraverseNullableSelectorInput     warning  CS8602
+ToResultNullForNonNullableError        warning  CS8625

@@ -177,6 +177,88 @@ checks.That("awaited maybe some", loaded.TryGetValue(out var loadedName) && load
 checks.That("awaited maybe none", !(await LoadAsync(found: false)).IsSome);
 checks.That("value task maybe", (await new ValueTask<Maybe<int>>(Maybe<int>.Some(1))).ValueOr(0) == 1);
 
+checks.Text("maybe map", "Maybe.Some(6)", Maybe.FromNullable(FindAge(1)).Map(static n => (n + 3) * 2).ToString());
+checks.Text("maybe map method group", "Maybe.Some(3)", Maybe<int>.Some(3).Map(FormatNumber).ToString());
+checks.Text("maybe map keeps null result", "Maybe.Some(null)", Maybe<int>.Some(1).Map(static _ => (string?)null).ToString());
+checks.Text("maybe and then", "Maybe.Some(3)", Maybe.FromNullable(FindName(1)).AndThen(static n => Maybe<int>.Some(n.Length)).ToString());
+checks.Text("maybe and then method group", "Maybe.None", Maybe<int>.Some(2).AndThen(FindUser).ToString());
+checks.Text("maybe and then default", "Maybe.None", Maybe<int>.Some(1).AndThen(static _ => default(Maybe<string>)).ToString());
+checks.Text("maybe or else", "Maybe.Some(fallback)", Maybe<string>.None.OrElse(static () => Maybe<string>.Some("fallback")).ToString());
+checks.Text("maybe or else keeps some null", "Maybe.Some(null)", presentNull.OrElse(static () => Maybe<string?>.Some("x")).ToString());
+checks.Text("maybe filter", "Maybe.None", Maybe<int>.Some(-1).Filter(static n => n >= 0).ToString());
+checks.Text("maybe filter keeps nullable type", "Maybe.Some(null)", presentNull.Filter(static v => v is null).ToString());
+var reassigned = Maybe<int>.Some(1);
+checks.Text("maybe filter keeps observed receiver", "Maybe.Some(1)", reassigned.Filter(_ => { reassigned = Maybe<int>.None; return true; }).ToString());
+checks.Text("maybe zip", "Maybe.Some(Ada:36)", Maybe<string>.Some("Ada").Zip(Maybe<int>.Some(36), static (n, a) => $"{n}:{a}").ToString());
+checks.Text("maybe zip tuple", "Maybe.Some((1, x))", Maybe<int>.Some(1).Zip(Maybe<string>.Some("x"), static (a, b) => (a, b)).ToString());
+checks.Text("maybe zip none", "Maybe.None", Maybe<int>.None.Zip(Maybe<int>.Some(1), static (a, b) => a + b).ToString());
+checks.Throws<ArgumentNullException>("maybe zip null selector on none", () => Maybe<int>.None.Zip<int, int>(Maybe<int>.None, null!));
+checks.Throws<ArgumentNullException>("maybe map null selector on none", () => Maybe<int>.None.Map<int>(null!));
+var pendingMaybe = Maybe<int>.Some(1).Map(static async n => { await Task.Yield(); return n + 1; });
+checks.That("maybe map async payload", pendingMaybe.TryGetValue(out var pendingTask) && await pendingTask == 2);
+
+string?[] names = [null, "Ada", "Bob", "Ada"];
+checks.Text("first or none present null", "Maybe.Some(null)", names.FirstOrNone().ToString());
+checks.Text("first or none predicate", "Maybe.Some(Bob)", names.FirstOrNone(static n => n is { Length: 3 } && n[0] == 'B').ToString());
+checks.Text("first or none empty", "Maybe.None", Array.Empty<int>().FirstOrNone().ToString());
+checks.Text("last or none list", "Maybe.Some(Ada)", names.LastOrNone().ToString());
+checks.Text("last or none predicate", "Maybe.Some(Bob)", names.LastOrNone(static n => n == "Bob").ToString());
+checks.Text("last or none sequence", "Maybe.Some(3)", Enumerable.Range(1, 3).Select(static n => n).LastOrNone().ToString());
+checks.Text("single or none", "Maybe.Some(Bob)", names.SingleOrNone(static n => n == "Bob").ToString());
+checks.Text("single or none empty", "Maybe.None", names.SingleOrNone(static n => n == "Eve").ToString());
+checks.Throws<InvalidOperationException>("single or none multiple", () => names.SingleOrNone(static n => n == "Ada"));
+checks.Text("element at or none", "Maybe.Some(Ada)", names.ElementAtOrNone(1).ToString());
+checks.Text("element at or none negative", "Maybe.None", names.ElementAtOrNone(-1).ToString());
+checks.Text("element at or none past end", "Maybe.None", Enumerable.Range(0, 2).ElementAtOrNone(5).ToString());
+
+var ages = new Dictionary<string, int?> { ["Ada"] = 36, ["Unknown"] = null };
+checks.Text("get or none dictionary", "Maybe.Some(36)", ages.GetOrNone("Ada").ToString());
+checks.Text("get or none present null", "Maybe.Some(null)", ages.GetOrNone("Unknown").ToString());
+checks.Text("get or none miss", "Maybe.None", ages.GetOrNone("Eve").ToString());
+IDictionary<string, int?> mutableAges = ages;
+IReadOnlyDictionary<string, int?> readOnlyAges = ages;
+checks.Text("get or none static IDictionary", "Maybe.Some(36)", mutableAges.GetOrNone("Ada").ToString());
+checks.Text("get or none static IReadOnlyDictionary", "Maybe.Some(36)", readOnlyAges.GetOrNone("Ada").ToString());
+checks.Text("get or none read-only priority", "Maybe.Some(read-only)", new DivergentDictionary().GetOrNone("key").ToString());
+checks.Text("get or none method group", "Maybe.Some(36)", Maybe<string>.Some("Ada").AndThen(ages.GetOrNone).ToString());
+if (new Dictionary<string, string> { ["k"] = "value" }.GetOrNone("k").TryGetValue(out var found))
+{
+    checks.Text("get or none non-null payload", "VALUE", found.ToUpperInvariant());
+}
+else
+{
+    checks.Fail("get or none non-null payload: unexpected none");
+}
+
+var collected = new[] { "1", "2" }.Traverse(ParseMaybe);
+checks.That("maybe collection traverse", collected.TryGetValue(out var collectedValues) && collectedValues.Sum() == 3);
+checks.Text("maybe collection traverse none", "Maybe.None", new[] { "1", "x" }.Traverse(ParseMaybe).ToString());
+checks.That("maybe collection traverse ready", new[] { Maybe<int>.Some(1), Maybe<int>.Some(2) }.Traverse(static m => m).Map(static a => a.Length) == Maybe<int>.Some(2));
+checks.Text("result collection traverse still binds", "Result.Ok(2)", new[] { "1", "2" }.Traverse(ParseNumber).Map(static a => a.Length).ToString());
+checks.Text("choose", "1,3", string.Join(",", new[] { "1", "x", "3" }.Choose(ParseMaybe)));
+checks.Text("choose ready", "2", string.Join(",", new[] { Maybe<int>.None, Maybe<int>.Some(2) }.Choose(static m => m)));
+var chooseCalls = 0;
+var lazyChoice = new[] { "1" }.Choose(text => { chooseCalls++; return ParseMaybe(text); });
+checks.That("choose is lazy", chooseCalls == 0 && lazyChoice.Count() == 1 && chooseCalls == 1);
+checks.Throws<ArgumentNullException>("choose null selector", () => new[] { 1 }.Choose<int, int>(null!));
+
+checks.Text("to result", "Result.Ok(Ada)", Maybe.FromNullable(FindName(1)).ToResult("missing").ToString());
+checks.Text("to result none", "Result.Error(missing)", Maybe.FromNullable(FindName(2)).ToResult("missing").ToString());
+checks.Text("to result else", "Result.Error(Failure { Code = 404 })", Maybe<int>.None.ToResultElse(static () => new Failure(404)).ToString());
+var delegateError = Maybe<int>.None.ToResult(static () => "missing");
+checks.That("to result keeps delegate error uninvoked", !delegateError.TryGetValue(out _, out var errorDelegate) && errorDelegate() == "missing");
+checks.Throws<ArgumentNullException>("to result else null factory on some", () => Maybe<int>.Some(1).ToResultElse<string>(null!));
+checks.Text("to maybe", "Maybe.Some(3)", ParseNumber("3").ToMaybe().ToString());
+checks.Text("to maybe loses error", "Maybe.None", ParseNumber("x").ToMaybe().ToString());
+checks.Throws<InvalidOperationException>("to maybe uninitialized", () => default(Result<int, string>).ToMaybe());
+checks.Text("maybe traverse none", "Result.Ok(Maybe.None)", Maybe<string>.None.Traverse(ParseNumber).ToString());
+checks.Text("maybe traverse some", "Result.Ok(Maybe.Some(4))", Maybe<string>.Some("4").Traverse(ParseNumber).ToString());
+checks.Text("maybe traverse error", "Result.Error(not a number: x)", Maybe<string>.Some("x").Traverse(ParseNumber).ToString());
+checks.Text("maybe traverse ready", "Result.Ok(Maybe.Some(5))", Maybe<Result<int, string>>.Some(ParseNumber("5")).Traverse(static r => r).ToString());
+checks.Throws<InvalidOperationException>("maybe traverse default selector result", () => Maybe<int>.Some(1).Traverse(static _ => default(Result<int, string>)));
+checks.Text("static owner maybe extensions", "Maybe.Some(1)", MaybeExtensions.FirstOrNone(new[] { 1 }).ToString());
+checks.Text("static owner result extensions", "Maybe.Some(1)", ResultExtensions.ToMaybe(ParseNumber("1")).ToString());
+
 return checks.Complete();
 
 static Result<int, string> ParseNumber(string text) =>
@@ -232,6 +314,11 @@ static IEnumerable<string> TrackedNumbers(DisposalTracker tracker)
 
 static string? FindName(int id) => id == 1 ? "Ada" : null;
 
+static Maybe<string> FindUser(int id) => id == 1 ? Maybe<string>.Some("user") : Maybe<string>.None;
+
+static Maybe<int> ParseMaybe(string text) =>
+    int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number) ? Maybe<int>.Some(number) : Maybe<int>.None;
+
 static int? FindAge(int id) => id == 1 ? 0 : null;
 
 static string Anonymous() => "anonymous";
@@ -268,6 +355,17 @@ internal static class MaybeConsumerExtensions
 
     public static T OrThrow<T>(this Maybe<T> maybe) =>
         maybe.TryGetValue(out var value) ? value : throw new InvalidOperationException("none");
+}
+
+internal sealed class DivergentDictionary : Dictionary<string, string>, IReadOnlyDictionary<string, string>
+{
+    public DivergentDictionary() => this["key"] = "dictionary";
+
+    bool IReadOnlyDictionary<string, string>.TryGetValue(string key, [System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)] out string value)
+    {
+        value = "read-only";
+        return true;
+    }
 }
 
 internal sealed class IgnoreCaseMaybeComparer : IEqualityComparer<Maybe<string>>

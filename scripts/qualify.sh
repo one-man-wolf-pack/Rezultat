@@ -62,16 +62,17 @@ build_clean() {
 
 compiler_controls() {
     local project="$root/qualification/CompilerControls/CompilerControls.csproj"
-    local failures=0 name kind expected output status actual
+    local failures=0 name kind expected language output status actual
     dotnet restore "$project" >/dev/null
-    while read -r name kind expected; do
+    while read -r name kind expected language; do
         [[ -z "$name" || "$name" == \#* ]] && continue
         status=0
-        output="$(dotnet build "$project" --no-restore --no-incremental -c Release -p:Case="$name" </dev/null 2>&1)" || status=$?
+        output="$(dotnet build "$project" --no-restore --no-incremental -c Release -p:Case="$name" \
+            ${language:+-p:LangVersion="$language"} </dev/null 2>&1)" || status=$?
         actual="$(grep -oE "$kind CS[0-9]+" <<<"$output" | awk '{print $2}' | sort -u | paste -sd, -)"
         expected="$(tr ',' '\n' <<<"$expected" | sort -u | paste -sd, -)"
         if [[ "$actual" == "$expected" ]] && { [[ "$kind" == error && $status -ne 0 ]] || [[ "$kind" == warning && $status -eq 0 ]]; }; then
-            echo "PASS $name: $kind $actual"
+            echo "PASS $name: $kind $actual${language:+ (C# $language)}"
         else
             echo "FAIL $name: expected $kind $expected (exit $status), got '${actual}'"
             grep -E "(error|warning) CS[0-9]+" <<<"$output" | sort -u || true
