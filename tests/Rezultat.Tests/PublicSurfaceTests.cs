@@ -13,7 +13,9 @@ public sealed class PublicSurfaceTests
     {
         var exported = typeof(Unit).Assembly.GetExportedTypes().Select(type => type.FullName).Order(StringComparer.Ordinal);
 
-        Assert.Equal(["Rezultat.Maybe", "Rezultat.Maybe`1", "Rezultat.ResultExtensions", "Rezultat.Result`2", "Rezultat.Unit"], exported);
+        Assert.Equal(
+            ["Rezultat.Maybe", "Rezultat.MaybeExtensions", "Rezultat.Maybe`1", "Rezultat.ResultExtensions", "Rezultat.Result`2", "Rezultat.Unit"],
+            exported);
     }
 
     [Fact]
@@ -54,17 +56,66 @@ public sealed class PublicSurfaceTests
     }
 
     [Fact]
-    public void ResultExtensions_is_static_and_declares_only_unconstrained_Traverse()
+    public void ResultExtensions_is_static_and_declares_only_unconstrained_Traverse_and_ToMaybe()
     {
         var type = typeof(ResultExtensions);
-        var traverse = type.GetMethod(nameof(ResultExtensions.Traverse))!;
 
         Assert.True(type.IsAbstract && type.IsSealed);
         Assert.Equal(
-            ["Rezultat.Result`2[TResult[],TError] Traverse[TSource,TResult,TError](System.Collections.Generic.IEnumerable`1[TSource], System.Func`2[TSource,Rezultat.Result`2[TResult,TError]])"],
+            [
+                "Rezultat.Maybe`1[T] ToMaybe[T,TError](Rezultat.Result`2[T,TError])",
+                "Rezultat.Result`2[TResult[],TError] Traverse[TSource,TResult,TError](System.Collections.Generic.IEnumerable`1[TSource], System.Func`2[TSource,Rezultat.Result`2[TResult,TError]])",
+            ],
             DeclaredMembers(type));
-        Assert.True(traverse.IsDefined(typeof(System.Runtime.CompilerServices.ExtensionAttribute)));
-        Assert.All(traverse.GetGenericArguments(), argument => Assert.Equal(GenericParameterAttributes.None, argument.GenericParameterAttributes));
+        AssertUnconstrainedExtensions(type);
+    }
+
+    [Fact]
+    public void MaybeExtensions_is_static_and_declares_only_rfc_extensions()
+    {
+        var type = typeof(MaybeExtensions);
+        string[] expected =
+        [
+            "Rezultat.Maybe`1[T] ElementAtOrNone[T](System.Collections.Generic.IEnumerable`1[T], Int32)",
+            "Rezultat.Maybe`1[T] FirstOrNone[T](System.Collections.Generic.IEnumerable`1[T])",
+            "Rezultat.Maybe`1[T] FirstOrNone[T](System.Collections.Generic.IEnumerable`1[T], System.Func`2[T,System.Boolean])",
+            "Rezultat.Maybe`1[T] LastOrNone[T](System.Collections.Generic.IEnumerable`1[T])",
+            "Rezultat.Maybe`1[T] LastOrNone[T](System.Collections.Generic.IEnumerable`1[T], System.Func`2[T,System.Boolean])",
+            "Rezultat.Maybe`1[T] SingleOrNone[T](System.Collections.Generic.IEnumerable`1[T])",
+            "Rezultat.Maybe`1[T] SingleOrNone[T](System.Collections.Generic.IEnumerable`1[T], System.Func`2[T,System.Boolean])",
+            "Rezultat.Maybe`1[TResult[]] Traverse[TSource,TResult](System.Collections.Generic.IEnumerable`1[TSource], System.Func`2[TSource,Rezultat.Maybe`1[TResult]])",
+            "Rezultat.Maybe`1[TValue] GetOrNone[TKey,TValue](System.Collections.Generic.IDictionary`2[TKey,TValue], TKey)",
+            "Rezultat.Maybe`1[TValue] GetOrNone[TKey,TValue](System.Collections.Generic.IReadOnlyDictionary`2[TKey,TValue], TKey)",
+            "Rezultat.Result`2[Rezultat.Maybe`1[TResult],TError] Traverse[T,TResult,TError](Rezultat.Maybe`1[T], System.Func`2[T,Rezultat.Result`2[TResult,TError]])",
+            "System.Collections.Generic.IEnumerable`1[TResult] Choose[TSource,TResult](System.Collections.Generic.IEnumerable`1[TSource], System.Func`2[TSource,Rezultat.Maybe`1[TResult]])",
+        ];
+
+        Assert.True(type.IsAbstract && type.IsSealed);
+        Assert.Equal(expected.Order(StringComparer.Ordinal), DeclaredMembers(type));
+        AssertUnconstrainedExtensions(type);
+    }
+
+    [Fact]
+    public void Only_read_only_GetOrNone_carries_overload_priority()
+    {
+        var priorities = typeof(MaybeExtensions).GetMethods(DeclaredPublic)
+            .Select(method => (method.ToString()!, method.GetCustomAttribute<System.Runtime.CompilerServices.OverloadResolutionPriorityAttribute>()?.Priority))
+            .Where(entry => entry.Priority is not null)
+            .ToArray();
+
+        var (method, priority) = Assert.Single(priorities);
+        Assert.Contains("IReadOnlyDictionary", method, StringComparison.Ordinal);
+        Assert.Equal(1, priority);
+    }
+
+    [Fact]
+    public void Maybe_Traverse_success_array_is_declared_non_null()
+    {
+        var traverse = typeof(MaybeExtensions).GetMethods(DeclaredPublic)
+            .Single(method => method.Name == nameof(MaybeExtensions.Traverse) && method.ReturnType.GetGenericTypeDefinition() == typeof(Maybe<>));
+        var returned = new NullabilityInfoContext().Create(traverse.ReturnParameter);
+
+        Assert.Equal(NullabilityState.NotNull, returned.GenericTypeArguments[0].ReadState);
     }
 
     [Fact]
@@ -117,9 +168,16 @@ public sealed class PublicSurfaceTests
             "Boolean op_Equality(Rezultat.Maybe`1[T], Rezultat.Maybe`1[T])",
             "Boolean op_Inequality(Rezultat.Maybe`1[T], Rezultat.Maybe`1[T])",
             "Int32 GetHashCode()",
+            "Rezultat.Maybe`1[T] Filter(System.Func`2[T,System.Boolean])",
             "Rezultat.Maybe`1[T] None",
+            "Rezultat.Maybe`1[T] OrElse(System.Func`1[Rezultat.Maybe`1[T]])",
             "Rezultat.Maybe`1[T] Some(T)",
             "Rezultat.Maybe`1[T] get_None()",
+            "Rezultat.Maybe`1[TResult] AndThen[TResult](System.Func`2[T,Rezultat.Maybe`1[TResult]])",
+            "Rezultat.Maybe`1[TResult] Map[TResult](System.Func`2[T,TResult])",
+            "Rezultat.Maybe`1[TResult] Zip[TOther,TResult](Rezultat.Maybe`1[TOther], System.Func`3[T,TOther,TResult])",
+            "Rezultat.Result`2[T,TError] ToResult[TError](TError)",
+            "Rezultat.Result`2[T,TError] ToResultElse[TError](System.Func`1[TError])",
             "System.String ToString()",
             "T ValueOr(T)",
             "T ValueOrElse(System.Func`1[T])",
@@ -172,6 +230,13 @@ public sealed class PublicSurfaceTests
         Assert.False(output.GetCustomAttribute<MaybeNullWhenAttribute>()!.ReturnValue);
         Assert.Null(output.GetCustomAttribute<NotNullWhenAttribute>());
     }
+
+    private static void AssertUnconstrainedExtensions(Type type) =>
+        Assert.All(type.GetMethods(DeclaredPublic), method =>
+        {
+            Assert.True(method.IsDefined(typeof(System.Runtime.CompilerServices.ExtensionAttribute)));
+            Assert.All(method.GetGenericArguments(), argument => Assert.Equal(GenericParameterAttributes.None, argument.GenericParameterAttributes));
+        });
 
     private static string[] DeclaredMembers(Type type) =>
         type.GetMembers(DeclaredPublic)
