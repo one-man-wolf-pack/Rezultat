@@ -27,10 +27,13 @@
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <EmbedUntrackedSources>false</EmbedUntrackedSources>
     <EmbedAllSources>false</EmbedAllSources>
-    <!-- No commit or supported source host exists yet, so a commit-specific mapping cannot be
-         truthful (library-distribution.md, local bootstrap before source binding). Enable it once
-         an agreed host/URL and the exact build commit exist. -->
+    <!-- No supported source host exists yet and local builds may contain uncommitted sources, so
+         neither a Source Link mapping nor an SCM-derived commit (nuspec repository commit,
+         informational version suffix) is truthful (library-distribution.md, local bootstrap before
+         source binding). Enable both once an agreed host/URL exists and artifacts are built from
+         the exact commit. -->
     <EnableSourceLink>false</EnableSourceLink>
+    <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>
   </PropertyGroup>
 
   <!-- Packaged symbols must not carry physical checkout/home roots; Debug keeps physical paths

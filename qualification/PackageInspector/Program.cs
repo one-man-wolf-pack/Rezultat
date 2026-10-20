@@ -74,7 +74,13 @@ internal sealed class Inspection(string packageVersion)
         Check("nuspec carries no invented repository url/commit",
             repository is null || (repository.Attribute("url") is null && repository.Attribute("commit") is null));
 
-        return ReadAll(package.GetEntry($"{LibPath}{PackageId}.dll")!);
+        var dll = ReadAll(package.GetEntry($"{LibPath}{PackageId}.dll")!);
+        var informationalVersion = ReadInformationalVersion(dll);
+        Report("dll informational version", informationalVersion ?? "<none>");
+        Check("dll informational version is the package version without unconfirmed source revision",
+            informationalVersion == packageVersion, informationalVersion);
+
+        return dll;
     }
 
     public void InspectSymbols(string snupkgPath, byte[] dll, string repoRoot)
@@ -226,6 +232,33 @@ internal sealed class Inspection(string packageVersion)
             .ToArray();
 
     private static void Report(string name, string value) => Console.WriteLine($"INFO {name}: {value}");
+
+    private static string? ReadInformationalVersion(byte[] dll)
+    {
+        using var peReader = new PEReader(ImmutableArray.Create(dll));
+        var metadata = peReader.GetMetadataReader();
+        foreach (var handle in metadata.GetAssemblyDefinition().GetCustomAttributes())
+        {
+            var attribute = metadata.GetCustomAttribute(handle);
+            if (attribute.Constructor.Kind != HandleKind.MemberReference)
+            {
+                continue;
+            }
+
+            var parent = metadata.GetMemberReference((MemberReferenceHandle)attribute.Constructor).Parent;
+            if (parent.Kind != HandleKind.TypeReference
+                || metadata.GetString(metadata.GetTypeReference((TypeReferenceHandle)parent).Name) != "AssemblyInformationalVersionAttribute")
+            {
+                continue;
+            }
+
+            var value = metadata.GetBlobReader(attribute.Value);
+            value.ReadUInt16();
+            return value.ReadSerializedString();
+        }
+
+        return null;
+    }
 
     private static byte[] ReadAll(ZipArchiveEntry entry)
     {
