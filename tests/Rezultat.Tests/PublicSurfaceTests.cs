@@ -9,11 +9,11 @@ public sealed class PublicSurfaceTests
         BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
 
     [Fact]
-    public void Assembly_exports_only_result_and_unit()
+    public void Assembly_exports_only_result_result_extensions_and_unit()
     {
         var exported = typeof(Unit).Assembly.GetExportedTypes().Select(type => type.FullName).Order(StringComparer.Ordinal);
 
-        Assert.Equal(["Rezultat.Result`2", "Rezultat.Unit"], exported);
+        Assert.Equal(["Rezultat.ResultExtensions", "Rezultat.Result`2", "Rezultat.Unit"], exported);
     }
 
     [Fact]
@@ -31,16 +31,48 @@ public sealed class PublicSurfaceTests
             "Boolean op_Equality(Rezultat.Result`2[T,TError], Rezultat.Result`2[T,TError])",
             "Boolean op_Inequality(Rezultat.Result`2[T,TError], Rezultat.Result`2[T,TError])",
             "Int32 GetHashCode()",
+            "Rezultat.Result`2[T,TError] Ensure(System.Func`2[T,System.Boolean], System.Func`2[T,TError])",
             "Rezultat.Result`2[T,TError] Error(TError)",
             "Rezultat.Result`2[T,TError] Ok(T)",
+            "Rezultat.Result`2[T,TNewError] MapError[TNewError,TState](TState, System.Func`3[TError,TState,TNewError])",
+            "Rezultat.Result`2[T,TNewError] MapError[TNewError](System.Func`2[TError,TNewError])",
+            "Rezultat.Result`2[T,TNewError] OrElse[TNewError](System.Func`2[TError,Rezultat.Result`2[T,TNewError]])",
+            "Rezultat.Result`2[TResult,TError] AndThen[TResult](System.Func`2[T,Rezultat.Result`2[TResult,TError]])",
+            "Rezultat.Result`2[TResult,TError] Map[TResult](System.Func`2[T,TResult])",
+            "Rezultat.Result`2[TResult,TError] Zip[TOther,TResult](Rezultat.Result`2[TOther,TError], System.Func`3[T,TOther,TResult])",
             "System.String ToString()",
             "TResult Match[TResult](System.Func`2[T,TResult], System.Func`2[TError,TResult])",
         ];
 
         Assert.Equal(expected, DeclaredMembers(typeof(Result<,>)));
+        Assert.All(
+            typeof(Result<,>).GetMethods(DeclaredPublic).SelectMany(method => method.GetGenericArguments()),
+            argument => Assert.Equal(GenericParameterAttributes.None, argument.GenericParameterAttributes));
         Assert.Equal([typeof(IEquatable<Result<int, string>>)], typeof(Result<int, string>).GetInterfaces());
         Assert.True(typeof(Result<,>).IsValueType);
         Assert.NotNull(typeof(Result<,>).GetCustomAttribute<System.Runtime.CompilerServices.IsReadOnlyAttribute>());
+    }
+
+    [Fact]
+    public void ResultExtensions_is_static_and_declares_only_unconstrained_Traverse()
+    {
+        var type = typeof(ResultExtensions);
+        var traverse = type.GetMethod(nameof(ResultExtensions.Traverse))!;
+
+        Assert.True(type.IsAbstract && type.IsSealed);
+        Assert.Equal(
+            ["Rezultat.Result`2[TResult[],TError] Traverse[TSource,TResult,TError](System.Collections.Generic.IEnumerable`1[TSource], System.Func`2[TSource,Rezultat.Result`2[TResult,TError]])"],
+            DeclaredMembers(type));
+        Assert.True(traverse.IsDefined(typeof(System.Runtime.CompilerServices.ExtensionAttribute)));
+        Assert.All(traverse.GetGenericArguments(), argument => Assert.Equal(GenericParameterAttributes.None, argument.GenericParameterAttributes));
+    }
+
+    [Fact]
+    public void Traverse_success_array_is_declared_non_null()
+    {
+        var returned = new NullabilityInfoContext().Create(typeof(ResultExtensions).GetMethod(nameof(ResultExtensions.Traverse))!.ReturnParameter);
+
+        Assert.Equal(NullabilityState.NotNull, returned.GenericTypeArguments[0].ReadState);
     }
 
     [Fact]
