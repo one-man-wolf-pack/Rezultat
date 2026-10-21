@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using Rezultat.Collections;
+using Rezultat.Linq;
 
 namespace Rezultat.Tests;
 
@@ -17,7 +18,8 @@ public sealed class PublicSurfaceTests
         Assert.Equal(
             [
                 "Rezultat.Collections.MaybeCollectionExtensions", "Rezultat.Collections.ResultCollectionExtensions",
-                "Rezultat.Collections.ValidationCollectionExtensions", "Rezultat.Maybe", "Rezultat.MaybeExtensions", "Rezultat.Maybe`1",
+                "Rezultat.Collections.ValidationCollectionExtensions", "Rezultat.Linq.MaybeQueryExtensions", "Rezultat.Linq.ResultQueryExtensions",
+                "Rezultat.Maybe", "Rezultat.MaybeExtensions", "Rezultat.Maybe`1",
                 "Rezultat.PresenceExtensions", "Rezultat.Presence`1", "Rezultat.ResultExtensions", "Rezultat.Result`2", "Rezultat.Unit",
                 "Rezultat.ValidationExtensions", "Rezultat.Validation`2",
             ],
@@ -109,15 +111,52 @@ public sealed class PublicSurfaceTests
     }
 
     [Fact]
-    public void ResultCollectionExtensions_is_static_and_declares_only_unconstrained_Traverse()
+    public void ResultCollectionExtensions_is_static_and_declares_only_unconstrained_Traverse_and_Sequence()
     {
         var type = typeof(ResultCollectionExtensions);
 
         Assert.True(type.IsAbstract && type.IsSealed);
         Assert.Equal(
-            ["Rezultat.Result`2[TResult[],TError] Traverse[TSource,TResult,TError](System.Collections.Generic.IEnumerable`1[TSource], System.Func`2[TSource,Rezultat.Result`2[TResult,TError]])"],
+            [
+                "Rezultat.Result`2[TResult[],TError] Traverse[TSource,TResult,TError](System.Collections.Generic.IEnumerable`1[TSource], System.Func`2[TSource,Rezultat.Result`2[TResult,TError]])",
+                "Rezultat.Result`2[T[],TError] Sequence[T,TError](System.Collections.Generic.IEnumerable`1[Rezultat.Result`2[T,TError]])",
+            ],
             DeclaredMembers(type));
         AssertUnconstrainedExtensions(type);
+        AssertNonNullArrayPayload(type.GetMethod(nameof(ResultCollectionExtensions.Sequence))!);
+    }
+
+    [Fact]
+    public void ResultQueryExtensions_is_static_and_declares_only_unconstrained_Select_and_SelectMany()
+    {
+        var type = typeof(ResultQueryExtensions);
+
+        Assert.True(type.IsAbstract && type.IsSealed);
+        Assert.Equal(
+            [
+                "Rezultat.Result`2[TResult,TError] SelectMany[T,TNext,TResult,TError](Rezultat.Result`2[T,TError], System.Func`2[T,Rezultat.Result`2[TNext,TError]], System.Func`3[T,TNext,TResult])",
+                "Rezultat.Result`2[TResult,TError] Select[T,TResult,TError](Rezultat.Result`2[T,TError], System.Func`2[T,TResult])",
+            ],
+            DeclaredMembers(type));
+        AssertUnconstrainedExtensions(type);
+        Assert.All(type.GetMethods(DeclaredPublic), method => Assert.Equal(MaybeNullable, NullableFlag(method.GetGenericArguments()[0], method)));
+    }
+
+    [Fact]
+    public void MaybeQueryExtensions_is_static_and_declares_only_unconstrained_Select_SelectMany_and_Where()
+    {
+        var type = typeof(MaybeQueryExtensions);
+
+        Assert.True(type.IsAbstract && type.IsSealed);
+        Assert.Equal(
+            [
+                "Rezultat.Maybe`1[TResult] SelectMany[T,TNext,TResult](Rezultat.Maybe`1[T], System.Func`2[T,Rezultat.Maybe`1[TNext]], System.Func`3[T,TNext,TResult])",
+                "Rezultat.Maybe`1[TResult] Select[T,TResult](Rezultat.Maybe`1[T], System.Func`2[T,TResult])",
+                "Rezultat.Maybe`1[T] Where[T](Rezultat.Maybe`1[T], System.Func`2[T,System.Boolean])",
+            ],
+            DeclaredMembers(type));
+        AssertUnconstrainedExtensions(type);
+        Assert.All(type.GetMethods(DeclaredPublic), method => Assert.Equal(MaybeNullable, NullableFlag(method.GetGenericArguments()[0], method)));
     }
 
     [Fact]
@@ -145,9 +184,11 @@ public sealed class PublicSurfaceTests
             "Rezultat.Maybe`1[T] LastOrNone[T](System.Collections.Generic.IEnumerable`1[T], System.Func`2[T,System.Boolean])",
             "Rezultat.Maybe`1[T] SingleOrNone[T](System.Collections.Generic.IEnumerable`1[T])",
             "Rezultat.Maybe`1[T] SingleOrNone[T](System.Collections.Generic.IEnumerable`1[T], System.Func`2[T,System.Boolean])",
+            "Rezultat.Maybe`1[T[]] Sequence[T](System.Collections.Generic.IEnumerable`1[Rezultat.Maybe`1[T]])",
             "Rezultat.Maybe`1[TResult[]] Traverse[TSource,TResult](System.Collections.Generic.IEnumerable`1[TSource], System.Func`2[TSource,Rezultat.Maybe`1[TResult]])",
             "Rezultat.Maybe`1[TValue] GetOrNone[TKey,TValue](System.Collections.Generic.IDictionary`2[TKey,TValue], TKey)",
             "Rezultat.Maybe`1[TValue] GetOrNone[TKey,TValue](System.Collections.Generic.IReadOnlyDictionary`2[TKey,TValue], TKey)",
+            "Rezultat.Result`2[Rezultat.Maybe`1[T],TError] AtMostOne[T,TError](System.Collections.Generic.IEnumerable`1[T], System.Func`1[TError])",
             "System.Collections.Generic.IEnumerable`1[TResult] Choose[TSource,TResult](System.Collections.Generic.IEnumerable`1[TSource], System.Func`2[TSource,Rezultat.Maybe`1[TResult]])",
         ];
 
@@ -176,6 +217,10 @@ public sealed class PublicSurfaceTests
         var returned = new NullabilityInfoContext().Create(traverse.ReturnParameter);
 
         Assert.Equal(NullabilityState.NotNull, returned.GenericTypeArguments[0].ReadState);
+        Assert.Equal(
+            NullabilityState.NotNull,
+            new NullabilityInfoContext().Create(typeof(MaybeCollectionExtensions).GetMethod(nameof(MaybeCollectionExtensions.Sequence))!.ReturnParameter)
+                .GenericTypeArguments[0].ReadState);
     }
 
     [Fact]
@@ -399,18 +444,27 @@ public sealed class PublicSurfaceTests
     }
 
     [Fact]
-    public void ValidationCollectionExtensions_is_static_and_declares_only_unconstrained_Traverse()
+    public void ValidationCollectionExtensions_is_static_and_declares_only_unconstrained_rfc_collection_extensions()
     {
         var type = typeof(ValidationCollectionExtensions);
         var traverse = type.GetMethod(nameof(ValidationCollectionExtensions.Traverse))!;
 
         Assert.True(type.IsAbstract && type.IsSealed);
         Assert.Equal(
-            ["Rezultat.Validation`2[TResult[],TIssue] Traverse[TSource,TResult,TIssue](System.Collections.Generic.IEnumerable`1[TSource], System.Func`2[TSource,Rezultat.Validation`2[TResult,TIssue]])"],
+            [
+                "Rezultat.Validation`2[Rezultat.Unit,TIssue] ValidateAll[T,TIssue](System.Collections.Generic.IEnumerable`1[Rezultat.Validation`2[T,TIssue]])",
+                "Rezultat.Validation`2[Rezultat.Unit,TIssue] ValidateAll[TSource,TValue,TIssue](System.Collections.Generic.IEnumerable`1[TSource], System.Func`2[TSource,Rezultat.Validation`2[TValue,TIssue]])",
+                "Rezultat.Validation`2[TResult[],TIssue] Traverse[TSource,TResult,TIssue](System.Collections.Generic.IEnumerable`1[TSource], System.Func`2[TSource,Rezultat.Validation`2[TResult,TIssue]])",
+                "Rezultat.Validation`2[T[],TIssue] Sequence[T,TIssue](System.Collections.Generic.IEnumerable`1[Rezultat.Validation`2[T,TIssue]])",
+            ],
             DeclaredMembers(type));
         AssertUnconstrainedExtensions(type);
         Assert.Equal(NullabilityState.NotNull, new NullabilityInfoContext().Create(traverse.ReturnParameter).GenericTypeArguments[0].ReadState);
+        AssertNonNullArrayPayload(type.GetMethod(nameof(ValidationCollectionExtensions.Sequence))!);
     }
+
+    private static void AssertNonNullArrayPayload(MethodInfo method) =>
+        Assert.Equal(NullabilityState.NotNull, new NullabilityInfoContext().Create(method.ReturnParameter).GenericTypeArguments[0].ReadState);
 
     private const byte NotNull = 1;
     private const byte MaybeNullable = 2;
