@@ -1,13 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <LangVersion>14.0</LangVersion>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>disable</ImplicitUsings>
     <WarningsAsErrors>$(WarningsAsErrors);nullable</WarningsAsErrors>
     <IsAotCompatible>true</IsAotCompatible>
-    <Deterministic>true</Deterministic>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
@@ -16,37 +11,8 @@
     <PackageId>Rezultat</PackageId>
     <AssemblyName>Rezultat</AssemblyName>
     <RootNamespace>Rezultat</RootNamespace>
-    <Version>0.8.0</Version>
-    <Authors>Zada Zorg</Authors>
-    <Copyright>Copyright (c) 2026 Zada Zorg</Copyright>
     <Description>Result, Maybe, Presence, Validation and Unit outcome carriers with synchronous composition, Maybe/Result and Result/Validation bridges, explicit nullable adaptation, opt-in collection operations and opt-in Result/Maybe query syntax.</Description>
     <PackageTags>result;maybe;option;validation;error-handling</PackageTags>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <IsPackable>true</IsPackable>
-    <DebugType>portable</DebugType>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-    <EmbedUntrackedSources>false</EmbedUntrackedSources>
-    <EmbedAllSources>false</EmbedAllSources>
-    <!-- No supported source host exists yet and local builds may contain uncommitted sources, so
-         neither a Source Link mapping nor an SCM-derived commit (nuspec repository commit,
-         informational version suffix) is truthful (library-distribution.md, local bootstrap before
-         source binding). Enable both once an agreed host/URL exists and artifacts are built from
-         the exact commit. -->
-    <EnableSourceLink>false</EnableSourceLink>
-    <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>
   </PropertyGroup>
-
-  <!-- Packaged symbols must not carry physical checkout/home roots; Debug keeps physical paths
-       because PathMap breaks local source debugging. -->
-  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
-    <PathMap>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../'))=/_/</PathMap>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <None Include="$(MSBuildThisFileDirectory)../../LICENSE" Pack="true" PackagePath="" Visible="false" />
-    <None Include="README.md" Pack="true" PackagePath="" />
-  </ItemGroup>
 
 </Project>
