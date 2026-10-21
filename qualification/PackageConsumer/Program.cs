@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using Rezultat;
 
@@ -92,7 +93,7 @@ checks.That("traverse ready outcomes", new[] { ParseNumber("4"), ParseNumber("5"
 var tracked = new DisposalTracker();
 checks.That("traverse early exit", !TrackedNumbers(tracked).Traverse(ParseNumber).IsSuccess && tracked.Disposed && tracked.Produced == 2);
 checks.Throws<InvalidOperationException>("traverse visited default", () => new[] { 1 }.Traverse(static _ => default(Result<int, string>)));
-checks.Throws<ArgumentNullException>("traverse null selector", () => new[] { 1 }.Traverse<int, int, string>(null!));
+checks.Throws<ArgumentNullException>("traverse null selector", () => ResultExtensions.Traverse<int, int, string>(new[] { 1 }, null!));
 
 var awaited = (await SaveAsync(succeed: true)).Map(static _ => "saved");
 checks.Text("await before map", "Result.Ok(saved)", awaited.ToString());
@@ -259,6 +260,106 @@ checks.Throws<InvalidOperationException>("maybe traverse default selector result
 checks.Text("static owner maybe extensions", "Maybe.Some(1)", MaybeExtensions.FirstOrNone(new[] { 1 }).ToString());
 checks.Text("static owner result extensions", "Maybe.Some(1)", ResultExtensions.ToMaybe(ParseNumber("1")).ToString());
 
+var missingName = Presence<string>.Missing;
+checks.That("presence default is missing", default(Presence<string>) == missingName && new Presence<string>().IsMissing);
+checks.That("presence one flag", Presence<int>.Null is { IsNull: true, IsMissing: false, IsValue: false });
+checks.That("presence zero is value", Presence<int>.Value(0).TryGetValue(out var zeroValue) && zeroValue == 0 && Presence<int>.Value(0) != default);
+checks.That("presence inactive out", !Presence<int>.Null.TryGetValue(out var inactiveNumber) && inactiveNumber == 0);
+if (Presence<string>.Value("ada").TryGetValue(out var presentName))
+{
+    checks.Text("presence value used without null check", "ADA", presentName.ToUpperInvariant());
+}
+else
+{
+    checks.Fail("presence value: unexpected inactive state");
+}
+
+checks.Throws<ArgumentNullException>("presence value null", () => Presence<string>.Value(null!));
+checks.Text("presence match", "null", Presence<int>.Null.Match(FormatNumber, static () => "null", static () => "missing"));
+checks.That("presence match nullable result", Presence<int>.Missing.Match<string?>(static _ => "v", static () => "n", static () => null) is null);
+checks.Text("presence missing text", "Presence.Missing", Presence<Point>.Missing.ToString());
+checks.Text("presence value text", "Presence.Value(Point { X = 1, Y = 2 })", Presence<Point>.Value(new Point(1, 2)).ToString());
+checks.Text("presence nested text", "Presence.Value(Presence.Null)", Presence<Presence<int>>.Value(Presence<int>.Null).ToString());
+checks.That("presence equality", Presence<string>.Value("a") == Presence<string>.Value("a") && Presence<string>.Null != Presence<string>.Missing);
+var presenceLookup = new Dictionary<Presence<int>, string> { [Presence<int>.Missing] = "keep", [Presence<int>.Null] = "clear" };
+checks.Text("presence dictionary key", "clear", presenceLookup[Presence<int>.Null]);
+checks.Text("presence map", "Presence.Value(4)", Presence<string>.Value("ab").Map(static text => text.Length * 2).ToString());
+checks.Text("presence map method group", "Presence.Value(3)", Presence<int>.Value(3).Map(FormatNumber).ToString());
+checks.Text("presence map keeps null", "Presence.Null", Presence<int>.Null.Map(FormatNumber).ToString());
+checks.Throws<InvalidOperationException>("presence map null result", () => Presence<int>.Value(1).Map(static _ => (string)null!));
+checks.Throws<ArgumentNullException>("presence map null selector on missing", () => Presence<int>.Missing.Map<int>(null!));
+var pendingPresence = Presence<int>.Value(1).Map(static async n => { await Task.Yield(); return n + 1; });
+checks.That("presence map async payload", pendingPresence.TryGetValue(out var presenceTask) && await presenceTask == 2);
+checks.That("presence awaited", (await LoadNicknameAsync(found: false)).IsNull);
+checks.Text("public-only presence step", "Presence.Missing", Presence<string>.Value(" ").ThenNonBlank().ToString());
+
+var validNumber = Validation<int, string>.Valid(1);
+checks.That("validation default uninitialized", !default(Validation<int, string>).IsInitialized && default(Validation<int, string>) != Validation<int, string>.Valid(0));
+checks.Throws<InvalidOperationException>("validation default IsValid", () => _ = default(Validation<int, string>).IsValid);
+checks.Throws<InvalidOperationException>("validation default TryGetValue", () => default(Validation<int, string>).TryGetValue(out _, out _));
+checks.That("validation valid empty issues", validNumber.TryGetValue(out var validValue, out var noIssues) && validValue == 1 && !noIssues.IsDefault && noIssues.IsEmpty);
+checks.That("validation valid null", Validation<string?, string>.Valid(null).IsValid);
+checks.That("validation invalid null issue", !Validation<int, string?>.Invalid(null).TryGetValue(out _, out var nullIssues) && nullIssues.Length == 1);
+checks.Throws<ArgumentException>("validation invalid many empty", () => Validation<int, string>.InvalidMany([]));
+checks.That("validation sequence equality", Validation<int, string>.InvalidMany(["a", "b"]) == Validation<int, string>.InvalidMany([.. new List<string> { "a", "b" }]));
+checks.Text("validation invalid text", "Validation.Invalid([a, null, a])", Validation<int, string?>.InvalidMany(["a", null, "a"]).ToString());
+checks.Text("validation valid text", "Validation.Valid(())", Validation<Unit, string>.Valid(Unit.Value).ToString());
+checks.Text("validation uninitialized text", "Validation.Uninitialized", default(Validation<int, int>).ToString());
+checks.That("validation match nullable result", validNumber.Match<string?>(static _ => null, static _ => "x") is null);
+checks.Text("validation match issues", "2", Validation<int, string>.InvalidMany(["a", "b"]).Match(FormatNumber, static issues => FormatNumber(issues.Length)));
+checks.Text("validation zip", "Validation.Valid(1:x)", validNumber.Zip(Validation<string, string>.Valid("x"), static (a, b) => $"{a}:{b}").ToString());
+checks.Text("validation zip accumulates", "Validation.Invalid([a, c])",
+    Validation<int, string>.Invalid("a").Zip(validNumber, Validation<int, string>.Invalid("c"), static (a, b, c) => a + b + c).ToString());
+checks.Text("validation zip four", "Validation.Valid(1-b-True-4)",
+    validNumber.Zip(Validation<string, string>.Valid("b"), Validation<bool, string>.Valid(true), Validation<int, string>.Valid(4), static (a, b, c, d) => $"{a}-{b}-{c}-{d}").ToString());
+checks.Throws<InvalidOperationException>("validation zip default next to invalid", () => Validation<int, string>.Invalid("a").Zip(default(Validation<int, string>), static (a, b) => a + b));
+checks.Text("validation traverse", "Validation.Invalid([not a number: x, not a number: y])", new[] { "1", "x", "y" }.Traverse(CheckNumber).ToString());
+checks.That("validation traverse values", new[] { "1", "2" }.Traverse(CheckNumber).TryGetValue(out var checkedNumbers, out _) && checkedNumbers.Sum() == 3);
+checks.Text("validation traverse ready", "Validation.Invalid([a])", new[] { validNumber, Validation<int, string>.Invalid("a") }.Traverse(static v => v).ToString());
+checks.Text("validation traverse static owner", "Validation.Valid(System.Int32[])", ValidationExtensions.Traverse(new[] { 1 }, static n => Validation<int, string>.Valid(n)).ToString());
+checks.Throws<ArgumentNullException>("validation traverse null selector", () => ValidationExtensions.Traverse<int, int, string>(new[] { 1 }, null!));
+checks.Text("result traverse still binds", "Result.Ok(1)", new[] { "1" }.Traverse(ParseNumber).Map(static a => a.Length).ToString());
+checks.Text("maybe traverse still binds", "Maybe.Some(1)", new[] { "1" }.Traverse(ParseMaybe).Map(static a => a.Length).ToString());
+checks.Text("maybe receiver traverse still binds", "Result.Ok(Maybe.Some(1))", Maybe<string>.Some("1").Traverse(ParseNumber).ToString());
+checks.Text("validation and then", "Validation.Invalid([too large: 7])", CheckNumber("7").AndThen(static n => CheckSmall(n)).ToString());
+checks.Text("validation and then method group", "Validation.Valid(2)", CheckNumber("2").AndThen(CheckSmall).ToString());
+checks.Text("validation or else new issue type", "Validation.Invalid([Failure { Code = 2 }])",
+    Validation<int, string>.InvalidMany(["a", "b"]).OrElse(static issues => Validation<int, Failure>.Invalid(new Failure(issues.Length))).ToString());
+checks.Text("validation or else recovery", "Validation.Valid(0)", CheckNumber("x").OrElse(static _ => Validation<int, Failure>.Valid(0)).ToString());
+var mappedIssues = CheckNumber("x").MapIssues(static issue => issue.Length);
+checks.That("validation map issues changes type", mappedIssues == Validation<int, int>.Invalid(15));
+checks.Text("validation map issues explicit target", "Validation.Invalid([Failure { Code = 1 }])",
+    Validation<int, string>.Invalid("a").MapIssues<object>(static issue => new Failure(issue.Length)).ToString());
+var pendingValidation = validNumber.Zip(validNumber, static async (a, b) => { await Task.Yield(); return a + b; });
+checks.That("validation zip async payload", pendingValidation.TryGetValue(out var validationTask, out _) && await validationTask == 2);
+var awaitedChecks = await Task.WhenAll(CheckNumberAsync("1"), CheckNumberAsync("x"));
+checks.Text("validation awaited before zip", "Validation.Invalid([not a number: x])", awaitedChecks[0].Zip(awaitedChecks[1], static (a, b) => a + b).ToString());
+var validationKeys = new HashSet<Validation<int, string>>(new IgnoreCaseIssuesComparer())
+{
+    Validation<int, string>.Invalid("Name"),
+    Validation<int, string>.Invalid("NAME"),
+    default,
+};
+checks.That("validation external comparer", validationKeys.Count == 2);
+
+var current = new Draft("Ada", 3, "ace");
+checks.That("patch keeps missing fields", Patch(current, Presence<string>.Missing, Presence<int>.Missing, Presence<string>.Missing) == Validation<Draft, string>.Valid(current));
+checks.That("patch keeps zero and clears nickname",
+    Patch(current, Presence<string>.Value("Bob"), Presence<int>.Value(0), Presence<string>.Null) == Validation<Draft, string>.Valid(new Draft("Bob", 0, null)));
+var draftsBuilt = 0;
+var rejectedPatch = Patch(current, Presence<string>.Value(string.Empty), Presence<int>.Value(-1), Presence<string>.Value("new"), () => draftsBuilt++);
+checks.That("patch accumulates independent issues", rejectedPatch == Validation<Draft, string>.InvalidMany(["name: empty", "count: negative"]) && draftsBuilt == 0);
+checks.That("patch null required field", Patch(current, Presence<string>.Null, Presence<int>.Missing, Presence<string>.Missing) == Validation<Draft, string>.Invalid("name: required"));
+checks.Text("patch boundary keeps every issue", "422 name: empty; count: negative", PatchBoundary(rejectedPatch).ToString());
+checks.Text("patch boundary success", "200 Bob/3/ace", PatchBoundary(Patch(current, Presence<string>.Value("Bob"), Presence<int>.Missing, Presence<string>.Missing)).ToString());
+checks.Text("patch dependent check", "Validation.Invalid([name: taken])",
+    Patch(current, Presence<string>.Value("Root"), Presence<int>.Missing, Presence<string>.Missing).AndThen(EnsureAvailable).ToString());
+var asResult = rejectedPatch.Match(Result<Draft, ImmutableArray<string>>.Ok, Result<Draft, ImmutableArray<string>>.Error);
+checks.That("validation match into result keeps issues", !asResult.TryGetValue(out _, out var resultIssues) && resultIssues.Length == 2);
+var otherResult = Patch(current, Presence<string>.Value(string.Empty), Presence<int>.Value(-1), Presence<string>.Missing)
+    .Match(Result<Draft, ImmutableArray<string>>.Ok, Result<Draft, ImmutableArray<string>>.Error);
+checks.That("result does not inherit validation sequence equality", asResult != otherResult);
+
 return checks.Complete();
 
 static Result<int, string> ParseNumber(string text) =>
@@ -312,6 +413,51 @@ static IEnumerable<string> TrackedNumbers(DisposalTracker tracker)
     }
 }
 
+static Validation<int, string> CheckNumber(string text) =>
+    int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number)
+        ? Validation<int, string>.Valid(number)
+        : Validation<int, string>.Invalid($"not a number: {text}");
+
+static Validation<int, string> CheckSmall(int number) =>
+    number < 5 ? Validation<int, string>.Valid(number) : Validation<int, string>.Invalid($"too large: {number}");
+
+static async Task<Validation<int, string>> CheckNumberAsync(string text)
+{
+    await Task.Yield();
+    return CheckNumber(text);
+}
+
+static async Task<Presence<string>> LoadNicknameAsync(bool found)
+{
+    await Task.Yield();
+    return found ? Presence<string>.Value("ace") : Presence<string>.Null;
+}
+
+static Validation<Draft, string> Patch(Draft current, Presence<string> name, Presence<int> count, Presence<string> nickname, Action? onDraft = null)
+{
+    var checkedName = name.Match(
+        static value => value.Length > 0 ? Validation<string, string>.Valid(value) : Validation<string, string>.Invalid("name: empty"),
+        static () => Validation<string, string>.Invalid("name: required"),
+        () => Validation<string, string>.Valid(current.Name));
+    var checkedCount = count.Match(
+        static value => value >= 0 ? Validation<int, string>.Valid(value) : Validation<int, string>.Invalid("count: negative"),
+        static () => Validation<int, string>.Invalid("count: required"),
+        () => Validation<int, string>.Valid(current.Count));
+    var nextNickname = nickname.Match<string?>(static value => value, static () => null, () => current.Nickname);
+    return checkedName.Zip(checkedCount, (validName, validCount) =>
+    {
+        onDraft?.Invoke();
+        return new Draft(validName, validCount, nextNickname);
+    });
+}
+
+static Validation<Draft, string> EnsureAvailable(Draft draft) =>
+    draft.Name == "Root" ? Validation<Draft, string>.Invalid("name: taken") : Validation<Draft, string>.Valid(draft);
+
+static Reply PatchBoundary(Validation<Draft, string> outcome) => outcome.Match(
+    static draft => new Reply(200, $"{draft.Name}/{draft.Count}/{draft.Nickname}"),
+    static issues => new Reply(422, string.Join("; ", issues)));
+
 static string? FindName(int id) => id == 1 ? "Ada" : null;
 
 static Maybe<string> FindUser(int id) => id == 1 ? Maybe<string>.Some("user") : Maybe<string>.None;
@@ -334,6 +480,38 @@ static async Task<Maybe<string>> LoadAsync(bool found)
 internal readonly record struct Point(int X, int Y);
 
 internal sealed record Failure(int Code);
+
+internal sealed record Draft(string Name, int Count, string? Nickname);
+
+internal sealed record Reply(int Status, string Body)
+{
+    public override string ToString() => $"{Status} {Body}";
+}
+
+internal static class PresenceConsumerExtensions
+{
+    public static Presence<string> ThenNonBlank(this Presence<string> presence) =>
+        presence.TryGetValue(out var value) && string.IsNullOrWhiteSpace(value) ? Presence<string>.Missing : presence;
+}
+
+internal sealed class IgnoreCaseIssuesComparer : IEqualityComparer<Validation<int, string>>
+{
+    public bool Equals(Validation<int, string> x, Validation<int, string> y)
+    {
+        if (!x.IsInitialized || !y.IsInitialized)
+        {
+            return x.IsInitialized == y.IsInitialized;
+        }
+
+        var xValid = x.TryGetValue(out var xValue, out var xIssues);
+        var yValid = y.TryGetValue(out var yValue, out var yIssues);
+        return xValid == yValid
+            && (xValid ? xValue == yValue : xIssues.SequenceEqual(yIssues, StringComparer.OrdinalIgnoreCase));
+    }
+
+    public int GetHashCode(Validation<int, string> obj) =>
+        !obj.IsInitialized ? 0 : obj.TryGetValue(out var value, out var issues) ? value : issues.Length;
+}
 
 internal sealed class DisposalTracker
 {

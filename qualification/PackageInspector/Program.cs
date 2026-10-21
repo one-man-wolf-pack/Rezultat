@@ -80,6 +80,14 @@ internal sealed class Inspection(string packageVersion)
         Check("dll informational version is the package version without unconfirmed source revision",
             informationalVersion == packageVersion, informationalVersion);
 
+        var references = ReadAssemblyReferences(dll);
+        Report("dll assembly references", string.Join(", ", references.Select(reference => $"{reference.Name} {reference.Version}")));
+        Check("dll references System.Collections.Immutable from the net10.0 framework",
+            references.Any(reference => reference.Name == "System.Collections.Immutable" && reference.Version.Major == 10));
+        Check("dll references only net10.0 framework assemblies",
+            references.All(reference => reference.Version.Major == 10 && (reference.Name.StartsWith("System.", StringComparison.Ordinal) || reference.Name == "netstandard")),
+            string.Join(", ", references.Select(reference => reference.Name)));
+
         return dll;
     }
 
@@ -232,6 +240,17 @@ internal sealed class Inspection(string packageVersion)
             .ToArray();
 
     private static void Report(string name, string value) => Console.WriteLine($"INFO {name}: {value}");
+
+    private static (string Name, Version Version)[] ReadAssemblyReferences(byte[] dll)
+    {
+        using var peReader = new PEReader(ImmutableArray.Create(dll));
+        var metadata = peReader.GetMetadataReader();
+        return metadata.AssemblyReferences
+            .Select(handle => metadata.GetAssemblyReference(handle))
+            .Select(reference => (metadata.GetString(reference.Name), reference.Version))
+            .Order()
+            .ToArray();
+    }
 
     private static string? ReadInformationalVersion(byte[] dll)
     {

@@ -73,4 +73,31 @@ checks.That("maybe traverse null ok", someNull.Traverse(v => Result<string, stri
 checks.That("maybe traverse null error", someNull.Traverse(v => Result<string, string>.Error(null)) == Result<Maybe<string>, string>.Error(null));
 checks.Throws<ArgumentNullException>("maybe traverse null selector", () => Maybe<string>.None.Traverse<string, string, string>(null));
 
+checks.Throws<ArgumentNullException>("presence value null", () => Presence<string>.Value(null));
+checks.Throws<ArgumentNullException>("presence value empty nullable", () => Presence<int?>.Value(null));
+checks.That("presence value non-empty nullable keeps type", Presence<int?>.Value(1).TryGetValue(out var nullableNumber) && nullableNumber.HasValue);
+checks.Throws<InvalidOperationException>("presence map null result", () => Presence<int>.Value(1).Map(_ => (string)null));
+checks.Throws<InvalidOperationException>("presence map empty nullable result", () => Presence<int>.Value(1).Map(_ => (int?)null));
+checks.That("presence map skips selector on null", Presence<string>.Null.Map<string>(_ => null).IsNull);
+checks.Throws<ArgumentNullException>("presence map null selector", () => Presence<string>.Missing.Map<string>(null));
+checks.Throws<ArgumentNullException>("presence match null handler", () => Presence<string>.Missing.Match(null, () => 0, () => 1));
+checks.That("presence inactive output", !Presence<string>.Null.TryGetValue(out var inactivePresence) && inactivePresence == null);
+checks.Text("presence null text", "Presence.Null", Presence<string>.Null.ToString());
+
+var validNull = Validation<string, string>.Valid(null);
+checks.That("validation valid null", validNull.IsValid && validNull.TryGetValue(out var validNullValue, out var validNullIssues) && validNullValue == null && validNullIssues.IsEmpty);
+var invalidNull = Validation<string, string>.Invalid(null);
+checks.That("validation invalid null", !invalidNull.TryGetValue(out _, out var invalidNullIssues) && invalidNullIssues.Length == 1 && invalidNullIssues[0] == null);
+checks.Text("validation null texts", "Validation.Valid(null) Validation.Invalid([null])", validNull + " " + invalidNull);
+checks.Throws<ArgumentException>("validation invalid many default", () => Validation<string, string>.InvalidMany(default));
+checks.Throws<InvalidOperationException>("validation default match with null handlers", () => default(Validation<string, string>).Match<int>(null, null));
+checks.Throws<ArgumentNullException>("validation null zip selector", () => validNull.Zip<string, string>(validNull, null));
+checks.Throws<ArgumentNullException>("validation null map issues selector on valid", () => validNull.MapIssues<string>(null));
+checks.Throws<ArgumentNullException>("validation null or else fallback on valid", () => validNull.OrElse<string>(null));
+checks.Throws<InvalidOperationException>("validation and then default outcome", () => validNull.AndThen(_ => default(Validation<string, string>)));
+checks.That("validation map issues keeps null", invalidNull.MapIssues(issue => issue) == invalidNull);
+var nullTraverse = new string[] { null, "a" }.Traverse(v => v == null ? Validation<string, string>.Invalid(null) : Validation<string, string>.Valid(v));
+checks.That("validation traverse null issue", nullTraverse == Validation<string[], string>.Invalid(null));
+checks.Throws<ArgumentNullException>("validation traverse null source", () => ((string[])null).Traverse(v => Validation<string, string>.Valid(v)));
+
 return checks.Complete();
