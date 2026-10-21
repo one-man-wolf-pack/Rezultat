@@ -88,6 +88,32 @@ public sealed class ValidationPropertyTests
         validation.AndThen(f).AndThen(g) == validation.AndThen(value => f(value).AndThen(g));
 
     [Property]
+    public bool Map_preserves_identity(Validation<int, int> validation) =>
+        validation.Map(static value => value) == validation;
+
+    [Property]
+    public bool Map_preserves_composition(Validation<int, int> validation, Func<int, int> f, Func<int, int> g) =>
+        validation.Map(f).Map(g) == validation.Map(value => g(f(value)));
+
+    [Property]
+    public bool Map_equals_AndThen_of_valid(Validation<int, int> validation, Func<int, int> f) =>
+        validation.Map(f) == validation.AndThen(value => Validation<int, int>.Valid(f(value)));
+
+    [Property]
+    public bool Ensure_equals_AndThen_of_the_dependent_check(Validation<int, int> validation, Func<int, bool> p, Func<int, int> e) =>
+        validation.Ensure(p, e) == validation.AndThen(value => p(value) ? Validation<int, int>.Valid(value) : Validation<int, int>.Invalid(e(value)));
+
+    [Property]
+    public bool ToResult_keeps_branch_value_and_issue_positions(Validation<int, int> validation) =>
+        validation.ToResult().Match(
+            value => validation == Validation<int, int>.Valid(value),
+            issues => validation == Validation<int, int>.InvalidMany(issues));
+
+    [Property]
+    public bool ToValidation_after_ToResult_of_valid_is_identity(int value) =>
+        Validation<int, int>.Valid(value).ToResult().ToValidation() == Validation<int, ImmutableArray<int>>.Valid(value);
+
+    [Property]
     public bool OrElse_on_invalid_equals_fallback(NonEmptyArray<int> issues, Func<ImmutableArray<int>, Validation<int, int>> fallback)
     {
         ImmutableArray<int> input = [.. issues.Get];

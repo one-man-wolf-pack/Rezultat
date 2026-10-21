@@ -18,7 +18,8 @@ public sealed class PublicSurfaceTests
             [
                 "Rezultat.Collections.MaybeCollectionExtensions", "Rezultat.Collections.ResultCollectionExtensions",
                 "Rezultat.Collections.ValidationCollectionExtensions", "Rezultat.Maybe", "Rezultat.MaybeExtensions", "Rezultat.Maybe`1",
-                "Rezultat.Presence`1", "Rezultat.ResultExtensions", "Rezultat.Result`2", "Rezultat.Unit", "Rezultat.Validation`2",
+                "Rezultat.PresenceExtensions", "Rezultat.Presence`1", "Rezultat.ResultExtensions", "Rezultat.Result`2", "Rezultat.Unit",
+                "Rezultat.ValidationExtensions", "Rezultat.Validation`2",
             ],
             exported);
     }
@@ -40,6 +41,8 @@ public sealed class PublicSurfaceTests
             "Int32 GetHashCode()",
             "Rezultat.Result`2[T,TError] Ensure(System.Func`2[T,System.Boolean], System.Func`2[T,TError])",
             "Rezultat.Result`2[T,TError] Error(TError)",
+            "Rezultat.Result`2[T,TError] Inspect(System.Action`1[T])",
+            "Rezultat.Result`2[T,TError] InspectError(System.Action`1[TError])",
             "Rezultat.Result`2[T,TError] Ok(T)",
             "Rezultat.Result`2[T,TNewError] MapError[TNewError,TState](TState, System.Func`3[TError,TState,TNewError])",
             "Rezultat.Result`2[T,TNewError] MapError[TNewError](System.Func`2[TError,TNewError])",
@@ -61,13 +64,48 @@ public sealed class PublicSurfaceTests
     }
 
     [Fact]
-    public void ResultExtensions_is_static_and_declares_only_unconstrained_ToMaybe()
+    public void ResultExtensions_is_static_and_declares_only_unconstrained_ToMaybe_and_ToValidation()
     {
         var type = typeof(ResultExtensions);
 
         Assert.True(type.IsAbstract && type.IsSealed);
-        Assert.Equal(["Rezultat.Maybe`1[T] ToMaybe[T,TError](Rezultat.Result`2[T,TError])"], DeclaredMembers(type));
+        Assert.Equal(
+            [
+                "Rezultat.Maybe`1[T] ToMaybe[T,TError](Rezultat.Result`2[T,TError])",
+                "Rezultat.Validation`2[T,TError] ToValidation[T,TError](Rezultat.Result`2[T,TError])",
+            ],
+            DeclaredMembers(type));
         AssertUnconstrainedExtensions(type);
+        AssertNullableConstraints(type.GetMethod(nameof(ResultExtensions.ToValidation))!, MaybeNullable, MaybeNullable);
+    }
+
+    [Fact]
+    public void ValidationExtensions_is_root_static_and_declares_only_unconstrained_ToResult()
+    {
+        var type = typeof(ValidationExtensions);
+
+        Assert.Equal("Rezultat", type.Namespace);
+        Assert.True(type.IsAbstract && type.IsSealed);
+        Assert.Equal(
+            ["Rezultat.Result`2[T,System.Collections.Immutable.ImmutableArray`1[TIssue]] ToResult[T,TIssue](Rezultat.Validation`2[T,TIssue])"],
+            DeclaredMembers(type));
+        AssertUnconstrainedExtensions(type);
+        AssertNullableConstraints(type.GetMethod(nameof(ValidationExtensions.ToResult))!, MaybeNullable, MaybeNullable);
+    }
+
+    [Fact]
+    public void PresenceExtensions_is_root_static_and_declares_only_Presence_receiver_Traverse_with_notnull_payloads()
+    {
+        var type = typeof(PresenceExtensions);
+        var traverse = type.GetMethod(nameof(PresenceExtensions.Traverse))!;
+
+        Assert.Equal("Rezultat", type.Namespace);
+        Assert.True(type.IsAbstract && type.IsSealed);
+        Assert.Equal(
+            ["Rezultat.Result`2[Rezultat.Presence`1[TResult],TError] Traverse[T,TResult,TError](Rezultat.Presence`1[T], System.Func`2[T,Rezultat.Result`2[TResult,TError]])"],
+            DeclaredMembers(type));
+        AssertUnconstrainedExtensions(type);
+        AssertNullableConstraints(traverse, NotNull, NotNull, MaybeNullable);
     }
 
     [Fact]
@@ -275,6 +313,9 @@ public sealed class PublicSurfaceTests
             "Rezultat.Presence`1[T] Value(T)",
             "Rezultat.Presence`1[T] get_Missing()",
             "Rezultat.Presence`1[T] get_Null()",
+            "Rezultat.Presence`1[T] FilterToMissing(System.Func`2[T,System.Boolean])",
+            "Rezultat.Presence`1[T] FilterToNull(System.Func`2[T,System.Boolean])",
+            "Rezultat.Presence`1[TResult] AndThen[TResult](System.Func`2[T,Rezultat.Presence`1[TResult]])",
             "Rezultat.Presence`1[TResult] Map[TResult](System.Func`2[T,TResult])",
             "System.String ToString()",
             "TResult Match[TResult](System.Func`2[T,TResult], System.Func`1[TResult], System.Func`1[TResult])",
@@ -287,6 +328,14 @@ public sealed class PublicSurfaceTests
         Assert.False(typeof(Presence<>).IsByRefLike);
         Assert.NotNull(typeof(Presence<>).GetCustomAttribute<System.Runtime.CompilerServices.IsReadOnlyAttribute>());
         Assert.Empty(typeof(Presence<>).GetConstructors());
+    }
+
+    [Fact]
+    public void Presence_projection_results_are_notnull_and_Validation_Map_result_is_unconstrained()
+    {
+        AssertNullableConstraints(typeof(Presence<>).GetMethod(nameof(Presence<int>.AndThen))!, NotNull);
+        AssertNullableConstraints(typeof(Presence<>).GetMethod(nameof(Presence<int>.Map))!, NotNull);
+        AssertNullableConstraints(typeof(Validation<,>).GetMethod(nameof(Validation<int, int>.Map))!, MaybeNullable);
     }
 
     [Fact]
@@ -313,12 +362,14 @@ public sealed class PublicSurfaceTests
             "Boolean op_Equality(Rezultat.Validation`2[T,TIssue], Rezultat.Validation`2[T,TIssue])",
             "Boolean op_Inequality(Rezultat.Validation`2[T,TIssue], Rezultat.Validation`2[T,TIssue])",
             "Int32 GetHashCode()",
+            "Rezultat.Validation`2[T,TIssue] Ensure(System.Func`2[T,System.Boolean], System.Func`2[T,TIssue])",
             "Rezultat.Validation`2[T,TIssue] Invalid(TIssue)",
             "Rezultat.Validation`2[T,TIssue] InvalidMany(System.Collections.Immutable.ImmutableArray`1[TIssue])",
             "Rezultat.Validation`2[T,TIssue] Valid(T)",
             "Rezultat.Validation`2[T,TNewIssue] MapIssues[TNewIssue](System.Func`2[TIssue,TNewIssue])",
             "Rezultat.Validation`2[T,TNewIssue] OrElse[TNewIssue](System.Func`2[System.Collections.Immutable.ImmutableArray`1[TIssue],Rezultat.Validation`2[T,TNewIssue]])",
             "Rezultat.Validation`2[TResult,TIssue] AndThen[TResult](System.Func`2[T,Rezultat.Validation`2[TResult,TIssue]])",
+            "Rezultat.Validation`2[TResult,TIssue] Map[TResult](System.Func`2[T,TResult])",
             "Rezultat.Validation`2[TResult,TIssue] Zip[TB,TC,TD,TResult](Rezultat.Validation`2[TB,TIssue], Rezultat.Validation`2[TC,TIssue], Rezultat.Validation`2[TD,TIssue], System.Func`5[T,TB,TC,TD,TResult])",
             "Rezultat.Validation`2[TResult,TIssue] Zip[TB,TC,TResult](Rezultat.Validation`2[TB,TIssue], Rezultat.Validation`2[TC,TIssue], System.Func`4[T,TB,TC,TResult])",
             "Rezultat.Validation`2[TResult,TIssue] Zip[TOther,TResult](Rezultat.Validation`2[TOther,TIssue], System.Func`3[T,TOther,TResult])",
@@ -360,6 +411,28 @@ public sealed class PublicSurfaceTests
         AssertUnconstrainedExtensions(type);
         Assert.Equal(NullabilityState.NotNull, new NullabilityInfoContext().Create(traverse.ReturnParameter).GenericTypeArguments[0].ReadState);
     }
+
+    private const byte NotNull = 1;
+    private const byte MaybeNullable = 2;
+
+    private static void AssertNullableConstraints(MethodInfo method, params byte[] expected) =>
+        Assert.Equal(expected, method.GetGenericArguments().Select(argument => NullableFlag(argument, method)).ToArray());
+
+    private static byte NullableFlag(Type parameter, MethodInfo method)
+    {
+        var flag = NullableValue(parameter.CustomAttributes, "System.Runtime.CompilerServices.NullableAttribute");
+        for (MemberInfo? owner = method; flag is null && owner is not null; owner = owner.DeclaringType)
+        {
+            flag = NullableValue(owner.CustomAttributes, "System.Runtime.CompilerServices.NullableContextAttribute");
+        }
+
+        return flag ?? 0;
+    }
+
+    private static byte? NullableValue(IEnumerable<CustomAttributeData> attributes, string name) =>
+        attributes.Where(attribute => attribute.AttributeType.FullName == name)
+            .Select(static attribute => attribute.ConstructorArguments[0].Value as byte?)
+            .FirstOrDefault();
 
     private static void AssertUnconstrainedExtensions(Type type) =>
         Assert.All(type.GetMethods(DeclaredPublic), method =>

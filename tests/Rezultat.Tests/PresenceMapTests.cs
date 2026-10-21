@@ -105,6 +105,18 @@ public static class PresenceValues
                 Gen.Constant(Presence<int>.Null),
                 Gen.Choose(-3, 3).Select(Presence<int>.Value))
             .ToArbitrary();
+
+    public static Arbitrary<Func<int, Presence<int>>> Steps() =>
+        (from state in ArbMap.Default.GeneratorFor<Func<int, int>>()
+         from value in ArbMap.Default.GeneratorFor<Func<int, int>>()
+         select (Func<int, Presence<int>>)(input => (state(input) & 3) switch
+         {
+             0 => Presence<int>.Missing,
+             1 => Presence<int>.Null,
+             2 => default,
+             _ => Presence<int>.Value(value(input)),
+         }))
+            .ToArbitrary();
 }
 
 [Properties(Arbitrary = [typeof(PresenceValues)])]
@@ -129,4 +141,29 @@ public sealed class PresencePropertyTests
     [Property]
     public bool Map_preserves_composition(Presence<int> presence, Func<int, int> f, Func<int, int> g) =>
         presence.Map(f).Map(g) == presence.Map(value => g(f(value)));
+
+    [Property]
+    public bool AndThen_has_left_identity(int value, Func<int, Presence<int>> next) =>
+        Presence<int>.Value(value).AndThen(next) == next(value);
+
+    [Property]
+    public bool AndThen_has_right_identity(Presence<int> presence) =>
+        presence.AndThen(Presence<int>.Value) == presence;
+
+    [Property]
+    public bool AndThen_is_associative(Presence<int> presence, Func<int, Presence<int>> f, Func<int, Presence<int>> g) =>
+        presence.AndThen(f).AndThen(g) == presence.AndThen(value => f(value).AndThen(g));
+
+    [Property]
+    public bool Map_equals_AndThen_of_value(Presence<int> presence, Func<int, int> f) =>
+        presence.Map(f) == presence.AndThen(value => Presence<int>.Value(f(value)));
+
+    [Property]
+    public bool Filters_equal_AndThen_with_the_named_state(Presence<int> presence, Func<int, bool> p) =>
+        presence.FilterToMissing(p) == presence.AndThen(value => p(value) ? Presence<int>.Value(value) : Presence<int>.Missing)
+        && presence.FilterToNull(p) == presence.AndThen(value => p(value) ? Presence<int>.Value(value) : Presence<int>.Null);
+
+    [Property]
+    public bool Traverse_of_ok_equals_ok_of_Map(Presence<int> presence, Func<int, int> f) =>
+        presence.Traverse(value => Result<int, string>.Ok(f(value))) == Result<Presence<int>, string>.Ok(presence.Map(f));
 }
