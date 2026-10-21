@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Cases/$(Case).cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Rezultat.Testing.Xunit" Version="$(RezultatPackageVersion)" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
+    <IsTestProject>true</IsTestProject>
+    <XunitV3Version Condition="'$(XunitV3Version)' == ''">4.0.2</XunitV3Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../Shared/RunnerScenarios.cs" Link="RunnerScenarios.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Rezultat.Testing.Xunit" Version="$(RezultatPackageVersion)" />
+    <PackageReference Include="xunit.v3" Version="$(XunitV3Version)" />
+  </ItemGroup>
+
+</Project>
