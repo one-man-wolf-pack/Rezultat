@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>Rezultat.Testing.Xunit</PackageId>
+    <AssemblyName>Rezultat.Testing.Xunit</AssemblyName>
+    <RootNamespace>Rezultat.Testing.Xunit</RootNamespace>
+    <Description>Test-only extracting assertions for Rezultat Result and Validation: ShouldBeOk, ShouldBeError, ShouldBeValid and ShouldBeInvalid return the active payload or fail with an xUnit assertion failure.</Description>
+    <PackageTags>result;validation;testing;assertions;xunit</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Rezultat/Rezultat.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Runtime must flow to consumers: helpers throw FailException from this assembly. Compile and
+         build/analyzer/content assets must not flow, otherwise an xUnit v2 consumer compiles two
+         Xunit.Assert types (CS0433). PrivateAssets="all" would drop the required runtime dependency. -->
+    <PackageReference Include="xunit.v3.assert" PrivateAssets="compile;contentfiles;build;buildmultitargeting;buildtransitive;analyzers" />
+  </ItemGroup>
+
+</Project>
