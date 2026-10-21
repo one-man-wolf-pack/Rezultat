@@ -21,14 +21,17 @@ usage: scripts/qualify.sh <command> [args]
   test [project] [mtp-args...]
                         run own tests of the solution, or of one tests/<project>; other arguments are forwarded
                         to the test platform (select the project when filtering: a project without matches fails)
-  pack                  pack Rezultat and Rezultat.Testing.Xunit (Release) into artifacts/package
+  pack                  pack Rezultat, Rezultat.Testing.Xunit and Rezultat.Analyzers (Release) into artifacts/package
   consumers             package consumers, compiler controls, packaged README examples and package inspection
   assertions            Rezultat.Testing.Xunit consumers, compiler controls, README examples, xUnit v2/v3 runner
                         scenarios and package inspection
+  analyzers             Rezultat.Analyzers package: RZT0001 corpus in warning/error/none/warnings-as-errors modes,
+                        same-named Task/ValueTask wrappers, downstream, packed-library and core-only isolation,
+                        README examples and package inspection
   alloc                 warmed Release allocation controls against the package
   publish <rid>         rooted trimmed and Native AOT publication of the package consumer, then run both
-  all <rid>             check, test, pack, consumers, assertions, alloc, publish
-  linux                 run "all linux-arm64" in the native Linux ARM64/glibc container
+  all <rid>             check, test, pack, consumers, assertions, analyzers, alloc, publish
+  linux [command...]    run a command (default "all linux-arm64") in the native Linux ARM64/glibc container
 EOF
 }
 
@@ -50,10 +53,11 @@ pack() {
     rm -rf "$feed"
     dotnet pack "$root/src/Rezultat" -c Release -o "$feed" -warnaserror
     dotnet pack "$root/src/Rezultat.Testing.Xunit" -c Release -o "$feed" -warnaserror
+    dotnet pack "$root/src/Rezultat.Analyzers" -c Release -o "$feed" -warnaserror
 }
 
 reset_package_cache() {
-    rm -rf "$packages/rezultat" "$packages/rezultat.testing.xunit"
+    rm -rf "$packages/rezultat" "$packages/rezultat.testing.xunit" "$packages/rezultat.analyzers"
     RezultatPackageVersion="$(package_version)"
     export RezultatPackageVersion
 }
@@ -97,6 +101,7 @@ extract_readme_examples() {
     mkdir -p "$snippets"
     awk -v dir="$snippets" '
         /^```csharp$/ { file = sprintf("%s/example%02d.cs", dir, ++count); inside = 1; next }
+        /^```ini$/ { file = sprintf("%s/example%02d.ini", dir, ++count); inside = 1; next }
         /^```$/ { if (inside) close(file); inside = 0; next }
         inside { print > file }
     ' "$readme"
@@ -211,6 +216,61 @@ assertions() {
         "$qualification/assets/XunitV3Consumer-4.0.2/project.assets.json"
 }
 
+analyzer_build() {
+    local label="$1" mode="$2" project="$3" status=0
+    local log="$qualification/analyzer-logs/$label.log" properties=()
+    shift 3
+    while [[ $# -gt 0 && "$1" != -- ]]; do properties+=("$1"); shift; done
+    shift
+    # SDK 10.0.402: the console logger prints each diagnostic twice even with NoSummary, which would fail the
+    # exactly-once check of AnalyzerReports. Return to the console log once it reports every diagnostic once.
+    dotnet build "$project" -c Release --no-incremental -tl:off -noconlog -flp:"logfile=$log;verbosity=minimal;NoSummary" \
+        ${properties[@]+"${properties[@]}"} </dev/null >/dev/null 2>&1 || status=$?
+    dotnet run --project "$root/qualification/AnalyzerReports" -c Release --no-build -- "$label" "$mode" "$status" "$log" "$@" \
+        || { cat "$log"; return 1; }
+}
+
+analyzers() {
+    local q="$root/qualification" library_feed="$qualification/library-feed" snippets="$qualification/analyzer-readme"
+    local corpus=("$q/AnalyzerConsumer" "$q/AnalyzerLibrary")
+    reset_package_cache
+    rm -rf "$qualification/analyzer-logs" "$qualification/analyzer-assets" "$library_feed" "$packages/rezultat.qualification.analyzerlibrary"
+    mkdir -p "$qualification/analyzer-logs" "$qualification/analyzer-assets"
+    build_clean "$q/AnalyzerReports"
+    analyzer_build direct-warning warning "$q/AnalyzerConsumer" -- "${corpus[@]}"
+    cp "$qualification/obj/AnalyzerConsumer/project.assets.json" "$qualification/analyzer-assets/AnalyzerConsumer.json"
+    cp "$qualification/obj/AnalyzerLibrary/project.assets.json" "$qualification/analyzer-assets/AnalyzerLibrary.json"
+    # Build only the consumer: -warnaserror and global properties would otherwise also apply to the referenced
+    # library, whose own RZT0001 is not part of the consumer's severity configuration and would fail these checks.
+    local consumer=("$q/AnalyzerConsumer" -p:BuildProjectReferences=false)
+    analyzer_build direct-error error "${consumer[@]}" -p:RztSeverity=error -- "$q/AnalyzerConsumer"
+    analyzer_build direct-none none "${consumer[@]}" -p:RztSeverity=none -- "$q/AnalyzerConsumer"
+    analyzer_build direct-warnaserror wae "${consumer[@]}" -warnaserror -- "$q/AnalyzerConsumer"
+    analyzer_build direct-treat-warnings-as-errors wae "${consumer[@]}" -p:TreatWarningsAsErrors=true -- "$q/AnalyzerConsumer"
+    analyzer_build direct-rule-as-error error "${consumer[@]}" -p:WarningsAsErrors=RZT0001 -- "$q/AnalyzerConsumer"
+    analyzer_build wrapper-homonyms warning "$q/AnalyzerWrapperHomonyms" -- "$q/AnalyzerLibrary" "$q/AnalyzerWrapperHomonyms"
+    analyzer_build downstream-project warning "$q/AnalyzerDownstream" -- "$q/AnalyzerLibrary" "$q/AnalyzerDownstream"
+    cp "$qualification/obj/AnalyzerDownstream/project.assets.json" "$qualification/analyzer-assets/AnalyzerDownstream.json"
+    dotnet pack "$q/AnalyzerLibrary" -c Release -o "$library_feed" >"$qualification/analyzer-logs/library-pack.log" 2>&1 \
+        || { cat "$qualification/analyzer-logs/library-pack.log"; return 1; }
+    analyzer_build packed-library-consumer warning "$q/AnalyzerPackedConsumer" -- "$q/AnalyzerPackedConsumer"
+    cp "$qualification/obj/AnalyzerPackedConsumer/project.assets.json" "$qualification/analyzer-assets/AnalyzerPackedConsumer.json"
+    analyzer_build core-only warning "$q/AnalyzerCoreOnly" -- "$q/AnalyzerCoreOnly"
+    cp "$qualification/obj/AnalyzerCoreOnly/project.assets.json" "$qualification/analyzer-assets/AnalyzerCoreOnly.json"
+    extract_readme_examples "$packages/rezultat.analyzers/$RezultatPackageVersion/README.md" "$snippets"
+    mv "$snippets"/*.ini "$qualification/analyzer-readme.ini"
+    analyzer_build readme-warning warning "$q/AnalyzerReadmeExamples" -p:SnippetDirectory="$snippets" -- "$snippets"
+    cp "$qualification/analyzer-readme.ini" "$snippets/.editorconfig"
+    analyzer_build readme-editorconfig-error error "$q/AnalyzerReadmeExamples" -p:SnippetDirectory="$snippets" -- "$snippets"
+    build_clean "$q/AnalyzerInspector"
+    dotnet run --project "$q/AnalyzerInspector" -c Release --no-build -- "$root" "$RezultatPackageVersion" \
+        "$feed/Rezultat.Analyzers.$RezultatPackageVersion.nupkg" "$packages" \
+        "$library_feed/Rezultat.Qualification.AnalyzerLibrary.1.0.0.nupkg" \
+        --direct "$qualification/analyzer-assets/AnalyzerConsumer.json" "$qualification/analyzer-assets/AnalyzerLibrary.json" \
+        --absent "$qualification/analyzer-assets/AnalyzerDownstream.json" "$qualification/analyzer-assets/AnalyzerPackedConsumer.json" \
+        "$qualification/analyzer-assets/AnalyzerCoreOnly.json"
+}
+
 alloc() {
     reset_package_cache
     build_clean "$root/qualification/AllocationControls"
@@ -235,7 +295,8 @@ publish() {
 }
 
 linux() {
-    local host_output="$artifacts/linux-arm64" engine
+    local host_output="$artifacts/linux-arm64" engine command=("$@")
+    [[ $# -gt 0 ]] || command=(all linux-arm64)
     engine="$(docker info --format '{{.OSType}}/{{.Architecture}}')"
     if [[ "$engine" != linux/aarch64 && "$engine" != linux/arm64 ]]; then
         echo "native linux/arm64 Docker engine required, found $engine" >&2
@@ -247,7 +308,8 @@ linux() {
         -e HOME=/work/artifacts/home -e DOTNET_CLI_HOME=/work/artifacts/home -e NUGET_PACKAGES=/work/artifacts/nuget \
         -v "$root:/work:ro" -v "$host_output:/work/artifacts" -w /work \
         "$linux_image" \
-        bash -c 'uname -m; ldd --version | head -1; . /etc/os-release; echo "$PRETTY_NAME"; dotnet --version; clang --version | head -1; scripts/qualify.sh all linux-arm64'
+        bash -c 'uname -m; ldd --version | head -1; . /etc/os-release; echo "$PRETTY_NAME"; dotnet --version; clang --version | head -1; scripts/qualify.sh "$@"' \
+        qualify "${command[@]}"
 }
 
 command="${1:-}"
@@ -260,7 +322,8 @@ case "$command" in
     assertions) assertions ;;
     alloc) alloc ;;
     publish) publish "$@" ;;
-    all) check; run_tests; pack; consumers; assertions; alloc; publish "$@" ;;
-    linux) linux ;;
+    analyzers) analyzers ;;
+    all) check; run_tests; pack; consumers; assertions; analyzers; alloc; publish "$@" ;;
+    linux) linux "$@" ;;
     *) usage; exit 2 ;;
 esac

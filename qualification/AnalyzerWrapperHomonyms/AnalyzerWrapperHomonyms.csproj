@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Rezultat" Version="$(RezultatPackageVersion)" />
+    <PackageReference Include="Rezultat.Analyzers" Version="$(RezultatPackageVersion)" PrivateAssets="all" IncludeAssets="analyzers" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../AnalyzerLibrary/AnalyzerLibrary.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="$(SnippetDirectory)/*.cs" Condition="'$(SnippetDirectory)' != ''" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Rezultat" Version="$(RezultatPackageVersion)" />
+    <PackageReference Include="Rezultat.Analyzers" Version="$(RezultatPackageVersion)" PrivateAssets="all" IncludeAssets="analyzers" />
+  </ItemGroup>
+
+</Project>
