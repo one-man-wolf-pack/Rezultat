@@ -7,6 +7,7 @@ feed="$artifacts/package"
 qualification="$artifacts/qualification"
 packages="$qualification/packages"
 linux_image="mcr.microsoft.com/dotnet/sdk:10.0.402-noble-aot"
+. "$root/scripts/release-record.sh"
 
 export DOTNET_NOLOGO=1 DOTNET_CLI_TELEMETRY_OPTOUT=1 TESTINGPLATFORM_TELEMETRY_OPTOUT=1
 
@@ -32,6 +33,10 @@ usage: scripts/qualify.sh <command> [args]
   publish <rid>         rooted trimmed and Native AOT publication of the package consumer, then run both
   all <rid>             check, test, pack, consumers, assertions, analyzers, alloc, publish
   linux [command...]    run a command (default "all linux-arm64") in the native Linux ARM64/glibc container
+  release <commit> <package-id>...
+                        export the committed tree to artifacts/release/<full-commit>, pack it with its own
+                        "linux pack" and write the source record of each named package next to its archives
+  release-controls      release and publish controls in a disposable Git fixture (host Git and Docker)
 EOF
 }
 
@@ -312,6 +317,39 @@ linux() {
         qualify "${command[@]}"
 }
 
+release() {
+    local revision snapshot packages id version found archives record
+    revision="$(git -C "$root" rev-parse --verify --end-of-options "${1:?commit required}^{commit}")" || return 1
+    shift
+    [[ $# -gt 0 ]] || { echo 'at least one package id required' >&2; return 1; }
+    for id in "$@"; do
+        release_known_id "$id" || { echo "Unknown package id: $id" >&2; return 1; }
+    done
+    snapshot="$artifacts/release/$revision"
+    packages="$snapshot/artifacts/linux-arm64/package"
+    rm -rf "$snapshot"
+    mkdir -p "$snapshot"
+    # Build only the exported commit: the working tree may hold modified or untracked inputs, and attributing
+    # them to the commit would make the source record false.
+    git -C "$root" archive "$revision" | tar -x -C "$snapshot"
+    "$snapshot/scripts/qualify.sh" linux pack
+    for id in "$@"; do
+        found=("$packages/$id".[0-9]*.nupkg)
+        [[ ${#found[@]} -eq 1 && -f "${found[0]}" ]] || { echo "Expected one $id package in $packages" >&2; return 1; }
+        version="$(release_nuspec_value "${found[0]}" version)" || return 1
+        archives=("$packages/$id.$version.nupkg")
+        release_has_symbols "$id" && archives+=("$packages/$id.$version.snupkg")
+        record="$packages/$id.$version.record"
+        if ! release_record "$id" "$version" "$revision" "${archives[@]}" >"$record.partial"; then
+            rm -f "$record.partial"
+            echo "No source record written for $id $version." >&2
+            return 1
+        fi
+        mv "$record.partial" "$record"
+        echo "Recorded $id $version from $revision: $record"
+    done
+}
+
 command="${1:-}"
 [[ $# -gt 0 ]] && shift
 case "$command" in
@@ -325,5 +363,7 @@ case "$command" in
     analyzers) analyzers ;;
     all) check; run_tests; pack; consumers; assertions; analyzers; alloc; publish "$@" ;;
     linux) linux "$@" ;;
+    release) release "$@" ;;
+    release-controls) bash "$root/qualification/ReleaseControls/run.sh" "$root" ;;
     *) usage; exit 2 ;;
 esac
