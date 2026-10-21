@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <!-- RS2008: RZT0001 and its release status are owned by the RFC-012 contract; analyzer release
+         tracking files would be a second, unconsumed record of the same diagnostic.
+         RS1004: the contract covers C# only and the package ships the analyzer under analyzers/dotnet/cs;
+         a Visual Basic registration would be an unqualified support claim. -->
+    <NoWarn>$(NoWarn);RS2008;RS1004</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>Rezultat.Analyzers</PackageId>
+    <AssemblyName>Rezultat.Analyzers</AssemblyName>
+    <RootNamespace>Rezultat.Analyzers</RootNamespace>
+    <Description>Opt-in C# compiler diagnostic RZT0001 for a directly discarded Rezultat Result or Validation outcome, including discarded Task/ValueTask outcomes, awaited outcomes and implicit void or Action lambda bodies.</Description>
+    <PackageTags>result;validation;analyzer;roslyn;diagnostics</PackageTags>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <IncludeSymbols>false</IncludeSymbols>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.Common" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="$(TargetPath)" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+  </ItemGroup>
+
+</Project>
