@@ -105,9 +105,62 @@ Console.WriteLine(string.Join(",", new[] { "1", "x", "3" }.Choose(TryParse)));
 | `Rezultat.ValidationExtensions` | `ToResult` |
 | `Rezultat.MaybeExtensions` | `Traverse` over a `Maybe<T>` |
 | `Rezultat.PresenceExtensions` | `Traverse` over a `Presence<T>` with a Result selector |
-| `Rezultat.Collections.ResultCollectionExtensions` | `Traverse` with a Result selector |
-| `Rezultat.Collections.MaybeCollectionExtensions` | `FirstOrNone`, `LastOrNone`, `SingleOrNone`, `ElementAtOrNone`, `GetOrNone`, `Traverse` with a Maybe selector, `Choose` |
-| `Rezultat.Collections.ValidationCollectionExtensions` | `Traverse` with a Validation selector |
+| `Rezultat.Collections.ResultCollectionExtensions` | `Traverse` with a Result selector, `Sequence` |
+| `Rezultat.Collections.MaybeCollectionExtensions` | `FirstOrNone`, `LastOrNone`, `SingleOrNone`, `AtMostOne`, `ElementAtOrNone`, `GetOrNone`, `Traverse` with a Maybe selector, `Sequence`, `Choose` |
+| `Rezultat.Collections.ValidationCollectionExtensions` | `Traverse` with a Validation selector, `Sequence`, `ValidateAll` |
+| `Rezultat.Linq.ResultQueryExtensions` | `Select`, `SelectMany` with a projection |
+| `Rezultat.Linq.MaybeQueryExtensions` | `Select`, `SelectMany` with a projection, `Where` |
+
+### Ready outcomes and multiplicity
+
+`Sequence` combines outcomes that already exist exactly like `Traverse` with an identity selector. `ValidateAll`
+collects only the issues and returns `Validation<Unit, TIssue>` without building an array of the valid values.
+`AtMostOne` turns a second element into an expected error instead of an exception.
+
+```csharp
+using Rezultat;
+using Rezultat.Collections;
+
+Validation<int, string> Check(string text) =>
+    int.TryParse(text, out var value) ? Validation<int, string>.Valid(value) : Validation<int, string>.Invalid($"not a number: {text}");
+
+Result<int, string>[] ready = [Result<int, string>.Ok(1), Result<int, string>.Ok(2)];
+Console.WriteLine(ready.Sequence().Map(static values => values.Sum()));
+Console.WriteLine(new[] { Maybe<int>.Some(1), Maybe<int>.None }.Sequence());
+
+Console.WriteLine(new[] { "1", "x", "y" }.ValidateAll(Check));
+Console.WriteLine(new[] { Check("1"), Check("2") }.ValidateAll());
+
+var admins = new[] { "Ada", "Bob", "Eve" };
+Console.WriteLine(admins.Where(static name => name.StartsWith('A')).AtMostOne(static () => "several admins"));
+Console.WriteLine(admins.AtMostOne(static () => "several admins"));
+```
+
+## Query syntax
+
+`from`, `let`, `select` for Result and Maybe, and `where` for Maybe, are available after `using Rezultat.Linq;`.
+Each later `from` runs only after the previous step succeeded; the first Error or None is the result.
+
+```csharp
+using Rezultat;
+using Rezultat.Linq;
+
+Result<int, string> Parse(string text) =>
+    int.TryParse(text, out var value) ? Result<int, string>.Ok(value) : Result<int, string>.Error($"not a number: {text}");
+
+Maybe<int> Find(int id) => id > 0 ? Maybe<int>.Some(id * 10) : Maybe<int>.None;
+
+var sum =
+    from width in Parse("3")
+    from height in Parse("4")
+    let area = width * height
+    select $"area {area}";
+Console.WriteLine(sum);
+Console.WriteLine(from width in Parse("3") from height in Parse("x") select width * height);
+
+Console.WriteLine(from found in Find(2) where found > 10 select found + 1);
+Console.WriteLine(from found in Find(1) where found > 10 select found + 1);
+```
 
 ## Behavior to know
 
@@ -126,6 +179,15 @@ Console.WriteLine(string.Join(",", new[] { "1", "x", "3" }.Choose(TryParse)));
 - A `Traverse` selector whose carrier type cannot be inferred, such as `null`, `default` or a throwing
   lambda with explicit type arguments, is ambiguous between the Result and Validation overloads. Use a typed
   selector or call the static class directly.
+- `Sequence` behaves exactly like `Traverse` with an identity selector. `ValidateAll` visits every element and
+  stops early only on an exception or an uninitialized Validation; one Invalid keeps its issue array.
+- `AtMostOne` detects the second element without reading it or the rest of the source and calls the error factory
+  only then. Filter first with `Where`; `SingleOrNone` still throws on a second element.
+- Query `select` and `where` are `Map` and `Filter`; `SelectMany` checks its delegates even on Error or None and
+  rejects an uninitialized Result. There is no Result `where`: use `Ensure` with an explicit error. Validation and
+  Presence have no query syntax. Queries run immediately and are not enumerable.
+- The compiler may not report nullable warnings inside query expressions as it does for lambdas; handle nullable
+  values explicitly. If another imported query provider makes a call ambiguous, call the static class directly.
 - For a type implementing both dictionary interfaces, `GetOrNone` prefers the `IReadOnlyDictionary` overload;
   callers compiled with C# 12 or earlier may get an ambiguity error instead.
 - `default` of `Result` and `Validation` is uninitialized: `IsInitialized` is false and reading its branch or payload

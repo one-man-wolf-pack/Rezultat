@@ -9,9 +9,11 @@ composition with `Inspect`/`InspectError` observers, Maybe composition, Maybe/Re
 fallible `PresenceExtensions.Traverse`), and accumulating Validation composition (`Map`, dependent `Ensure`, `Zip`
 for 2–4 inputs, `AndThen`, `OrElse`, `MapIssues`) over `System.Collections.Immutable.ImmutableArray<TIssue>`
 issues, all in the `Rezultat` namespace. Operations over BCL collections are opt-in through
-`using Rezultat.Collections;`: `ResultCollectionExtensions.Traverse`, `ValidationCollectionExtensions.Traverse`
-and `MaybeCollectionExtensions` (`FirstOrNone`, `LastOrNone`, `SingleOrNone`, `ElementAtOrNone`, `GetOrNone`,
-`Traverse`, lazy `Choose`).
+`using Rezultat.Collections;`: `ResultCollectionExtensions` (`Traverse`, `Sequence`), `ValidationCollectionExtensions`
+(`Traverse`, `Sequence`, issue-only `ValidateAll`) and `MaybeCollectionExtensions` (`FirstOrNone`, `LastOrNone`,
+`SingleOrNone`, `AtMostOne`, `ElementAtOrNone`, `GetOrNone`, `Traverse`, `Sequence`, lazy `Choose`). Query syntax for
+Result and Maybe is opt-in through `using Rezultat.Linq;`: `ResultQueryExtensions` (`Select`, projected `SelectMany`)
+and `MaybeQueryExtensions` (`Select`, projected `SelectMany`, `Where`).
 
 The consumer-facing package README is `src/Rezultat/README.md`; it is packed into the `.nupkg` root and its
 `csharp` examples are compiled and run against the built package.
@@ -47,7 +49,7 @@ Linux container outputs are kept separately in `artifacts/linux-arm64`.
 
 | Path | Content |
 | --- | --- |
-| `src/Rezultat` | The core library and package; collection extensions in `Collections/`, consumer `README.md`. |
+| `src/Rezultat` | The core library and package; collection extensions in `Collections/`, query extensions in `Linq/`, consumer `README.md`. |
 | `tests/Rezultat.Tests` | Own behavioral and property tests (xUnit v3, FsCheck). |
 | `qualification/` | Package consumers, compiler controls, README examples, allocation controls and package inspector; outside the solution and restored only from the built package. |
 | `scripts/qualify.sh` | Command adapter over native `dotnet` and Docker. |
