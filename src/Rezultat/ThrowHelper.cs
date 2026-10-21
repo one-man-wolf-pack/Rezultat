@@ -14,12 +14,20 @@ internal static class ThrowHelper
         throw new InvalidOperationException($"The Result returned by {callback} is uninitialized; create it with Ok or Error.");
 
     [DoesNotReturn]
+    public static void ThrowUninitializedResultElement() =>
+        throw new InvalidOperationException("The sequence contains an uninitialized Result; create it with Ok or Error.");
+
+    [DoesNotReturn]
     public static void ThrowUninitializedValidation() =>
         throw new InvalidOperationException("The Validation is uninitialized; create it with Valid, Invalid or InvalidMany.");
 
     [DoesNotReturn]
     public static void ThrowUninitializedReturnedValidation(string callback) =>
         throw new InvalidOperationException($"The Validation returned by {callback} is uninitialized; create it with Valid, Invalid or InvalidMany.");
+
+    [DoesNotReturn]
+    public static void ThrowUninitializedValidationElement() =>
+        throw new InvalidOperationException("The sequence contains an uninitialized Validation; create it with Valid, Invalid or InvalidMany.");
 
     [DoesNotReturn]
     public static void ThrowEmptyIssues(string paramName) =>

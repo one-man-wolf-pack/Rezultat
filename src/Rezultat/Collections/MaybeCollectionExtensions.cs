@@ -154,6 +154,34 @@ public static class MaybeCollectionExtensions
     }
 
     /// <summary>
+    /// Ok(None) for an empty source and Ok(Some) of the exact first element for one element, even a
+    /// <see langword="null"/> one. On a second element returns the Error from one <paramref name="errorFactory"/>
+    /// call; the second element is detected by MoveNext only, without reading it or the rest of the sequence. The
+    /// factory is not called for zero or one element. Source, factory and Dispose exceptions propagate unchanged.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="source"/> or <paramref name="errorFactory"/> is null, checked in that order before enumeration.
+    /// </exception>
+    public static Result<Maybe<T>, TError> AtMostOne<T, TError>(this IEnumerable<T> source, Func<TError> errorFactory)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(errorFactory);
+        using var enumerator = source.GetEnumerator();
+        if (!enumerator.MoveNext())
+        {
+            return Result<Maybe<T>, TError>.Ok(Maybe<T>.None);
+        }
+
+        var first = enumerator.Current;
+        if (enumerator.MoveNext())
+        {
+            return Result<Maybe<T>, TError>.Error(errorFactory());
+        }
+
+        return Result<Maybe<T>, TError>.Ok(Maybe<T>.Some(first));
+    }
+
+    /// <summary>
     /// None for no match, Some for exactly one match, even a <see langword="null"/> one. Matches are counted per
     /// element, not per distinct value; enumeration stops at the second match, which throws.
     /// </summary>
@@ -277,6 +305,19 @@ public static class MaybeCollectionExtensions
         }
 
         return Maybe<TResult[]>.Some(values.ToArray());
+    }
+
+    /// <summary>
+    /// Enumerates <paramref name="source"/> once, in order, and stops at the first None, including a
+    /// <c>default</c> element, returning None without a partial array. Otherwise returns Some with a new array of the
+    /// payloads in source order, including <see langword="null"/> ones. The enumerator is disposed as by
+    /// <see langword="foreach"/>; exceptions of the source and Dispose propagate unchanged.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> is null, checked before enumeration.</exception>
+    public static Maybe<T[]> Sequence<T>(this IEnumerable<Maybe<T>> source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        return source.Traverse(static item => item);
     }
 
     /// <summary>
