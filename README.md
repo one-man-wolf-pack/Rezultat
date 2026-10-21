@@ -2,12 +2,16 @@
 
 Implementation of the Rezultat core library: the `Rezultat` NuGet package with `Result<T, TError>`,
 `Maybe<T>`, `Presence<T>`, `Validation<T, TIssue>` and `Unit` for `net10.0`, including synchronous Result
-and Maybe composition, collection operations (`ResultExtensions.Traverse`; `MaybeExtensions` lookups
-`FirstOrNone`, `LastOrNone`, `SingleOrNone`, `ElementAtOrNone`, `GetOrNone`, plus `Traverse` and lazy
-`Choose`), Maybe/Result bridges (`ToResult`, `ToResultElse`, `ToMaybe`, Maybe-receiver `Traverse`),
-explicit nullable adaptation through `Maybe.FromNullable`, strict Presence `Map`, and accumulating
-Validation composition (`Zip` for 2–4 inputs, `AndThen`, `OrElse`, `MapIssues` and
-`ValidationExtensions.Traverse`) over `System.Collections.Immutable.ImmutableArray<TIssue>` issues.
+and Maybe composition, Maybe/Result bridges (`ToResult`, `ToResultElse`, `ResultExtensions.ToMaybe`,
+Maybe-receiver `MaybeExtensions.Traverse`), explicit nullable adaptation through `Maybe.FromNullable`, strict
+Presence `Map`, and accumulating Validation composition (`Zip` for 2–4 inputs, `AndThen`, `OrElse`,
+`MapIssues`) over `System.Collections.Immutable.ImmutableArray<TIssue>` issues, all in the `Rezultat` namespace. Operations over BCL collections are opt-in through
+`using Rezultat.Collections;`: `ResultCollectionExtensions.Traverse`, `ValidationCollectionExtensions.Traverse`
+and `MaybeCollectionExtensions` (`FirstOrNone`, `LastOrNone`, `SingleOrNone`, `ElementAtOrNone`, `GetOrNone`,
+`Traverse`, lazy `Choose`).
+
+The consumer-facing package README is `src/Rezultat/README.md`; it is packed into the `.nupkg` root and its
+`csharp` examples are compiled and run against the built package.
 
 Contracts, decisions and policies live in the specification repository
 (`../rezultat-specification`): carrier behavior in `rfc/`, technical mapping in `realization/`,
@@ -26,7 +30,7 @@ All recurring operations go through `scripts/qualify.sh`; run it without argumen
 scripts/qualify.sh check                 # format verification, warning-free Release build
 scripts/qualify.sh test                  # own tests; extra arguments go to the test platform
 scripts/qualify.sh pack                  # artifacts/package/Rezultat.<version>.nupkg and .snupkg
-scripts/qualify.sh consumers             # package consumers, compiler controls, package inspection
+scripts/qualify.sh consumers             # package consumers, compiler controls, README examples, package inspection
 scripts/qualify.sh alloc                 # warmed Release allocation controls
 scripts/qualify.sh publish <host-rid>    # rooted trimmed and Native AOT consumer publication and run
 scripts/qualify.sh linux                 # everything above inside the Linux ARM64/glibc SDK container
@@ -40,9 +44,9 @@ Linux container outputs are kept separately in `artifacts/linux-arm64`.
 
 | Path | Content |
 | --- | --- |
-| `src/Rezultat` | The core library and package. |
+| `src/Rezultat` | The core library and package; collection extensions in `Collections/`, consumer `README.md`. |
 | `tests/Rezultat.Tests` | Own behavioral and property tests (xUnit v3, FsCheck). |
-| `qualification/` | Package consumers, compiler controls, allocation controls and package inspector; outside the solution and restored only from the built package. |
+| `qualification/` | Package consumers, compiler controls, README examples, allocation controls and package inspector; outside the solution and restored only from the built package. |
 | `scripts/qualify.sh` | Command adapter over native `dotnet` and Docker. |
 
 ## License
