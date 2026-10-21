@@ -2,13 +2,20 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-version="${1:?usage: scripts/publish-local.sh <0.y.z> [package-directory] [feed-directory]}"
+usage='usage: scripts/publish-local.sh [--package Rezultat|Rezultat.Testing.Xunit] <0.y.z> [package-directory] [feed-directory]'
+id=Rezultat
+if [[ "${1:-}" == --package ]]; then
+    id="${2:?$usage}"
+    shift 2
+fi
+version="${1:?$usage}"
 packages="${2:-$root/artifacts/linux-arm64/package}"
 feed="${3:-${REZULTAT_LOCAL_FEED:-$HOME/.local/share/nuget/rezultat}}"
 
+[[ "$id" == Rezultat || "$id" == Rezultat.Testing.Xunit ]] || { echo "Unknown package id: $id. $usage" >&2; exit 1; }
 [[ "$version" =~ ^0\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || { echo 'Expected a private 0.y.z version.' >&2; exit 1; }
-package="$packages/Rezultat.$version.nupkg"
-symbols="$packages/Rezultat.$version.snupkg"
+package="$packages/$id.$version.nupkg"
+symbols="$packages/$id.$version.snupkg"
 [[ -f "$package" && -f "$symbols" ]] || { echo "Both qualified package artifacts are required in $packages." >&2; exit 1; }
 
 mkdir -p "$feed/symbols"
