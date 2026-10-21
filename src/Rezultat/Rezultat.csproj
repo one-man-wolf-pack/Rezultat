@@ -16,10 +16,10 @@
     <PackageId>Rezultat</PackageId>
     <AssemblyName>Rezultat</AssemblyName>
     <RootNamespace>Rezultat</RootNamespace>
-    <Version>0.4.0</Version>
+    <Version>0.5.0</Version>
     <Authors>Zada Zorg</Authors>
     <Copyright>Copyright (c) 2026 Zada Zorg</Copyright>
-    <Description>Result, Maybe and Unit carriers with synchronous Result and Maybe composition, Maybe collection lookup and traversal, Maybe/Result bridges and explicit nullable adaptation.</Description>
+    <Description>Result, Maybe, Presence, Validation and Unit carriers with synchronous composition, accumulating Validation composition and traversal, Maybe collection lookup and traversal, Maybe/Result bridges and explicit nullable adaptation.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <IsPackable>true</IsPackable>
     <DebugType>portable</DebugType>

@@ -1,11 +1,13 @@
 # Rezultat
 
 Implementation of the Rezultat core library: the `Rezultat` NuGet package with `Result<T, TError>`,
-`Maybe<T>` and `Unit` for `net10.0`, including synchronous Result and Maybe composition,
-collection operations (`ResultExtensions.Traverse`; `MaybeExtensions` lookups `FirstOrNone`,
-`LastOrNone`, `SingleOrNone`, `ElementAtOrNone`, `GetOrNone`, plus `Traverse` and lazy `Choose`),
-Maybe/Result bridges (`ToResult`, `ToResultElse`, `ToMaybe`, Maybe-receiver `Traverse`) and
-explicit nullable adaptation through `Maybe.FromNullable`.
+`Maybe<T>`, `Presence<T>`, `Validation<T, TIssue>` and `Unit` for `net10.0`, including synchronous Result
+and Maybe composition, collection operations (`ResultExtensions.Traverse`; `MaybeExtensions` lookups
+`FirstOrNone`, `LastOrNone`, `SingleOrNone`, `ElementAtOrNone`, `GetOrNone`, plus `Traverse` and lazy
+`Choose`), Maybe/Result bridges (`ToResult`, `ToResultElse`, `ToMaybe`, Maybe-receiver `Traverse`),
+explicit nullable adaptation through `Maybe.FromNullable`, strict Presence `Map`, and accumulating
+Validation composition (`Zip` for 2–4 inputs, `AndThen`, `OrElse`, `MapIssues` and
+`ValidationExtensions.Traverse`) over `System.Collections.Immutable.ImmutableArray<TIssue>` issues.
 
 Contracts, decisions and policies live in the specification repository
 (`../rezultat-specification`): carrier behavior in `rfc/`, technical mapping in `realization/`,
