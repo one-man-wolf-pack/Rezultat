@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 
-namespace Rezultat;
+namespace Rezultat.Collections;
 
-public static class ValidationExtensions
+public static class ValidationCollectionExtensions
 {
     /// <summary>
     /// Enumerates <paramref name="source"/> once, in order, invoking <paramref name="selector"/> once per visited
