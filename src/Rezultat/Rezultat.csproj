@@ -16,10 +16,10 @@
     <PackageId>Rezultat</PackageId>
     <AssemblyName>Rezultat</AssemblyName>
     <RootNamespace>Rezultat</RootNamespace>
-    <Version>0.6.0</Version>
+    <Version>0.7.0</Version>
     <Authors>Zada Zorg</Authors>
     <Copyright>Copyright (c) 2026 Zada Zorg</Copyright>
-    <Description>Result, Maybe, Presence, Validation and Unit outcome carriers with synchronous composition, Maybe/Result bridges, explicit nullable adaptation and opt-in collection operations.</Description>
+    <Description>Result, Maybe, Presence, Validation and Unit outcome carriers with synchronous composition, Maybe/Result and Result/Validation bridges, explicit nullable adaptation and opt-in collection operations.</Description>
     <PackageTags>result;maybe;option;validation;error-handling</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

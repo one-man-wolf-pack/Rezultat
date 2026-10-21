@@ -2,10 +2,13 @@
 
 Implementation of the Rezultat core library: the `Rezultat` NuGet package with `Result<T, TError>`,
 `Maybe<T>`, `Presence<T>`, `Validation<T, TIssue>` and `Unit` for `net10.0`, including synchronous Result
-and Maybe composition, Maybe/Result bridges (`ToResult`, `ToResultElse`, `ResultExtensions.ToMaybe`,
-Maybe-receiver `MaybeExtensions.Traverse`), explicit nullable adaptation through `Maybe.FromNullable`, strict
-Presence `Map`, and accumulating Validation composition (`Zip` for 2–4 inputs, `AndThen`, `OrElse`,
-`MapIssues`) over `System.Collections.Immutable.ImmutableArray<TIssue>` issues, all in the `Rezultat` namespace. Operations over BCL collections are opt-in through
+composition with `Inspect`/`InspectError` observers, Maybe composition, Maybe/Result bridges (`ToResult`,
+`ToResultElse`, `ResultExtensions.ToMaybe`, Maybe-receiver `MaybeExtensions.Traverse`), Result/Validation bridges
+(`ResultExtensions.ToValidation`, `ValidationExtensions.ToResult`), explicit nullable adaptation through
+`Maybe.FromNullable`, Presence composition (strict `Map`, `AndThen`, `FilterToMissing`, `FilterToNull` and
+fallible `PresenceExtensions.Traverse`), and accumulating Validation composition (`Map`, dependent `Ensure`, `Zip`
+for 2–4 inputs, `AndThen`, `OrElse`, `MapIssues`) over `System.Collections.Immutable.ImmutableArray<TIssue>`
+issues, all in the `Rezultat` namespace. Operations over BCL collections are opt-in through
 `using Rezultat.Collections;`: `ResultCollectionExtensions.Traverse`, `ValidationCollectionExtensions.Traverse`
 and `MaybeCollectionExtensions` (`FirstOrNone`, `LastOrNone`, `SingleOrNone`, `ElementAtOrNone`, `GetOrNone`,
 `Traverse`, lazy `Choose`).

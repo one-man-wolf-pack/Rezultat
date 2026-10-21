@@ -14,7 +14,8 @@ dotnet add package Rezultat
 
 ## Carriers and composition
 
-`using Rezultat;` brings the carriers, `Maybe.FromNullable` and the bridges between Maybe and Result.
+`using Rezultat;` brings the carriers, `Maybe.FromNullable`, the bridges between Maybe, Result and Validation and
+the fallible `Presence` projection.
 
 ```csharp
 using Rezultat;
@@ -45,6 +46,32 @@ Console.WriteLine(person);
 
 Validation issues are an `ImmutableArray<TIssue>`; `Zip` keeps the issues of every invalid input in order.
 
+### Observation, dependent checks and bridges
+
+```csharp
+using System.Collections.Immutable;
+using Rezultat;
+
+Result<int, string> Parse(string text) =>
+    int.TryParse(text, out var value) ? Result<int, string>.Ok(value) : Result<int, string>.Error($"not a number: {text}");
+
+var parsed = Parse("x")
+    .Inspect(static value => Console.WriteLine($"parsed {value}"))
+    .InspectError(static error => Console.WriteLine($"rejected: {error}"));
+
+Validation<ushort, string> port = Parse("70000").ToValidation()
+    .Ensure(static value => value <= 65535, static value => $"port {value} is out of range")
+    .Map(static value => (ushort)value);
+Result<ushort, ImmutableArray<string>> checkedPort = port.ToResult();
+Console.WriteLine($"{parsed} {port} {checkedPort.IsSuccess}");
+
+Presence<string> field = Presence<string>.Value("8080");
+Result<Presence<int>, string> update = field.FilterToNull(static text => text.Length > 0).Traverse(Parse);
+Presence<int> positive = Presence<string>.Value("-1").AndThen(static text =>
+    int.TryParse(text, out var value) ? Presence<int>.Value(value) : Presence<int>.Missing).FilterToMissing(static value => value > 0);
+Console.WriteLine($"{update} {positive} {Presence<string>.Null.Traverse(Parse)}");
+```
+
 ## Collection operations
 
 Operations over `IEnumerable<T>`, `IDictionary<TKey, TValue>` and `IReadOnlyDictionary<TKey, TValue>` are in a
@@ -74,13 +101,25 @@ Console.WriteLine(string.Join(",", new[] { "1", "x", "3" }.Choose(TryParse)));
 
 | Static class | Operations |
 | --- | --- |
-| `Rezultat.ResultExtensions` | `ToMaybe` |
+| `Rezultat.ResultExtensions` | `ToMaybe`, `ToValidation` |
+| `Rezultat.ValidationExtensions` | `ToResult` |
 | `Rezultat.MaybeExtensions` | `Traverse` over a `Maybe<T>` |
+| `Rezultat.PresenceExtensions` | `Traverse` over a `Presence<T>` with a Result selector |
 | `Rezultat.Collections.ResultCollectionExtensions` | `Traverse` with a Result selector |
 | `Rezultat.Collections.MaybeCollectionExtensions` | `FirstOrNone`, `LastOrNone`, `SingleOrNone`, `ElementAtOrNone`, `GetOrNone`, `Traverse` with a Maybe selector, `Choose` |
 | `Rezultat.Collections.ValidationCollectionExtensions` | `Traverse` with a Validation selector |
 
 ## Behavior to know
+
+- `Ensure` is a dependent check: it runs only on a valid value and adds one issue. Chained `Ensure` calls stop at
+  the first Invalid; independent checks accumulate through `Zip` or the collection `Traverse`.
+- `Inspect`, `InspectError` and the Presence filters return the carrier as it was before the callback, even if the
+  callback reassigns the variable it was called on; a mutable payload object is still shared, not copied.
+  `Inspect` takes an `Action`: an `async` lambda becomes `async void`, so await asynchronous observation explicitly.
+- Callbacks are checked for `null` even on the branch that does not invoke them.
+- `ToValidation` keeps the error as one issue, even when it is a collection. `ToResult` keeps the issue array itself
+  and compares it with `ImmutableArray` equality, so `ToResult` followed by `ToValidation` is not a round trip.
+- `Presence.Traverse` and `Presence.Map` reject a `null` result instead of turning it into Null or Missing.
 
 - Result and Maybe `Traverse` stop at the first failure; Validation `Traverse` visits every element and
   accumulates the issues. All three enumerate the source once and return a new array. `Choose` is lazy.
