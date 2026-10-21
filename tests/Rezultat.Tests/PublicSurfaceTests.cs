@@ -9,12 +9,15 @@ public sealed class PublicSurfaceTests
         BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
 
     [Fact]
-    public void Assembly_exports_only_result_maybe_and_unit_types()
+    public void Assembly_exports_only_rfc_types()
     {
         var exported = typeof(Unit).Assembly.GetExportedTypes().Select(type => type.FullName).Order(StringComparer.Ordinal);
 
         Assert.Equal(
-            ["Rezultat.Maybe", "Rezultat.MaybeExtensions", "Rezultat.Maybe`1", "Rezultat.ResultExtensions", "Rezultat.Result`2", "Rezultat.Unit"],
+            [
+                "Rezultat.Maybe", "Rezultat.MaybeExtensions", "Rezultat.Maybe`1", "Rezultat.Presence`1", "Rezultat.ResultExtensions",
+                "Rezultat.Result`2", "Rezultat.Unit", "Rezultat.ValidationExtensions", "Rezultat.Validation`2",
+            ],
             exported);
     }
 
@@ -229,6 +232,114 @@ public sealed class PublicSurfaceTests
 
         Assert.False(output.GetCustomAttribute<MaybeNullWhenAttribute>()!.ReturnValue);
         Assert.Null(output.GetCustomAttribute<NotNullWhenAttribute>());
+    }
+
+    [Fact]
+    public void Presence_declares_only_rfc_members()
+    {
+        string[] expected =
+        [
+            "Boolean Equals(Rezultat.Presence`1[T])",
+            "Boolean Equals(System.Object)",
+            "Boolean IsMissing",
+            "Boolean IsNull",
+            "Boolean IsValue",
+            "Boolean TryGetValue(T ByRef)",
+            "Boolean get_IsMissing()",
+            "Boolean get_IsNull()",
+            "Boolean get_IsValue()",
+            "Boolean op_Equality(Rezultat.Presence`1[T], Rezultat.Presence`1[T])",
+            "Boolean op_Inequality(Rezultat.Presence`1[T], Rezultat.Presence`1[T])",
+            "Int32 GetHashCode()",
+            "Rezultat.Presence`1[T] Missing",
+            "Rezultat.Presence`1[T] Null",
+            "Rezultat.Presence`1[T] Value(T)",
+            "Rezultat.Presence`1[T] get_Missing()",
+            "Rezultat.Presence`1[T] get_Null()",
+            "Rezultat.Presence`1[TResult] Map[TResult](System.Func`2[T,TResult])",
+            "System.String ToString()",
+            "TResult Match[TResult](System.Func`2[T,TResult], System.Func`1[TResult], System.Func`1[TResult])",
+        ];
+
+        Assert.Equal(expected.Order(StringComparer.Ordinal), DeclaredMembers(typeof(Presence<>)));
+        Assert.Equal(GenericParameterAttributes.None, typeof(Presence<>).GetGenericArguments()[0].GenericParameterAttributes);
+        Assert.Equal([typeof(IEquatable<Presence<int>>)], typeof(Presence<int>).GetInterfaces());
+        Assert.True(typeof(Presence<>).IsValueType);
+        Assert.False(typeof(Presence<>).IsByRefLike);
+        Assert.NotNull(typeof(Presence<>).GetCustomAttribute<System.Runtime.CompilerServices.IsReadOnlyAttribute>());
+        Assert.Empty(typeof(Presence<>).GetConstructors());
+    }
+
+    [Fact]
+    public void Presence_TryGetValue_output_is_not_null_only_when_true()
+    {
+        var output = typeof(Presence<>).GetMethod(nameof(Presence<int>.TryGetValue))!.GetParameters()[0];
+
+        Assert.False(output.GetCustomAttribute<MaybeNullWhenAttribute>()!.ReturnValue);
+        Assert.True(output.GetCustomAttribute<NotNullWhenAttribute>()!.ReturnValue);
+    }
+
+    [Fact]
+    public void Validation_declares_only_rfc_members()
+    {
+        string[] expected =
+        [
+            "Boolean Equals(Rezultat.Validation`2[T,TIssue])",
+            "Boolean Equals(System.Object)",
+            "Boolean IsInitialized",
+            "Boolean IsValid",
+            "Boolean TryGetValue(T ByRef, System.Collections.Immutable.ImmutableArray`1[TIssue] ByRef)",
+            "Boolean get_IsInitialized()",
+            "Boolean get_IsValid()",
+            "Boolean op_Equality(Rezultat.Validation`2[T,TIssue], Rezultat.Validation`2[T,TIssue])",
+            "Boolean op_Inequality(Rezultat.Validation`2[T,TIssue], Rezultat.Validation`2[T,TIssue])",
+            "Int32 GetHashCode()",
+            "Rezultat.Validation`2[T,TIssue] Invalid(TIssue)",
+            "Rezultat.Validation`2[T,TIssue] InvalidMany(System.Collections.Immutable.ImmutableArray`1[TIssue])",
+            "Rezultat.Validation`2[T,TIssue] Valid(T)",
+            "Rezultat.Validation`2[T,TNewIssue] MapIssues[TNewIssue](System.Func`2[TIssue,TNewIssue])",
+            "Rezultat.Validation`2[T,TNewIssue] OrElse[TNewIssue](System.Func`2[System.Collections.Immutable.ImmutableArray`1[TIssue],Rezultat.Validation`2[T,TNewIssue]])",
+            "Rezultat.Validation`2[TResult,TIssue] AndThen[TResult](System.Func`2[T,Rezultat.Validation`2[TResult,TIssue]])",
+            "Rezultat.Validation`2[TResult,TIssue] Zip[TB,TC,TD,TResult](Rezultat.Validation`2[TB,TIssue], Rezultat.Validation`2[TC,TIssue], Rezultat.Validation`2[TD,TIssue], System.Func`5[T,TB,TC,TD,TResult])",
+            "Rezultat.Validation`2[TResult,TIssue] Zip[TB,TC,TResult](Rezultat.Validation`2[TB,TIssue], Rezultat.Validation`2[TC,TIssue], System.Func`4[T,TB,TC,TResult])",
+            "Rezultat.Validation`2[TResult,TIssue] Zip[TOther,TResult](Rezultat.Validation`2[TOther,TIssue], System.Func`3[T,TOther,TResult])",
+            "System.String ToString()",
+            "TResult Match[TResult](System.Func`2[T,TResult], System.Func`2[System.Collections.Immutable.ImmutableArray`1[TIssue],TResult])",
+        ];
+
+        Assert.Equal(expected.Order(StringComparer.Ordinal), DeclaredMembers(typeof(Validation<,>)));
+        Assert.All(typeof(Validation<,>).GetGenericArguments(), argument => Assert.Equal(GenericParameterAttributes.None, argument.GenericParameterAttributes));
+        Assert.All(
+            typeof(Validation<,>).GetMethods(DeclaredPublic).SelectMany(method => method.GetGenericArguments()),
+            argument => Assert.Equal(GenericParameterAttributes.None, argument.GenericParameterAttributes));
+        Assert.Equal([typeof(IEquatable<Validation<int, string>>)], typeof(Validation<int, string>).GetInterfaces());
+        Assert.True(typeof(Validation<,>).IsValueType);
+        Assert.False(typeof(Validation<,>).IsByRefLike);
+        Assert.NotNull(typeof(Validation<,>).GetCustomAttribute<System.Runtime.CompilerServices.IsReadOnlyAttribute>());
+        Assert.Empty(typeof(Validation<,>).GetConstructors());
+    }
+
+    [Fact]
+    public void Validation_TryGetValue_only_value_output_is_maybe_null_when_false()
+    {
+        var parameters = typeof(Validation<,>).GetMethod(nameof(Validation<int, int>.TryGetValue))!.GetParameters();
+
+        Assert.False(parameters[0].GetCustomAttribute<MaybeNullWhenAttribute>()!.ReturnValue);
+        Assert.DoesNotContain(parameters[1].GetCustomAttributes(), attribute => attribute.GetType().Namespace == typeof(MaybeNullWhenAttribute).Namespace);
+    }
+
+    [Fact]
+    public void ValidationExtensions_is_static_and_declares_only_unconstrained_Traverse()
+    {
+        var type = typeof(ValidationExtensions);
+        var traverse = type.GetMethod(nameof(ValidationExtensions.Traverse))!;
+
+        Assert.True(type.IsAbstract && type.IsSealed);
+        Assert.Equal(
+            ["Rezultat.Validation`2[TResult[],TIssue] Traverse[TSource,TResult,TIssue](System.Collections.Generic.IEnumerable`1[TSource], System.Func`2[TSource,Rezultat.Validation`2[TResult,TIssue]])"],
+            DeclaredMembers(type));
+        AssertUnconstrainedExtensions(type);
+        Assert.Equal(NullabilityState.NotNull, new NullabilityInfoContext().Create(traverse.ReturnParameter).GenericTypeArguments[0].ReadState);
     }
 
     private static void AssertUnconstrainedExtensions(Type type) =>
