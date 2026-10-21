@@ -1,3 +1,5 @@
+using Rezultat.Collections;
+
 namespace Rezultat.Tests;
 
 public sealed class ResultTraverseTests
@@ -6,7 +8,7 @@ public sealed class ResultTraverseTests
     public void Null_source_is_rejected_before_selector()
     {
         var exception = Assert.Throws<ArgumentNullException>(
-            () => ResultExtensions.Traverse<int, int, string>(null!, null!));
+            () => ResultCollectionExtensions.Traverse<int, int, string>(null!, null!));
 
         Assert.Equal("source", exception.ParamName);
     }
@@ -16,7 +18,7 @@ public sealed class ResultTraverseTests
     {
         var source = new TrackedSequence<int>();
 
-        var exception = Assert.Throws<ArgumentNullException>(() => ResultExtensions.Traverse<int, int, string>(source, null!));
+        var exception = Assert.Throws<ArgumentNullException>(() => ResultCollectionExtensions.Traverse<int, int, string>(source, null!));
 
         Assert.Equal("selector", exception.ParamName);
         Assert.Equal(0, source.Enumerations);
@@ -153,7 +155,7 @@ public sealed class ResultTraverseTests
         var thrown = new OperationCanceledException();
         var source = new TrackedSequence<int>(1, 2) { PoisonFrom = 1 };
 
-        var observed = Assert.Throws<OperationCanceledException>(() => ResultExtensions.Traverse<int, int, string>(source, _ => throw thrown));
+        var observed = Assert.Throws<OperationCanceledException>(() => ResultCollectionExtensions.Traverse<int, int, string>(source, _ => throw thrown));
 
         Assert.Same(thrown, observed);
         Assert.Equal(1, source.Disposals);

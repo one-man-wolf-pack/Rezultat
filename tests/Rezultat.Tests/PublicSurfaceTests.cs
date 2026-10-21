@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
+using Rezultat.Collections;
 
 namespace Rezultat.Tests;
 
@@ -15,8 +16,9 @@ public sealed class PublicSurfaceTests
 
         Assert.Equal(
             [
-                "Rezultat.Maybe", "Rezultat.MaybeExtensions", "Rezultat.Maybe`1", "Rezultat.Presence`1", "Rezultat.ResultExtensions",
-                "Rezultat.Result`2", "Rezultat.Unit", "Rezultat.ValidationExtensions", "Rezultat.Validation`2",
+                "Rezultat.Collections.MaybeCollectionExtensions", "Rezultat.Collections.ResultCollectionExtensions",
+                "Rezultat.Collections.ValidationCollectionExtensions", "Rezultat.Maybe", "Rezultat.MaybeExtensions", "Rezultat.Maybe`1",
+                "Rezultat.Presence`1", "Rezultat.ResultExtensions", "Rezultat.Result`2", "Rezultat.Unit", "Rezultat.Validation`2",
             ],
             exported);
     }
@@ -59,24 +61,43 @@ public sealed class PublicSurfaceTests
     }
 
     [Fact]
-    public void ResultExtensions_is_static_and_declares_only_unconstrained_Traverse_and_ToMaybe()
+    public void ResultExtensions_is_static_and_declares_only_unconstrained_ToMaybe()
     {
         var type = typeof(ResultExtensions);
 
         Assert.True(type.IsAbstract && type.IsSealed);
+        Assert.Equal(["Rezultat.Maybe`1[T] ToMaybe[T,TError](Rezultat.Result`2[T,TError])"], DeclaredMembers(type));
+        AssertUnconstrainedExtensions(type);
+    }
+
+    [Fact]
+    public void ResultCollectionExtensions_is_static_and_declares_only_unconstrained_Traverse()
+    {
+        var type = typeof(ResultCollectionExtensions);
+
+        Assert.True(type.IsAbstract && type.IsSealed);
         Assert.Equal(
-            [
-                "Rezultat.Maybe`1[T] ToMaybe[T,TError](Rezultat.Result`2[T,TError])",
-                "Rezultat.Result`2[TResult[],TError] Traverse[TSource,TResult,TError](System.Collections.Generic.IEnumerable`1[TSource], System.Func`2[TSource,Rezultat.Result`2[TResult,TError]])",
-            ],
+            ["Rezultat.Result`2[TResult[],TError] Traverse[TSource,TResult,TError](System.Collections.Generic.IEnumerable`1[TSource], System.Func`2[TSource,Rezultat.Result`2[TResult,TError]])"],
             DeclaredMembers(type));
         AssertUnconstrainedExtensions(type);
     }
 
     [Fact]
-    public void MaybeExtensions_is_static_and_declares_only_rfc_extensions()
+    public void MaybeExtensions_is_static_and_declares_only_unconstrained_Maybe_receiver_Traverse()
     {
         var type = typeof(MaybeExtensions);
+
+        Assert.True(type.IsAbstract && type.IsSealed);
+        Assert.Equal(
+            ["Rezultat.Result`2[Rezultat.Maybe`1[TResult],TError] Traverse[T,TResult,TError](Rezultat.Maybe`1[T], System.Func`2[T,Rezultat.Result`2[TResult,TError]])"],
+            DeclaredMembers(type));
+        AssertUnconstrainedExtensions(type);
+    }
+
+    [Fact]
+    public void MaybeCollectionExtensions_is_static_and_declares_only_rfc_collection_extensions()
+    {
+        var type = typeof(MaybeCollectionExtensions);
         string[] expected =
         [
             "Rezultat.Maybe`1[T] ElementAtOrNone[T](System.Collections.Generic.IEnumerable`1[T], Int32)",
@@ -89,7 +110,6 @@ public sealed class PublicSurfaceTests
             "Rezultat.Maybe`1[TResult[]] Traverse[TSource,TResult](System.Collections.Generic.IEnumerable`1[TSource], System.Func`2[TSource,Rezultat.Maybe`1[TResult]])",
             "Rezultat.Maybe`1[TValue] GetOrNone[TKey,TValue](System.Collections.Generic.IDictionary`2[TKey,TValue], TKey)",
             "Rezultat.Maybe`1[TValue] GetOrNone[TKey,TValue](System.Collections.Generic.IReadOnlyDictionary`2[TKey,TValue], TKey)",
-            "Rezultat.Result`2[Rezultat.Maybe`1[TResult],TError] Traverse[T,TResult,TError](Rezultat.Maybe`1[T], System.Func`2[T,Rezultat.Result`2[TResult,TError]])",
             "System.Collections.Generic.IEnumerable`1[TResult] Choose[TSource,TResult](System.Collections.Generic.IEnumerable`1[TSource], System.Func`2[TSource,Rezultat.Maybe`1[TResult]])",
         ];
 
@@ -101,7 +121,7 @@ public sealed class PublicSurfaceTests
     [Fact]
     public void Only_read_only_GetOrNone_carries_overload_priority()
     {
-        var priorities = typeof(MaybeExtensions).GetMethods(DeclaredPublic)
+        var priorities = typeof(MaybeCollectionExtensions).GetMethods(DeclaredPublic)
             .Select(method => (method.ToString()!, method.GetCustomAttribute<System.Runtime.CompilerServices.OverloadResolutionPriorityAttribute>()?.Priority))
             .Where(entry => entry.Priority is not null)
             .ToArray();
@@ -114,8 +134,7 @@ public sealed class PublicSurfaceTests
     [Fact]
     public void Maybe_Traverse_success_array_is_declared_non_null()
     {
-        var traverse = typeof(MaybeExtensions).GetMethods(DeclaredPublic)
-            .Single(method => method.Name == nameof(MaybeExtensions.Traverse) && method.ReturnType.GetGenericTypeDefinition() == typeof(Maybe<>));
+        var traverse = typeof(MaybeCollectionExtensions).GetMethod(nameof(MaybeCollectionExtensions.Traverse))!;
         var returned = new NullabilityInfoContext().Create(traverse.ReturnParameter);
 
         Assert.Equal(NullabilityState.NotNull, returned.GenericTypeArguments[0].ReadState);
@@ -124,7 +143,7 @@ public sealed class PublicSurfaceTests
     [Fact]
     public void Traverse_success_array_is_declared_non_null()
     {
-        var returned = new NullabilityInfoContext().Create(typeof(ResultExtensions).GetMethod(nameof(ResultExtensions.Traverse))!.ReturnParameter);
+        var returned = new NullabilityInfoContext().Create(typeof(ResultCollectionExtensions).GetMethod(nameof(ResultCollectionExtensions.Traverse))!.ReturnParameter);
 
         Assert.Equal(NullabilityState.NotNull, returned.GenericTypeArguments[0].ReadState);
     }
@@ -329,10 +348,10 @@ public sealed class PublicSurfaceTests
     }
 
     [Fact]
-    public void ValidationExtensions_is_static_and_declares_only_unconstrained_Traverse()
+    public void ValidationCollectionExtensions_is_static_and_declares_only_unconstrained_Traverse()
     {
-        var type = typeof(ValidationExtensions);
-        var traverse = type.GetMethod(nameof(ValidationExtensions.Traverse))!;
+        var type = typeof(ValidationCollectionExtensions);
+        var traverse = type.GetMethod(nameof(ValidationCollectionExtensions.Traverse))!;
 
         Assert.True(type.IsAbstract && type.IsSealed);
         Assert.Equal(

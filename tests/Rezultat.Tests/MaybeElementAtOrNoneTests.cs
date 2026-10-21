@@ -1,3 +1,5 @@
+using Rezultat.Collections;
+
 namespace Rezultat.Tests;
 
 public sealed class MaybeElementAtOrNoneTests

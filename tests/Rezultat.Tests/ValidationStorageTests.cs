@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Runtime.InteropServices;
+using Rezultat.Collections;
 
 namespace Rezultat.Tests;
 

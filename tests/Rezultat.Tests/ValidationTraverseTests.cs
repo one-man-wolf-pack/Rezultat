@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Rezultat.Collections;
 
 namespace Rezultat.Tests;
 
@@ -8,7 +9,7 @@ public sealed class ValidationTraverseTests
     public void Null_source_is_rejected_before_selector()
     {
         var exception = Assert.Throws<ArgumentNullException>(
-            () => ValidationExtensions.Traverse<int, int, string>(null!, null!));
+            () => ValidationCollectionExtensions.Traverse<int, int, string>(null!, null!));
 
         Assert.Equal("source", exception.ParamName);
     }
@@ -18,7 +19,7 @@ public sealed class ValidationTraverseTests
     {
         var source = new TrackedSequence<int>();
 
-        var exception = Assert.Throws<ArgumentNullException>(() => ValidationExtensions.Traverse<int, int, string>(source, null!));
+        var exception = Assert.Throws<ArgumentNullException>(() => ValidationCollectionExtensions.Traverse<int, int, string>(source, null!));
 
         Assert.Equal("selector", exception.ParamName);
         Assert.Equal(0, source.Enumerations);
