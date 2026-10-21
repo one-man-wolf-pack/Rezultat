@@ -20,9 +20,16 @@ assertions `ResultAssertions.ShouldBeOk`/`ShouldBeError` and `ValidationAssertio
 over the `Rezultat` package. It throws `Xunit.Sdk.FailException` from `xunit.v3.assert`, a runtime-only
 dependency, and is qualified with xUnit v2 and v3 test projects.
 
-The consumer-facing package READMEs are `src/Rezultat/README.md` and `src/Rezultat.Testing.Xunit/README.md`; each is
-packed into its `.nupkg` root and its `csharp` examples are compiled and run against the built package. Both packages
-share the version and packaging settings in `src/Directory.Build.props`.
+The optional compile-time package `Rezultat.Analyzers` (`src/Rezultat.Analyzers`) is a `netstandard2.0` Roslyn
+analyzer built against the Roslyn 4.14 API with one diagnostic, `RZT0001`, for a directly discarded `Result` or
+`Validation` (including `Task`/`ValueTask` of one, awaited outcomes and implicit void/`Action` lambda bodies). It is
+packed as an analyzer-only `analyzers/dotnet/cs` asset without dependencies or symbols package, connected with
+`PrivateAssets="all" IncludeAssets="analyzers"` and qualified with the .NET SDK 10.0.402 command line.
+
+The consumer-facing package READMEs are `src/Rezultat/README.md`, `src/Rezultat.Testing.Xunit/README.md` and
+`src/Rezultat.Analyzers/README.md`; each is packed into its `.nupkg` root and its `csharp` examples are compiled against
+the built package (and run, or checked for the `RZT0001` lines they mark). All packages share the version and
+packaging settings in `src/Directory.Build.props`.
 
 Contracts, decisions and policies live in the specification repository
 (`../rezultat-specification`): carrier behavior in `rfc/`, technical mapping in `realization/`,
@@ -43,29 +50,35 @@ All recurring operations go through `scripts/qualify.sh`; run it without argumen
 scripts/qualify.sh check                 # format verification, warning-free Release build
 scripts/qualify.sh test                  # own tests of the solution; extra arguments go to the test platform
 scripts/qualify.sh test Rezultat.Tests --filter-class Rezultat.Tests.ResultMapTests   # one test project, filtered
-scripts/qualify.sh pack                  # artifacts/package/{Rezultat,Rezultat.Testing.Xunit}.<version>.nupkg and .snupkg
+scripts/qualify.sh pack                  # artifacts/package/{Rezultat,Rezultat.Testing.Xunit}.<version>.nupkg/.snupkg, Rezultat.Analyzers.<version>.nupkg
 scripts/qualify.sh consumers             # package consumers, compiler controls, README examples, package inspection
 scripts/qualify.sh assertions            # assertion package consumers, xUnit v2/v3 runner scenarios, package inspection
+scripts/qualify.sh analyzers             # RZT0001 corpus in all severity modes, downstream isolation, README, package inspection
 scripts/qualify.sh alloc                 # warmed Release allocation controls
 scripts/qualify.sh publish <host-rid>    # rooted trimmed and Native AOT consumer publication and run
 scripts/qualify.sh linux                 # everything above inside the Linux ARM64/glibc SDK container
+scripts/qualify.sh linux analyzers       # one command inside the same container
 ```
 
-`consumers`, `assertions`, `alloc` and `publish` consume the packages from `artifacts/package` through
+`consumers`, `assertions`, `analyzers`, `alloc` and `publish` consume the packages from `artifacts/package` through
 `qualification/NuGet.Config` and an isolated package folder, so run `pack` first.
 Linux container outputs are kept separately in `artifacts/linux-arm64`. `assertions` runs expected-failure
-fixtures on purpose and checks the native reports kept in `artifacts/qualification/runner-reports`.
+fixtures on purpose and checks the native reports kept in `artifacts/qualification/runner-reports`. `analyzers`
+compares every diagnostic of each build with the markers in the checked sources: `/*ID*/` expects the diagnostic at
+the following token (the next line's first token when the marker stands alone), a trailing `// ID` anywhere on its
+line. Build logs are kept in `artifacts/qualification/analyzer-logs`.
 
 ## Local releases
 
 The durable local feed defaults to `$HOME/.local/share/nuget/rezultat`, outside checkout,
 build outputs and NuGet caches. `REZULTAT_LOCAL_FEED` or the third command argument can
 select another directory. Publish the existing qualified Linux artifacts of one package
-(`Rezultat` by default, or `--package Rezultat.Testing.Xunit`):
+(`Rezultat` by default, `--package Rezultat.Testing.Xunit` or `--package Rezultat.Analyzers`):
 
 ```sh
 scripts/publish-local.sh 0.8.0
 scripts/publish-local.sh --package Rezultat.Testing.Xunit 0.8.0
+scripts/publish-local.sh --package Rezultat.Analyzers 0.8.0
 # Explicit inputs/destination:
 scripts/publish-local.sh 0.8.0 artifacts/linux-arm64/package /absolute/path/to/rezultat-feed
 ```
@@ -77,7 +90,8 @@ different bytes and is refused; keep the issued one and publish only the package
 different bytes under an issued version fail. The command copies without repacking and
 publishes read-only files with atomic no-replace names. Do not use `dotnet nuget push`
 directly to this directory: its local-folder path can overwrite a version. Keep this feed
-when cleaning build outputs. The `symbols/` directory retains matching `.snupkg` files;
+when cleaning build outputs. `Rezultat.Analyzers` is published as its `.nupkg` alone. The `symbols/` directory
+retains matching `.snupkg` files;
 it is an archive, not a symbol server or Source Link support claim.
 
 Register the feed for ordinary local CLI/IDE use:
@@ -110,7 +124,9 @@ For example, merge these entries with the project's existing sources/mappings:
 
 Consumers reference the package, not its source project. An exact first-release reference
 is `<PackageReference Include="Rezultat" Version="[0.8.0]" />`; projects with central package
-management put the version on their `PackageVersion` entry. Consumer repositories own the
+management put the version on their `PackageVersion` entry. The analyzer is referenced per checked project as
+`<PackageReference Include="Rezultat.Analyzers" Version="0.8.0" PrivateAssets="all" IncludeAssets="analyzers" />`;
+it does not bring `Rezultat` and is not brought by it. Consumer repositories own the
 switch and qualification of their API, adapters and deployment profiles.
 
 ## Layout
@@ -119,8 +135,9 @@ switch and qualification of their API, adapters and deployment profiles.
 | --- | --- |
 | `src/Rezultat` | The core library and package; collection extensions in `Collections/`, query extensions in `Linq/`, consumer `README.md`. |
 | `src/Rezultat.Testing.Xunit` | The test-only assertions package and its consumer `README.md`. |
-| `tests/Rezultat.Tests`, `tests/Rezultat.Testing.Xunit.Tests` | Own behavioral and property tests (xUnit v3, FsCheck). |
-| `qualification/` | Package consumers, compiler controls, README examples, xUnit v2/v3 runner consumers and report checks, allocation controls and package inspector; outside the solution and restored only from the built packages. |
+| `src/Rezultat.Analyzers` | The `RZT0001` analyzer package and its consumer `README.md`. |
+| `tests/Rezultat.Tests`, `tests/Rezultat.Testing.Xunit.Tests`, `tests/Rezultat.Analyzers.Tests` | Own behavioral and property tests (xUnit v3, FsCheck) and in-process Roslyn analyzer tests. |
+| `qualification/` | Package consumers, compiler controls, README examples, xUnit v2/v3 runner consumers and report checks, analyzer corpus/isolation consumers and diagnostic report checks, allocation controls and package inspectors; outside the solution and restored only from the built packages. |
 | `scripts/qualify.sh` | Command adapter over native `dotnet` and Docker. |
 
 ## License
