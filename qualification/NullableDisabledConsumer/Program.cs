@@ -101,4 +101,16 @@ var nullTraverse = new string[] { null, "a" }.Traverse(v => v == null ? Validati
 checks.That("validation traverse null issue", nullTraverse == Validation<string[], string>.Invalid(null));
 checks.Throws<ArgumentNullException>("validation traverse null source", () => ((string[])null).Traverse(v => Validation<string, string>.Valid(v)));
 
+checks.Throws<InvalidOperationException>("presence traverse oblivious ok null", () => Presence<string>.Value("a").Traverse(_ => Result<string, string>.Ok(null)));
+checks.That("presence traverse error null", Presence<string>.Value("a").Traverse(_ => Result<string, string>.Error(null)) == Result<Presence<string>, string>.Error(null));
+checks.Throws<ArgumentNullException>("presence traverse null selector on null", () => Presence<string>.Null.Traverse<string, string, string>(null));
+checks.Throws<ArgumentNullException>("presence and then oblivious value null", () => Presence<string>.Value("a").AndThen(_ => Presence<string>.Value(null)));
+checks.Throws<ArgumentNullException>("presence filter null predicate on missing", () => Presence<string>.Missing.FilterToNull(null));
+checks.That("inspect null payload", okNull.Inspect(v => checks.That("inspect receives null", v == null)) == okNull);
+checks.Throws<ArgumentNullException>("inspect error null action on success", () => okNull.InspectError(null));
+checks.That("to validation null error", errorNull.ToValidation() == Validation<string, string>.Invalid(null));
+checks.That("to result null issue", invalidNull.ToResult().TryGetValue(out _, out var bridgedNullIssues) == false && bridgedNullIssues[0] == null);
+checks.That("validation map null payload", validNull.Map(v => v == null) == Validation<bool, string>.Valid(true));
+checks.That("validation ensure null issue", validNull.Ensure(v => v != null, _ => null) == Validation<string, string>.Invalid(null));
+
 return checks.Complete();

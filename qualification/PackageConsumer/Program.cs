@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using Rezultat;
 using Rezultat.Collections;
 
@@ -364,7 +365,53 @@ var otherResult = Patch(current, Presence<string>.Value(string.Empty), Presence<
     .Match(Result<Draft, ImmutableArray<string>>.Ok, Result<Draft, ImmutableArray<string>>.Error);
 checks.That("result does not inherit validation sequence equality", asResult != otherResult);
 
+var inspected = new List<string>();
+var inspectedReceiver = ParseNumber("5");
+checks.Text("inspect returns snapshot", "Result.Ok(5)",
+    inspectedReceiver.Inspect(n => { inspected.Add(FormatNumber(n)); inspectedReceiver = ParseNumber("x"); }).InspectError(inspected.Add).ToString());
+checks.Text("inspect error", "Result.Error(not a number: x)", ParseNumber("x").Inspect(n => inspected.Add(FormatNumber(n))).InspectError(inspected.Add).ToString());
+checks.Text("inspect selected branch only", "5|not a number: x", string.Join("|", inspected));
+checks.Throws<ArgumentNullException>("inspect null action on inactive branch", () => ParseNumber("x").Inspect(null!));
+checks.Throws<InvalidOperationException>("inspect uninitialized before action guard", () => default(Result<int, string>).InspectError(null!));
+checks.Text("validation map", "Validation.Valid(2)", CheckNumber("1").Map(static n => n * 2).ToString());
+checks.Text("validation map keeps issues", "Validation.Invalid([not a number: x])", CheckNumber("x").Map(static n => n * 2).ToString());
+checks.Text("validation ensure", "Validation.Invalid([too large: 7])", CheckNumber("7").Ensure(static n => n < 5, static n => $"too large: {n}").ToString());
+checks.Text("validation ensure is dependent", "Validation.Invalid([not a number: x])",
+    CheckNumber("x").Ensure(static n => n < 5, static n => $"too large: {n}").Ensure(static n => n > 0, static _ => "not positive").ToString());
+ImmutableArray<string> sharedIssues = ["a", "b"];
+checks.That("validation map and ensure reuse issues",
+    !Validation<int, string>.InvalidMany(sharedIssues).Map(static n => n).Ensure(static _ => true, static _ => "c").TryGetValue(out _, out var reusedIssues)
+    && ImmutableCollectionsMarshal.AsArray(reusedIssues) == ImmutableCollectionsMarshal.AsArray(sharedIssues));
+checks.Throws<ArgumentNullException>("validation ensure null factory on invalid", () => CheckNumber("x").Ensure(static _ => true, null!));
+checks.Text("presence and then", "Presence.Value(2)", Presence<string>.Value("ab").AndThen(static text => Presence<int>.Value(text.Length)).ToString());
+checks.Text("presence and then keeps null", "Presence.Null", Presence<string>.Null.AndThen(static text => Presence<int>.Value(text.Length)).ToString());
+checks.Text("presence and then default", "Presence.Missing", Presence<int>.Value(1).AndThen(static _ => default(Presence<string>)).ToString());
+checks.Text("presence filter to missing", "Presence.Missing", Presence<int>.Value(-1).FilterToMissing(static n => n >= 0).ToString());
+checks.Text("presence filter to null", "Presence.Null", Presence<int>.Value(-1).FilterToNull(static n => n >= 0).ToString());
+checks.Text("presence filter keeps value", "Presence.Value(1)", Presence<int>.Value(1).FilterToNull(static n => n >= 0).ToString());
+checks.Throws<ArgumentNullException>("presence filter null predicate on missing", () => Presence<int>.Missing.FilterToMissing(null!));
+checks.Text("presence traverse", "Result.Ok(Presence.Value(5))", Presence<string>.Value("5").Traverse(ParseNumber).ToString());
+checks.Text("presence traverse error", "Result.Error(not a number: x)", Presence<string>.Value("x").Traverse(ParseNumber).ToString());
+checks.Text("presence traverse null", "Result.Ok(Presence.Null)", Presence<string>.Null.Traverse(ParseNumber).ToString());
+checks.Text("presence traverse missing", "Result.Ok(Presence.Missing)", Presence<string>.Missing.Traverse(ParseNumber).ToString());
+checks.Throws<InvalidOperationException>("presence traverse ok null", () => Presence<int>.Value(1).Traverse(static _ => Result<string, int>.Ok(null!)));
+checks.Text("presence traverse error null", "Result.Error(null)", Presence<int>.Value(1).Traverse(static _ => Result<string, string?>.Error(null)).ToString());
+checks.Text("presence traverse nested collection traverse", "Result.Ok(Presence.Value(System.Int32[]))",
+    Presence<string[]>.Value(["1", "2"]).Traverse(static items => items.Traverse(ParseNumber)).ToString());
+checks.Text("to validation", "Validation.Invalid([not a number: x])", ParseNumber("x").ToValidation().ToString());
+checks.That("to validation atomic collection error",
+    !Result<int, string[]>.Error(["a", "b"]).ToValidation().TryGetValue(out _, out var atomicIssues) && atomicIssues.Length == 1 && atomicIssues[0].Length == 2);
+checks.That("to result keeps issue buffer",
+    !Validation<int, string>.InvalidMany(sharedIssues).ToResult().TryGetValue(out _, out var bridgedIssues)
+    && ImmutableCollectionsMarshal.AsArray(bridgedIssues) == ImmutableCollectionsMarshal.AsArray(sharedIssues));
+checks.That("to result equality follows the shared buffer, not issue sequence", rejectedPatch.ToResult() == asResult && rejectedPatch.ToResult() != otherResult);
+checks.Text("static owner validation extensions", "Result.Ok(1)", ValidationExtensions.ToResult(validNumber).ToString());
+checks.Text("static owner presence extensions", "Result.Ok(Presence.Value(1))", PresenceExtensions.Traverse(Presence<string>.Value("1"), ParseNumber).ToString());
+checks.Text("static owner result to validation", "Validation.Valid(1)", ResultExtensions.ToValidation(ParseNumber("1")).ToString());
+checks.Text("collection validation traverse still binds", "Validation.Valid(System.Int32[])", new[] { "1" }.Traverse(CheckNumber).ToString());
+
 RootOnlyConsumer.Run(checks);
+PackageConsumer.Legacy.LegacyRecipeConsumer.Run(checks);
 
 return checks.Complete();
 

@@ -89,6 +89,8 @@ failures += Witness("Traverse of singleton Invalid grows linearly (256 vs 64 wit
 var released = Kernels.TraverseReleasesSuccessPrefix(out var attempts);
 failures += Witness("optimized Traverse releases its success prefix after the first Invalid", released, $"{attempts} attempt(s)");
 
+failures += ScalarCosts.Run();
+
 Kernels.Consume();
 return failures == 0 ? 0 : 1;
 
