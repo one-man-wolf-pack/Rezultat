@@ -12,6 +12,19 @@ The package targets `net10.0` and has no dependencies beyond the .NET framework.
 dotnet add package Rezultat
 ```
 
+## States, defaults and null
+
+| Type | `default` | `null` | Observing the state and payload |
+| --- | --- | --- | --- |
+| `Result<T, TError>` | Uninitialized: neither Ok nor Error | `Ok(null)` and `Error(null)` are kept as created branches when `T` or `TError` allows `null`; there is no null guard | `IsInitialized` is safe and is `false` only for `default`. On an uninitialized value `IsSuccess`, `TryGetValue`, `Match` and the composition operations throw `InvalidOperationException` |
+| `Maybe<T>` | `None` | `Some(null)` is present and differs from `None`; `Maybe.FromNullable(null)` gives `None` | `default` is an ordinary `None`: `IsSome` and `TryGetValue` return `false`, `Match` calls the None handler. `true` from `IsSome` or `TryGetValue` does not mean the payload is non-null |
+| `Presence<T>` (`T : notnull`) | `Missing` | `Null` is an explicit state; `Value(null)` throws `ArgumentNullException` | Exactly one of `IsMissing`, `IsNull`, `IsValue` is `true`. `TryGetValue` returns `true` and a non-null value only for `Value`; use the flags to tell `Missing` from `Null` |
+| `Validation<T, TIssue>` | Uninitialized: neither Valid nor Invalid | `Valid(null)` and a `null` issue are kept; `InvalidMany` rejects a default or empty array | As for `Result`: `IsInitialized` is safe; `IsValid`, `TryGetValue`, `Match` and the composition operations throw `InvalidOperationException` on an uninitialized value |
+| `Unit` | Valid: `default(Unit)`, `new Unit()` and `Unit.Value` are equal | No payload | Nothing to observe; there is no uninitialized state |
+
+Equality, hashing and `ToString` of an uninitialized `Result` or `Validation` do not throw: two uninitialized
+values of the same type are equal, and `ToString` shows `Result.Uninitialized` or `Validation.Uninitialized`.
+
 ## Carriers and composition
 
 `using Rezultat;` brings the carriers, `Maybe.FromNullable`, the bridges between Maybe, Result and Validation and
@@ -190,7 +203,13 @@ Console.WriteLine(from found in Find(1) where found > 10 select found + 1);
   values explicitly. If another imported query provider makes a call ambiguous, call the static class directly.
 - For a type implementing both dictionary interfaces, `GetOrNone` prefers the `IReadOnlyDictionary` overload;
   callers compiled with C# 12 or earlier may get an ambiguity error instead.
-- `default` of `Result` and `Validation` is uninitialized: `IsInitialized` is false and reading its branch or payload
-  throws. `default` of `Maybe` is None.
 - All operations are synchronous; there are no overloads for `Task` or `ValueTask` callbacks.
 - This package contains no test assertion helpers and no analyzer.
+
+## Release notes
+
+- 0.8.1: documentation only. Adds the states table and these notes. Compared with 0.8.0, operations,
+  signatures, nullable annotations, guards and exceptions, namespaces and overload binding are unchanged; no
+  action is needed besides updating the version.
+- 0.8.0: the first issued `Rezultat` package. Its API, as described in this README, is the baseline; it is not a
+  change relative to similar types in code outside this package.

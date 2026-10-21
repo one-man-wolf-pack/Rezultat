@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <Version>0.8.0</Version>
+    <Version>0.8.1</Version>
     <Authors>Zada Zorg</Authors>
     <Copyright>Copyright (c) 2026 Zada Zorg</Copyright>
     <PackageReadmeFile>README.md</PackageReadmeFile>
