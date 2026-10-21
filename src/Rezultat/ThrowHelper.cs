@@ -30,6 +30,10 @@ internal static class ThrowHelper
         throw new InvalidOperationException("The Presence Map selector returned null; choose Null, Missing or a failure explicitly instead.");
 
     [DoesNotReturn]
+    public static void ThrowNullPresenceTraverseResult() =>
+        throw new InvalidOperationException("The Presence Traverse selector returned Ok with a null value; choose Null, Missing or an Error explicitly instead.");
+
+    [DoesNotReturn]
     public static void ThrowArgumentNull(string paramName) =>
         throw new ArgumentNullException(paramName);
 

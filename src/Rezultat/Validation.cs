@@ -98,6 +98,45 @@ public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
     }
 
     /// <summary>
+    /// Projects the Valid value; Invalid keeps the same issue storage without invoking <paramref name="selector"/>.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The carrier is uninitialized; checked before the selector.</exception>
+    /// <exception cref="ArgumentNullException">The selector is null, even for Invalid.</exception>
+    public Validation<TResult, TIssue> Map<TResult>(Func<T, TResult> selector)
+    {
+        EnsureInitialized();
+        ArgumentNullException.ThrowIfNull(selector);
+        return _state == ValidState
+            ? Validation<TResult, TIssue>.Valid(selector(_value))
+            : Validation<TResult, TIssue>.FromIssues(_issues);
+    }
+
+    /// <summary>
+    /// Dependent check of the Valid value: when <paramref name="predicate"/> fails, <paramref name="issueFactory"/>
+    /// receives the same value and yields exactly one issue. Invalid is returned with the same issue storage
+    /// without invoking either callback, so chained Ensure calls do not accumulate independent issues; use Zip or
+    /// a collection Traverse for that. Reassigning the caller's variable from a callback changes neither the kept
+    /// outcome nor the value passed to <paramref name="issueFactory"/>.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The carrier is uninitialized; checked before the callbacks.</exception>
+    /// <exception cref="ArgumentNullException">
+    /// A callback is null, even for Invalid; <paramref name="predicate"/> is checked first.
+    /// </exception>
+    public Validation<T, TIssue> Ensure(Func<T, bool> predicate, Func<T, TIssue> issueFactory)
+    {
+        EnsureInitialized();
+        ArgumentNullException.ThrowIfNull(predicate);
+        ArgumentNullException.ThrowIfNull(issueFactory);
+        if (_state != ValidState)
+        {
+            return this;
+        }
+
+        var value = _value;
+        return predicate(value) ? Valid(value) : Invalid(issueFactory(value));
+    }
+
+    /// <summary>
     /// Translates every issue once, in order, keeping their number, duplicates and <see langword="null"/> results;
     /// Valid keeps its value without invoking <paramref name="selector"/>. Changing the number of issues is not
     /// MapIssues; use <see cref="OrElse{TNewIssue}"/> or <see cref="Match{TResult}"/>.

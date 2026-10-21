@@ -109,6 +109,37 @@ public readonly struct Presence<T> : IEquatable<Presence<T>>
         }
     }
 
+    /// <summary>
+    /// Runs the dependent step only for Value and returns its Presence as is, <c>default</c> being Missing; Missing
+    /// and Null keep their state without invoking <paramref name="next"/>.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"><paramref name="next"/> is null, even for Missing and Null.</exception>
+    public Presence<TResult> AndThen<TResult>(Func<T, Presence<TResult>> next)
+        where TResult : notnull
+    {
+        ArgumentNullException.ThrowIfNull(next);
+        return _state switch
+        {
+            ValueState => next(_value),
+            NullState => Presence<TResult>.Null,
+            _ => Presence<TResult>.Missing,
+        };
+    }
+
+    /// <summary>
+    /// Keeps Value when <paramref name="predicate"/> holds and otherwise returns Missing; Missing and Null are kept
+    /// without invoking it. Reassigning the caller's variable from the predicate does not change the kept Value.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"><paramref name="predicate"/> is null, even for Missing and Null.</exception>
+    public Presence<T> FilterToMissing(Func<T, bool> predicate) => Filter(predicate, Missing);
+
+    /// <summary>
+    /// Keeps Value when <paramref name="predicate"/> holds and otherwise returns Null; Missing and Null are kept
+    /// without invoking it. Reassigning the caller's variable from the predicate does not change the kept Value.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"><paramref name="predicate"/> is null, even for Missing and Null.</exception>
+    public Presence<T> FilterToNull(Func<T, bool> predicate) => Filter(predicate, Null);
+
     public bool Equals(Presence<T> other)
     {
         if (_state != other._state)
@@ -134,4 +165,16 @@ public readonly struct Presence<T> : IEquatable<Presence<T>>
         NullState => "Presence.Null",
         _ => "Presence.Missing",
     };
+
+    private Presence<T> Filter(Func<T, bool> predicate, Presence<T> rejected)
+    {
+        ArgumentNullException.ThrowIfNull(predicate);
+        var snapshot = this;
+        if (snapshot._state != ValueState)
+        {
+            return snapshot;
+        }
+
+        return predicate(snapshot._value) ? snapshot : rejected;
+    }
 }

@@ -76,6 +76,48 @@ public readonly struct Result<T, TError> : IEquatable<Result<T, TError>>
         return _state == Success ? onSuccess(_value) : onError(_error);
     }
 
+    /// <summary>
+    /// Invokes <paramref name="action"/> once only on success and returns the carrier as it was before the call;
+    /// reassigning the caller's variable from the action does not change the result, while a mutable payload is
+    /// passed and kept by reference. The action has no async completion channel: an async lambda becomes
+    /// <c>async void</c> and its faults are not observed here.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The carrier is uninitialized; checked before the action.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="action"/> is null, even on failure.</exception>
+    public Result<T, TError> Inspect(Action<T> action)
+    {
+        EnsureInitialized();
+        ArgumentNullException.ThrowIfNull(action);
+        var snapshot = this;
+        if (snapshot._state == Success)
+        {
+            action(snapshot._value);
+        }
+
+        return snapshot;
+    }
+
+    /// <summary>
+    /// Invokes <paramref name="action"/> once only on failure and returns the carrier as it was before the call;
+    /// reassigning the caller's variable from the action does not change the result, while a mutable payload is
+    /// passed and kept by reference. The action has no async completion channel: an async lambda becomes
+    /// <c>async void</c> and its faults are not observed here.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The carrier is uninitialized; checked before the action.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="action"/> is null, even on success.</exception>
+    public Result<T, TError> InspectError(Action<TError> action)
+    {
+        EnsureInitialized();
+        ArgumentNullException.ThrowIfNull(action);
+        var snapshot = this;
+        if (snapshot._state == Failure)
+        {
+            action(snapshot._error);
+        }
+
+        return snapshot;
+    }
+
     /// <exception cref="InvalidOperationException">The carrier is uninitialized; checked before the selector.</exception>
     /// <exception cref="ArgumentNullException">The selector is null, regardless of the active branch.</exception>
     public Result<TResult, TError> Map<TResult>(Func<T, TResult> selector)
