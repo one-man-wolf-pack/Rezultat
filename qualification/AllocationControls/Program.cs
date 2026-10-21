@@ -86,10 +86,17 @@ failures += Witness("direct Zip4 of four Invalid allocates less than binary chai
 var traverse64 = Measure(Kernels.Traverse64Invalid);
 var traverse256 = Measure(Kernels.Traverse256Invalid);
 failures += Witness("Traverse of singleton Invalid grows linearly (256 vs 64 within 6x)", traverse256 <= traverse64 * 6, $"{traverse64} vs {traverse256} B/op");
+var validateAll64Valid = Measure(Kernels.ValidateAll64Valid);
+var validateAll256Valid = Measure(Kernels.ValidateAll256Valid);
+failures += Witness("ValidateAll of all-Valid keeps no success buffer (256 vs 64 within 64 B)", validateAll256Valid <= validateAll64Valid + 64, $"{validateAll64Valid} vs {validateAll256Valid} B/op");
+var validateAll64Invalid = Measure(Kernels.ValidateAll64Invalid);
+var validateAll256Invalid = Measure(Kernels.ValidateAll256Invalid);
+failures += Witness("ValidateAll of singleton Invalid grows linearly (256 vs 64 within 6x)", validateAll256Invalid <= validateAll64Invalid * 6, $"{validateAll64Invalid} vs {validateAll256Invalid} B/op");
 var released = Kernels.TraverseReleasesSuccessPrefix(out var attempts);
 failures += Witness("optimized Traverse releases its success prefix after the first Invalid", released, $"{attempts} attempt(s)");
 
 failures += ScalarCosts.Run();
+failures += CollectionQueryCosts.Run();
 
 Kernels.Consume();
 return failures == 0 ? 0 : 1;
@@ -143,6 +150,8 @@ internal static class Kernels
     private static readonly Validation<string, string> _invalidString = Validation<string, string>.InvalidMany(_issues);
     private static readonly Validation<int, string>[] _invalidOutcomes64 = Enumerable.Repeat(Validation<int, string>.Invalid("e"), 64).ToArray();
     private static readonly Validation<int, string>[] _invalidOutcomes256 = Enumerable.Repeat(Validation<int, string>.Invalid("e"), 256).ToArray();
+    private static readonly Validation<int, string>[] _validOutcomes64 = Enumerable.Repeat(Validation<int, string>.Valid(1), 64).ToArray();
+    private static readonly Validation<int, string>[] _validOutcomes256 = Enumerable.Repeat(Validation<int, string>.Valid(1), 256).ToArray();
 
     private static Presence<int> _presenceIntSink;
     private static Presence<string> _presenceStringSink;
@@ -150,6 +159,7 @@ internal static class Kernels
     private static Validation<int, string> _validationIntSink;
     private static Validation<string, string> _validationStringSink;
     private static Validation<int[], string> _validationArraySink;
+    private static Validation<Unit, string> _validationUnitSink;
     private static Result<int, int> _intSink;
     private static Result<string, string> _stringSink;
     private static Result<Unit, string> _unitSink;
@@ -584,6 +594,42 @@ internal static class Kernels
         }
     }
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void ValidateAll64Valid(int n)
+    {
+        for (var i = 0; i < n; i++)
+        {
+            _validationUnitSink = _validOutcomes64.ValidateAll();
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void ValidateAll256Valid(int n)
+    {
+        for (var i = 0; i < n; i++)
+        {
+            _validationUnitSink = _validOutcomes256.ValidateAll();
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void ValidateAll64Invalid(int n)
+    {
+        for (var i = 0; i < n; i++)
+        {
+            _validationUnitSink = _invalidOutcomes64.ValidateAll();
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void ValidateAll256Invalid(int n)
+    {
+        for (var i = 0; i < n; i++)
+        {
+            _validationUnitSink = _invalidOutcomes256.ValidateAll();
+        }
+    }
+
     public static bool TraverseReleasesSuccessPrefix(out int attempts)
     {
         const int MaxAttempts = 30;
@@ -640,5 +686,5 @@ internal static class Kernels
 
     public static void Consume() =>
         Console.WriteLine($"sinks: {_counter} {_intSink} {_stringSink} {_unitSink} {_maybeIntSink} {_maybeStringSink} {_maybeUnitSink} " +
-            $"{_presenceIntSink} {_presenceStringSink} {_presenceUnitSink} {_validationIntSink} {_validationStringSink} {_validationArraySink.IsInitialized} {_objectSink is not null}");
+            $"{_presenceIntSink} {_presenceStringSink} {_presenceUnitSink} {_validationIntSink} {_validationStringSink} {_validationArraySink.IsInitialized} {_validationUnitSink.IsInitialized} {_objectSink is not null}");
 }

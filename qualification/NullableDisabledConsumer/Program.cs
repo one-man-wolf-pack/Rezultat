@@ -1,5 +1,6 @@
 using Rezultat;
 using Rezultat.Collections;
+using Rezultat.Linq;
 
 var checks = new Checks();
 
@@ -112,5 +113,21 @@ checks.That("to validation null error", errorNull.ToValidation() == Validation<s
 checks.That("to result null issue", invalidNull.ToResult().TryGetValue(out _, out var bridgedNullIssues) == false && bridgedNullIssues[0] == null);
 checks.That("validation map null payload", validNull.Map(v => v == null) == Validation<bool, string>.Valid(true));
 checks.That("validation ensure null issue", validNull.Ensure(v => v != null, _ => null) == Validation<string, string>.Invalid(null));
+
+var sequencedNulls = new[] { Result<string, string>.Ok(null), Result<string, string>.Ok("a") }.Sequence();
+checks.That("null payload sequence", sequencedNulls.TryGetValue(out var sequenced, out _) && sequenced.Length == 2 && sequenced[0] == null);
+checks.That("null error sequence", new[] { Result<string, string>.Error(null) }.Sequence() == Result<string[], string>.Error(null));
+checks.That("null payload maybe sequence", new[] { Maybe<string>.Some(null) }.Sequence().Map(v => v[0] == null) == Maybe<bool>.Some(true));
+checks.That("null issue validate all", new[] { Validation<string, string>.Valid(null), Validation<string, string>.Invalid(null) }.ValidateAll() == Validation<Unit, string>.Invalid(null));
+checks.That("null payload validate all selector", new string[] { null }.ValidateAll(v => Validation<string, string>.Valid(v)) == Validation<Unit, string>.Valid(Unit.Value));
+checks.Throws<ArgumentNullException>("null validate all source", () => ((Validation<string, string>[])null).ValidateAll());
+checks.That("null element at most one", new string[] { null }.AtMostOne(() => "many") == Result<Maybe<string>, string>.Ok(Maybe<string>.Some(null)));
+checks.That("null error at most one", new string[] { null, null }.AtMostOne(() => (string)null) == Result<Maybe<string>, string>.Error(null));
+checks.Throws<ArgumentNullException>("null at most one factory", () => new string[0].AtMostOne<string, string>(null));
+checks.That("null payload query", (from a in okNull from b in okNull select a == null && b == null) == Result<bool, string>.Ok(true));
+checks.That("null project result", okNull.SelectMany(v => okNull, (a, b) => (string)null) == Result<string, string>.Ok(null));
+checks.Throws<ArgumentNullException>("null select many next", () => errorNull.SelectMany<string, string, string, string>(null, null));
+checks.That("null maybe query where", (from v in Maybe<string>.Some(null) where v == null select "kept") == Maybe<string>.Some("kept"));
+checks.Throws<ArgumentNullException>("null maybe where predicate", () => Maybe<string>.None.Where(null));
 
 return checks.Complete();

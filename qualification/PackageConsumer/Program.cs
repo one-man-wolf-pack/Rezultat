@@ -412,6 +412,8 @@ checks.Text("collection validation traverse still binds", "Validation.Valid(Syst
 
 RootOnlyConsumer.Run(checks);
 PackageConsumer.Legacy.LegacyRecipeConsumer.Run(checks);
+ReadyCollectionQueryConsumer.Run(checks);
+PackageConsumer.LegacyQuery.LegacyQueryConsumer.Run(checks);
 
 return checks.Complete();
 

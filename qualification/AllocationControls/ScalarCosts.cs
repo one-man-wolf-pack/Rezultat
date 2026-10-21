@@ -1,23 +1,19 @@
 using System.Collections.Immutable;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Rezultat;
 
 internal static class ScalarCosts
 {
-    private const int Iterations = 20_000;
-    private const int WarmupRounds = 50;
-
     private static readonly ImmutableArray<string> _issues = ["a", "b"];
     private static readonly Validation<int, string> _valid = Validation<int, string>.Valid(6);
     private static readonly Validation<int, string> _invalid = Validation<int, string>.InvalidMany(_issues);
     private static readonly Result<int, string> _ok = Result<int, string>.Ok(7);
     private static readonly Result<int, string> _error = Result<int, string>.Error("e");
-    private static readonly Result<Large, string> _okLarge = Result<Large, string>.Ok(CreateLarge(3));
+    private static readonly Result<Large, string> _okLarge = Result<Large, string>.Ok(CostMeasurement.CreateLarge(3));
     private static readonly Result<string, string> _okReference = Result<string, string>.Ok("reference");
     private static readonly Presence<int> _value = Presence<int>.Value(5);
-    private static readonly Presence<Large> _valueLarge = Presence<Large>.Value(CreateLarge(3));
+    private static readonly Presence<Large> _valueLarge = Presence<Large>.Value(CostMeasurement.CreateLarge(3));
     private static readonly Presence<string> _valueReference = Presence<string>.Value("reference");
 
     private static Validation<int, string> _validationSink;
@@ -83,13 +79,13 @@ internal static class ScalarCosts
 
         foreach (var (name, library, recipe, _) in pairs)
         {
-            var (libraryBytes, libraryNanoseconds) = Measure(library);
-            var (recipeBytes, recipeNanoseconds) = Measure(recipe);
+            var (libraryBytes, libraryNanoseconds) = CostMeasurement.Measure(library);
+            var (recipeBytes, recipeNanoseconds) = CostMeasurement.Measure(recipe);
             Console.WriteLine($"INFO {name}: allocation {libraryBytes} vs {recipeBytes} B/op (no budget)");
             Console.WriteLine($"INFO {name}: time {libraryNanoseconds:F1} vs {recipeNanoseconds:F1} ns/op (no budget)");
         }
 
-        var (singletonBytes, singletonNanoseconds) = Measure(DirectInvalid);
+        var (singletonBytes, singletonNanoseconds) = CostMeasurement.Measure(DirectInvalid);
         Console.WriteLine($"INFO Validation.Invalid singleton baseline: allocation {singletonBytes} B/op, time {singletonNanoseconds:F1} ns/op (no budget)");
 
         _counter += _validationSink.IsInitialized ? 1 : 0;
@@ -123,28 +119,6 @@ internal static class ScalarCosts
 
     private static bool SameBuffer(ImmutableArray<string> issues) =>
         ReferenceEquals(ImmutableCollectionsMarshal.AsArray(issues), ImmutableCollectionsMarshal.AsArray(_issues));
-
-    private static Large CreateLarge(long first)
-    {
-        var large = default(Large);
-        large[0] = first;
-        return large;
-    }
-
-    private static (double Bytes, double Nanoseconds) Measure(Action<int> kernel)
-    {
-        for (var round = 0; round < WarmupRounds; round++)
-        {
-            kernel(Iterations / 10);
-        }
-
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        var started = Stopwatch.GetTimestamp();
-        kernel(Iterations);
-        var elapsed = Stopwatch.GetElapsedTime(started);
-        var bytes = (double)(GC.GetAllocatedBytesForCurrentThread() - before) / Iterations;
-        return (bytes, elapsed.TotalNanoseconds / Iterations);
-    }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void ValidationMap(int n)
@@ -448,11 +422,5 @@ internal static class ScalarCosts
         }
 
         return result;
-    }
-
-    [InlineArray(64)]
-    private struct Large
-    {
-        private long _element;
     }
 }
