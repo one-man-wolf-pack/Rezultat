@@ -4,6 +4,7 @@ using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
 if (args.Length < 6)
@@ -14,7 +15,7 @@ if (args.Length < 6)
 
 var repoRoot = Path.GetFullPath(args[0]);
 var inspection = new Inspection(args[1]);
-var nupkgDll = inspection.InspectPackage(args[2]);
+var nupkgDll = inspection.InspectPackage(args[2], repoRoot);
 inspection.InspectSymbols(args[3], nupkgDll, repoRoot);
 foreach (var assets in args[5..])
 {
@@ -28,6 +29,7 @@ internal sealed class Inspection(string packageVersion)
     private const string PackageId = "Rezultat";
     private const string LibPath = "lib/net10.0/";
     private const string LogicalRoot = "/_/";
+    private const string ReadmePath = "README.md";
 
     private static readonly Guid _sha256Algorithm = new("8829d00f-11b8-4213-878b-770e8597ac16");
     private static readonly Guid _embeddedSourceKind = new("0e8a571b-6926-466e-b4ad-8ab04611f5fe");
@@ -35,7 +37,7 @@ internal sealed class Inspection(string packageVersion)
 
     private int _failures;
 
-    public byte[] InspectPackage(string nupkgPath)
+    public byte[] InspectPackage(string nupkgPath, string repoRoot)
     {
         using var package = ZipFile.OpenRead(nupkgPath);
         var entries = package.Entries.Select(entry => entry.FullName).Order(StringComparer.Ordinal).ToArray();
@@ -43,13 +45,13 @@ internal sealed class Inspection(string packageVersion)
 
         string[] allowed =
         [
-            "[Content_Types].xml", "_rels/.rels", "LICENSE", $"{PackageId}.nuspec",
+            "[Content_Types].xml", "_rels/.rels", "LICENSE", ReadmePath, $"{PackageId}.nuspec",
             $"{LibPath}{PackageId}.dll", $"{LibPath}{PackageId}.xml",
         ];
         var unexpected = entries
             .Where(entry => !allowed.Contains(entry) && !entry.StartsWith("package/services/metadata/core-properties/", StringComparison.Ordinal))
             .ToArray();
-        Check("nupkg has only lib/net10.0 assets, docs, license and metadata", unexpected.Length == 0, string.Join(", ", unexpected));
+        Check("nupkg has only lib/net10.0 assets, docs, license, readme and metadata", unexpected.Length == 0, string.Join(", ", unexpected));
         Check("nupkg has no build/analyzer/content/ref assets",
             !entries.Any(entry => entry.Split('/')[0] is "build" or "buildTransitive" or "buildMultiTargeting" or "analyzers" or "content" or "contentFiles" or "ref" or "tools"));
 
@@ -60,6 +62,11 @@ internal sealed class Inspection(string packageVersion)
         Check("nuspec version", Value("version") == packageVersion, Value("version"));
         var license = metadata.Elements().Single(element => element.Name.LocalName == "license");
         Check("nuspec license expression MIT", license.Attribute("type")?.Value == "expression" && license.Value == "MIT", license.ToString());
+
+        Report("nuspec description", Value("description") ?? "<none>");
+        Report("nuspec tags", Value("tags") ?? "<none>");
+        Check("nuspec has description and tags", !string.IsNullOrWhiteSpace(Value("description")) && !string.IsNullOrWhiteSpace(Value("tags")));
+        InspectReadme(package, Value("readme"), repoRoot);
 
         var dependencies = metadata.Elements().SingleOrDefault(element => element.Name.LocalName == "dependencies");
         var groups = dependencies?.Elements().ToArray() ?? [];
@@ -223,6 +230,28 @@ internal sealed class Inspection(string packageVersion)
     {
         Console.WriteLine(_failures == 0 ? "package inspection passed" : $"package inspection failed: {_failures}");
         return _failures == 0 ? 0 : 1;
+    }
+
+    private void InspectReadme(ZipArchive package, string? readme, string repoRoot)
+    {
+        Check("nuspec readme names the root README.md", readme == ReadmePath, readme);
+        var entry = package.GetEntry(ReadmePath);
+        Check("nupkg contains root README.md", entry is not null);
+        if (entry is null)
+        {
+            return;
+        }
+
+        var packaged = ReadAll(entry);
+        var authored = File.ReadAllBytes(Path.Combine(repoRoot, "src", PackageId, ReadmePath));
+        Check("packaged README.md is the authored consumer readme", packaged.AsSpan().SequenceEqual(authored));
+
+        var text = System.Text.Encoding.UTF8.GetString(packaged);
+        var localLinks = Regex.Matches(text, @"\]\((?!https://)[^)]*\)").Select(match => match.Value).ToArray();
+        Check("README.md links only to absolute https targets", localLinks.Length == 0, string.Join(", ", localLinks));
+        string[] checkoutMarkers = ["../", "scripts/", "qualify.sh", "rezultat-specification", "src/", "artifacts/"];
+        var checkoutOnly = checkoutMarkers.Where(marker => text.Contains(marker, StringComparison.Ordinal)).ToArray();
+        Check("README.md has no checkout-only paths or tooling", checkoutOnly.Length == 0, string.Join(", ", checkoutOnly));
     }
 
     private void Check(string name, bool condition, string? detail = null)

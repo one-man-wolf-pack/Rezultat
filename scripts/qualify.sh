@@ -20,7 +20,7 @@ usage: scripts/qualify.sh <command> [args]
   check                 format verification and warning-free Release build of the solution
   test [mtp-args...]    run own tests; arguments are forwarded to the test platform
   pack                  pack Rezultat (Release) into artifacts/package
-  consumers             package consumers, compiler controls and package inspection
+  consumers             package consumers, compiler controls, packaged README examples and package inspection
   alloc                 warmed Release allocation controls against the package
   publish <rid>         rooted trimmed and Native AOT publication of the package consumer, then run both
   all <rid>             check, test, pack, consumers, alloc, publish
@@ -52,7 +52,7 @@ reset_package_cache() {
 build_clean() {
     local project="$1"
     local output
-    output="$(dotnet build "$project" -c Release --no-incremental 2>&1)" || { echo "$output"; return 1; }
+    output="$(dotnet build "$project" -c Release --no-incremental "${@:2}" 2>&1)" || { echo "$output"; return 1; }
     if grep -Eq 'warning [A-Z]+[0-9]+' <<<"$output"; then
         echo "$output"
         echo "FAIL $project built with warnings"
@@ -82,6 +82,25 @@ compiler_controls() {
     return "$failures"
 }
 
+readme_examples() {
+    local project="$root/qualification/ReadmeExamples"
+    local snippets="$qualification/readme" snippet
+    dotnet restore "$project" >/dev/null
+    rm -rf "$snippets"
+    mkdir -p "$snippets"
+    awk -v dir="$snippets" '
+        /^```csharp$/ { file = sprintf("%s/example%02d.cs", dir, ++count); inside = 1; next }
+        /^```$/ { if (inside) close(file); inside = 0; next }
+        inside { print > file }
+    ' "$packages/rezultat/$RezultatPackageVersion/README.md"
+    compgen -G "$snippets/*.cs" >/dev/null || { echo "FAIL packaged README.md has no csharp examples"; return 1; }
+    for snippet in "$snippets"/*.cs; do
+        build_clean "$project" -p:Snippet="$snippet"
+        dotnet run --project "$project" -c Release --no-build
+        echo "PASS README example $(basename "$snippet")"
+    done
+}
+
 consumers() {
     reset_package_cache
     build_clean "$root/qualification/PackageConsumer"
@@ -89,6 +108,7 @@ consumers() {
     build_clean "$root/qualification/NullableDisabledConsumer"
     dotnet run --project "$root/qualification/NullableDisabledConsumer" -c Release --no-build
     compiler_controls
+    readme_examples
     build_clean "$root/qualification/PackageInspector"
     dotnet run --project "$root/qualification/PackageInspector" -c Release --no-build -- \
         "$root" "$RezultatPackageVersion" "$feed/Rezultat.$RezultatPackageVersion.nupkg" \

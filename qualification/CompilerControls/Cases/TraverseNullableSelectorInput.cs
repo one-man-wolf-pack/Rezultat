@@ -1,4 +1,5 @@
 using Rezultat;
+using Rezultat.Collections;
 
 internal static class Case
 {

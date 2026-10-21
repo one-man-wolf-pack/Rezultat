@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Rezultat;
+using Rezultat.Collections;
 
 const int Iterations = 100_000;
 const int WarmupRounds = 50;

@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Globalization;
 using Rezultat;
+using Rezultat.Collections;
 
 CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
 var checks = new Checks();
@@ -93,7 +94,7 @@ checks.That("traverse ready outcomes", new[] { ParseNumber("4"), ParseNumber("5"
 var tracked = new DisposalTracker();
 checks.That("traverse early exit", !TrackedNumbers(tracked).Traverse(ParseNumber).IsSuccess && tracked.Disposed && tracked.Produced == 2);
 checks.Throws<InvalidOperationException>("traverse visited default", () => new[] { 1 }.Traverse(static _ => default(Result<int, string>)));
-checks.Throws<ArgumentNullException>("traverse null selector", () => ResultExtensions.Traverse<int, int, string>(new[] { 1 }, null!));
+checks.Throws<ArgumentNullException>("traverse null selector", () => ResultCollectionExtensions.Traverse<int, int, string>(new[] { 1 }, null!));
 
 var awaited = (await SaveAsync(succeed: true)).Map(static _ => "saved");
 checks.Text("await before map", "Result.Ok(saved)", awaited.ToString());
@@ -257,7 +258,10 @@ checks.Text("maybe traverse some", "Result.Ok(Maybe.Some(4))", Maybe<string>.Som
 checks.Text("maybe traverse error", "Result.Error(not a number: x)", Maybe<string>.Some("x").Traverse(ParseNumber).ToString());
 checks.Text("maybe traverse ready", "Result.Ok(Maybe.Some(5))", Maybe<Result<int, string>>.Some(ParseNumber("5")).Traverse(static r => r).ToString());
 checks.Throws<InvalidOperationException>("maybe traverse default selector result", () => Maybe<int>.Some(1).Traverse(static _ => default(Result<int, string>)));
-checks.Text("static owner maybe extensions", "Maybe.Some(1)", MaybeExtensions.FirstOrNone(new[] { 1 }).ToString());
+checks.Text("static owner maybe collection extensions", "Maybe.Some(1)", MaybeCollectionExtensions.FirstOrNone(new[] { 1 }).ToString());
+checks.Text("static owner maybe collection traverse", "Maybe.Some(System.Int32[])", MaybeCollectionExtensions.Traverse(new[] { 1 }, static n => Maybe<int>.Some(n)).ToString());
+checks.Text("static owner result collection traverse", "Result.Ok(System.Int32[])", ResultCollectionExtensions.Traverse(new[] { "1" }, ParseNumber).ToString());
+checks.Text("static owner maybe extensions", "Result.Ok(Maybe.Some(1))", MaybeExtensions.Traverse(Maybe<string>.Some("1"), ParseNumber).ToString());
 checks.Text("static owner result extensions", "Maybe.Some(1)", ResultExtensions.ToMaybe(ParseNumber("1")).ToString());
 
 var missingName = Presence<string>.Missing;
@@ -316,8 +320,8 @@ checks.Throws<InvalidOperationException>("validation zip default next to invalid
 checks.Text("validation traverse", "Validation.Invalid([not a number: x, not a number: y])", new[] { "1", "x", "y" }.Traverse(CheckNumber).ToString());
 checks.That("validation traverse values", new[] { "1", "2" }.Traverse(CheckNumber).TryGetValue(out var checkedNumbers, out _) && checkedNumbers.Sum() == 3);
 checks.Text("validation traverse ready", "Validation.Invalid([a])", new[] { validNumber, Validation<int, string>.Invalid("a") }.Traverse(static v => v).ToString());
-checks.Text("validation traverse static owner", "Validation.Valid(System.Int32[])", ValidationExtensions.Traverse(new[] { 1 }, static n => Validation<int, string>.Valid(n)).ToString());
-checks.Throws<ArgumentNullException>("validation traverse null selector", () => ValidationExtensions.Traverse<int, int, string>(new[] { 1 }, null!));
+checks.Text("validation traverse static owner", "Validation.Valid(System.Int32[])", ValidationCollectionExtensions.Traverse(new[] { 1 }, static n => Validation<int, string>.Valid(n)).ToString());
+checks.Throws<ArgumentNullException>("validation traverse null selector", () => ValidationCollectionExtensions.Traverse<int, int, string>(new[] { 1 }, null!));
 checks.Text("result traverse still binds", "Result.Ok(1)", new[] { "1" }.Traverse(ParseNumber).Map(static a => a.Length).ToString());
 checks.Text("maybe traverse still binds", "Maybe.Some(1)", new[] { "1" }.Traverse(ParseMaybe).Map(static a => a.Length).ToString());
 checks.Text("maybe receiver traverse still binds", "Result.Ok(Maybe.Some(1))", Maybe<string>.Some("1").Traverse(ParseNumber).ToString());
@@ -359,6 +363,8 @@ checks.That("validation match into result keeps issues", !asResult.TryGetValue(o
 var otherResult = Patch(current, Presence<string>.Value(string.Empty), Presence<int>.Value(-1), Presence<string>.Missing)
     .Match(Result<Draft, ImmutableArray<string>>.Ok, Result<Draft, ImmutableArray<string>>.Error);
 checks.That("result does not inherit validation sequence equality", asResult != otherResult);
+
+RootOnlyConsumer.Run(checks);
 
 return checks.Complete();
 
