@@ -45,6 +45,60 @@ scripts/qualify.sh linux                 # everything above inside the Linux ARM
 `qualification/NuGet.Config` and an isolated package folder, so run `pack` first.
 Linux container outputs are kept separately in `artifacts/linux-arm64`.
 
+## Local releases
+
+The durable local feed defaults to `$HOME/.local/share/nuget/rezultat`, outside checkout,
+build outputs and NuGet caches. `REZULTAT_LOCAL_FEED` or the third command argument can
+select another directory. Publish the existing qualified Linux artifacts:
+
+```sh
+scripts/publish-local.sh 0.8.0
+# Explicit inputs/destination:
+scripts/publish-local.sh 0.8.0 artifacts/linux-arm64/package /absolute/path/to/rezultat-feed
+```
+
+For the next release, change `Version` in `src/Rezultat/Rezultat.csproj`, qualify the changed
+outcome with `scripts/qualify.sh linux`, then publish that version. Changed package contents
+always receive a new `0.y.z` version. Publishing identical artifacts again is a no-op;
+different bytes under an issued version fail. The command copies without repacking and
+publishes read-only files with atomic no-replace names. Do not use `dotnet nuget push`
+directly to this directory: its local-folder path can overwrite a version. Keep this feed
+when cleaning build outputs. The `symbols/` directory retains matching `.snupkg` files;
+it is an archive, not a symbol server or Source Link support claim.
+
+Register the feed for ordinary local CLI/IDE use:
+
+```sh
+dotnet nuget add source "$HOME/.local/share/nuget/rezultat" --name rezultat-local
+```
+
+A project whose own `NuGet.Config` clears sources must add the feed there. When source
+mapping is enabled, map `Rezultat` (and later `Rezultat.*` packages) to `rezultat-local`.
+For example, merge these entries with the project's existing sources/mappings:
+
+```xml
+<configuration>
+  <packageSources>
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+    <add key="rezultat-local" value="/absolute/path/to/rezultat-feed" />
+  </packageSources>
+  <packageSourceMapping>
+    <packageSource key="rezultat-local">
+      <package pattern="Rezultat" />
+      <package pattern="Rezultat.*" />
+    </packageSource>
+    <packageSource key="nuget.org">
+      <package pattern="*" />
+    </packageSource>
+  </packageSourceMapping>
+</configuration>
+```
+
+Consumers reference the package, not its source project. An exact first-release reference
+is `<PackageReference Include="Rezultat" Version="[0.8.0]" />`; projects with central package
+management put the version on their `PackageVersion` entry. Consumer repositories own the
+switch and qualification of their API, adapters and deployment profiles.
+
 ## Layout
 
 | Path | Content |
