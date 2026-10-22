@@ -25,6 +25,29 @@ dotnet add package Rezultat
 Equality, hashing and `ToString` of an uninitialized `Result` or `Validation` do not throw: two uninitialized
 values of the same type are equal, and `ToString` shows `Result.Uninitialized` or `Validation.Uninitialized`.
 
+**`Result` and `Validation` are not safe-to-log containers.** Their `ToString` shows the active payload or every
+issue and calls the payload's own `ToString`, with its side effects and exceptions. String interpolation, a log
+message argument, an assertion message or a debugger display can run it even without an explicit
+`Console.WriteLine`. For diagnostics, select the facts that may be shown instead of passing the carrier:
+
+```csharp
+using Rezultat;
+
+Result<Receipt, PaymentError> payment = Result<Receipt, PaymentError>.Error(new PaymentError("card-declined", "4111 1111 1111 1111"));
+
+string state = !payment.IsInitialized ? "Uninitialized" : payment.IsSuccess ? "Ok" : "Error";
+string? code = payment.IsInitialized && !payment.TryGetValue(out _, out var error) ? error.Code : null;
+Console.WriteLine($"payment {state} {code}");
+
+internal sealed record Receipt(string Id);
+
+internal sealed record PaymentError(string Code, string CardNumber);
+```
+
+Which fields may be shown is a decision of your domain. Do not hand the carrier or its payload to structured
+logging, an object dump or a serializer next to the selected fields. Overriding the payload's `ToString` covers only
+formatting: a logger or serializer can read the properties itself. The package does no automatic redaction.
+
 ## Carriers and composition
 
 `using Rezultat;` brings the carriers, `Maybe.FromNullable`, the bridges between Maybe, Result and Validation and
@@ -204,10 +227,196 @@ Console.WriteLine(from found in Find(1) where found > 10 select found + 1);
 - For a type implementing both dictionary interfaces, `GetOrNone` prefers the `IReadOnlyDictionary` overload;
   callers compiled with C# 12 or earlier may get an ambiguity error instead.
 - All operations are synchronous; there are no overloads for `Task` or `ValueTask` callbacks.
-- This package contains no test assertion helpers and no analyzer.
+- This package contains no test assertion helpers and no analyzer; for tests see "Assertions in tests" below.
+
+## Moving from local outcome types
+
+### Extract both outcomes with one `TryGetValue`
+
+`Result.TryGetValue` checks the branch once and gives both typed outputs. It replaces `.Value` and `.Error`
+getters and pairs of single-output probes, without `Match` or a chain of combinators:
+
+```csharp
+using Rezultat;
+
+Result<int, string> Parse(string text) =>
+    int.TryParse(text, out var value) ? Result<int, string>.Ok(value) : Result<int, string>.Error($"not a number: {text}");
+
+static string MapError(string error) => $"rejected, {error}";
+static string Use(int value) => $"next {value + 1}";
+
+string Handle(Result<int, string> result)
+{
+    if (!result.TryGetValue(out var value, out var error))
+    {
+        return MapError(error);
+    }
+
+    return Use(value);
+}
+
+Console.WriteLine(Handle(Parse("41")));
+Console.WriteLine(Handle(Parse("x")));
+```
+
+Use in each branch only its own output: the other one holds only a `default` value, and nullable analysis treats a
+reference-type one as possibly `null`.
+`Validation.TryGetValue` works the same way with the valid value or the `ImmutableArray` of issues.
+
+### Uninitialized carriers and domain guards
+
+A `default` `Result` or `Validation` is not an expected failure but a carrier that was never created.
+`TryGetValue`, `IsSuccess`, `IsValid`, `Match` and the composition operations throw `InvalidOperationException`
+on it. Among the branch checks only `IsInitialized` is safe; use it for code that inspects that state on purpose.
+Equality, hashing and `ToString` do not throw either, as described above. Do not turn a forgotten
+creation into Error or Invalid with a `catch` or an adapter that returns `false` on `default`; make every fallback
+and early return create an explicit outcome.
+
+`Ok(null)` and `Valid(null)` are allowed when the payload type allows `null`. That does not remove the non-null
+rules of your domain: keep its guards where they were, in the same order and with the same exceptions, and do not
+move them into the carrier or drop them to unify types. When updating the package, compare nullable annotations,
+guards and operations with the release notes, not with the methods of the previous local type.
+
+```csharp
+using Rezultat;
+
+Result<string?, string> found = Result<string?, string>.Ok(null);
+Console.WriteLine(found.IsSuccess);
+
+try
+{
+    _ = found.Map(static name => new CustomerName(name));
+}
+catch (ArgumentNullException)
+{
+    Console.WriteLine("the domain guard still rejects null");
+}
+
+internal sealed class CustomerName
+{
+    public CustomerName(string? value) => Value = value ?? throw new ArgumentNullException(nameof(value));
+
+    public string Value { get; }
+}
+```
+
+### Independent checks first, the object last
+
+Run the independent checks first and construct the target object only in the selector of the successful
+composition. The selector, and the constructor in it, runs only when every check is Valid:
+
+```csharp
+using Rezultat;
+
+var constructed = 0;
+
+Validation<string, string> CheckName(string name) =>
+    name.Length > 0 ? Validation<string, string>.Valid(name) : Validation<string, string>.Invalid("name is empty");
+
+Validation<int, string> CheckAge(int age) =>
+    age >= 0 ? Validation<int, string>.Valid(age) : Validation<int, string>.Invalid("age is negative");
+
+var person = CheckName("").Zip(CheckAge(-1), (name, age) =>
+{
+    constructed++;
+    return new Person(name, age);
+});
+
+if (!person.TryGetValue(out _, out var issues))
+{
+    Console.WriteLine($"{string.Join("; ", issues)}; constructed {constructed}");
+}
+
+internal sealed record Person(string Name, int Age);
+```
+
+C# evaluates ordinary arguments before the call: an object created in advance or a constructor call written as
+an argument has already run, and `Zip` cannot defer it. The issues keep the order of the inputs. Use `AndThen` for
+a check that needs a valid value and `ValidateAll` when only the issues matter; a large validator can stay an
+ordinary loop with a BCL builder. When an error carries domain facts beyond a list of issues, such as a truncation
+flag, keep it as a specific `TError` in a `Result` instead of converting every failure to `Validation`, and do not
+construct a partially valid object.
+
+### Assertions in tests
+
+With xUnit, the optional `Rezultat.Testing.Xunit` package gives `ShouldBeOk`, `ShouldBeError`, `ShouldBeValid`
+and `ShouldBeInvalid`. From its version 0.8.2 each has an `includePayload: false` overload whose failure message
+names only the expected and actual branches; version 0.8.0 does not have it. The flag limits only that message:
+later assertions and runner output can still show the data.
+
+With Shouldly, a test project can keep a small local recipe of the same four extractions instead. It needs only
+this package and Shouldly, not `Rezultat.Testing.Xunit`:
+
+```csharp shouldly
+using System.Collections.Immutable;
+using Rezultat;
+using Shouldly;
+
+internal static class RezultatShouldlyExtensions
+{
+    public static T ShouldBeOk<T, TError>(this Result<T, TError> result) =>
+        result.TryGetValue(out var value, out _) ? value : throw new ShouldAssertException("Expected Result.Ok; actual Result.Error.");
+
+    public static TError ShouldBeError<T, TError>(this Result<T, TError> result) =>
+        result.TryGetValue(out _, out var error) ? throw new ShouldAssertException("Expected Result.Error; actual Result.Ok.") : error;
+
+    public static T ShouldBeValid<T, TIssue>(this Validation<T, TIssue> validation) =>
+        validation.TryGetValue(out var value, out _) ? value : throw new ShouldAssertException("Expected Validation.Valid; actual Validation.Invalid.");
+
+    public static ImmutableArray<TIssue> ShouldBeInvalid<T, TIssue>(this Validation<T, TIssue> validation) =>
+        validation.TryGetValue(out _, out var issues) ? throw new ShouldAssertException("Expected Validation.Invalid; actual Validation.Valid.") : issues;
+}
+```
+
+Its checks, written here with xUnit attributes; use the test attribute of your framework:
+
+```csharp shouldly
+using System.Collections.Immutable;
+using Rezultat;
+using Shouldly;
+using Xunit;
+
+public sealed class RezultatShouldlyRecipeTests
+{
+    [Fact]
+    public void ExtractsTheActiveBranch()
+    {
+        Result<int, string>.Ok(42).ShouldBeOk().ShouldBe(42);
+        Result<int, string>.Error("refused").ShouldBeError().ShouldBe("refused");
+        Validation<string?, string>.Valid(null).ShouldBeValid().ShouldBeNull();
+
+        var issues = ImmutableArray.Create("bad name", "bad name");
+        Validation<int, string>.InvalidMany(issues).ShouldBeInvalid().ShouldBe(issues);
+    }
+
+    [Fact]
+    public void WrongBranchNamesOnlyTheBranches()
+    {
+        var failure = Should.Throw<ShouldAssertException>(() => Result<int, string>.Error("secret").ShouldBeOk());
+        failure.Message.ShouldNotContain("secret");
+    }
+
+    [Fact]
+    public void UninitializedKeepsTheCarrierGuard() =>
+        Should.Throw<InvalidOperationException>(() => default(Validation<int, string>).ShouldBeValid());
+}
+```
+
+- A wrong branch throws `ShouldAssertException` directly with constant branch names; the payload and the issues
+  are not formatted. Do not replace the `throw` with a fail callback that could return.
+- Success returns the exact payload, still nullable when its type is, or the stored issue array.
+- An uninitialized carrier keeps the native `InvalidOperationException` of `TryGetValue`. This differs from the
+  xUnit package, which reports `Uninitialized` as an assertion failure; check `IsInitialized` explicitly when a test
+  studies `default`.
+- If you add a `customMessage` parameter, its content is your responsibility: interpolating the payload into it
+  shows the data again. Later Shouldly assertions such as `ShouldBe` format their own values.
 
 ## Release notes
 
+- 0.8.2: documentation only. Adds the formatting warning next to the states table, the guide for moving from
+  local outcome types and the Shouldly recipe. Compared with 0.8.1, operations, signatures, nullable annotations,
+  guards and exceptions, namespaces and overload binding are unchanged; no action is needed besides updating the
+  version.
 - 0.8.1: documentation only. Adds the states table and these notes. Compared with 0.8.0, operations,
   signatures, nullable annotations, guards and exceptions, namespaces and overload binding are unchanged; no
   action is needed besides updating the version.

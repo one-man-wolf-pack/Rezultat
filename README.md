@@ -17,7 +17,8 @@ and `MaybeQueryExtensions` (`Select`, projected `SelectMany`, `Where`).
 
 The optional test-only package `Rezultat.Testing.Xunit` (`src/Rezultat.Testing.Xunit`) adds the extracting
 assertions `ResultAssertions.ShouldBeOk`/`ShouldBeError` and `ValidationAssertions.ShouldBeValid`/`ShouldBeInvalid`
-over the `Rezultat` package. It throws `Xunit.Sdk.FailException` from `xunit.v3.assert`, a runtime-only
+over the `Rezultat` package, each also with a required `includePayload` flag that keeps payloads and issues out of
+the failure message when `false`. It throws `Xunit.Sdk.FailException` from `xunit.v3.assert`, a runtime-only
 dependency, and is qualified with xUnit v2 and v3 test projects.
 
 The optional compile-time package `Rezultat.Analyzers` (`src/Rezultat.Analyzers`) is a `netstandard2.0` Roslyn
@@ -28,7 +29,9 @@ packed as an analyzer-only `analyzers/dotnet/cs` asset without dependencies or s
 
 The consumer-facing package READMEs are `src/Rezultat/README.md`, `src/Rezultat.Testing.Xunit/README.md` and
 `src/Rezultat.Analyzers/README.md`; each is packed into its `.nupkg` root and its `csharp` examples are compiled against
-the built package (and run, or checked for the `RZT0001` lines they mark). All packages share the version and
+the built package (and run, or checked for the `RZT0001` lines they mark). The core README also carries the
+migration guide and a Shouldly recipe in `csharp shouldly` blocks, which `qualification/ShouldlyRecipeConsumer`
+compiles and tests from the installed package with Shouldly and xUnit v3, without `Rezultat.Testing.Xunit`. All packages share the version and
 packaging settings in `src/Directory.Build.props`.
 
 Contracts, decisions and policies live in the specification repository
@@ -51,7 +54,7 @@ scripts/qualify.sh check                 # format verification, warning-free Rel
 scripts/qualify.sh test                  # own tests of the solution; extra arguments go to the test platform
 scripts/qualify.sh test Rezultat.Tests --filter-class Rezultat.Tests.ResultMapTests   # one test project, filtered
 scripts/qualify.sh pack                  # artifacts/package/{Rezultat,Rezultat.Testing.Xunit}.<version>.nupkg/.snupkg, Rezultat.Analyzers.<version>.nupkg
-scripts/qualify.sh consumers             # package consumers, compiler controls, README examples, package inspection
+scripts/qualify.sh consumers             # package consumers, compiler controls, README examples, Shouldly recipe, package inspection
 scripts/qualify.sh assertions            # assertion package consumers, xUnit v2/v3 runner scenarios, package inspection
 scripts/qualify.sh analyzers             # RZT0001 corpus in all severity modes, downstream isolation, README, package inspection
 scripts/qualify.sh alloc                 # warmed Release allocation controls
@@ -82,7 +85,7 @@ package is built from a commit, and its private source record goes with it into 
 ```sh
 scripts/qualify.sh release <commit> Rezultat                      # name each package to issue
 artifacts/release/<full-commit>/scripts/qualify.sh linux consumers   # qualify those exact archives
-scripts/publish-local.sh 0.8.1 artifacts/release/<full-commit>/artifacts/linux-arm64/package
+scripts/publish-local.sh 0.8.2 artifacts/release/<full-commit>/artifacts/linux-arm64/package
 # Other packages and explicit destination:
 scripts/publish-local.sh --package Rezultat.Analyzers <version> <package-directory> /absolute/path/to/rezultat-feed
 ```
@@ -144,7 +147,7 @@ For example, merge these entries with the project's existing sources/mappings:
 ```
 
 Consumers reference the package, not its source project. An exact reference
-is `<PackageReference Include="Rezultat" Version="[0.8.1]" />`; projects with central package
+is `<PackageReference Include="Rezultat" Version="[0.8.2]" />`; projects with central package
 management put the version on their `PackageVersion` entry. The analyzer is referenced per checked project as
 `<PackageReference Include="Rezultat.Analyzers" Version="0.8.0" PrivateAssets="all" IncludeAssets="analyzers" />`;
 it does not bring `Rezultat` and is not brought by it. Consumer repositories own the

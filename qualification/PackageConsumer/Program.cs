@@ -414,6 +414,7 @@ RootOnlyConsumer.Run(checks);
 PackageConsumer.Legacy.LegacyRecipeConsumer.Run(checks);
 ReadyCollectionQueryConsumer.Run(checks);
 PackageConsumer.LegacyQuery.LegacyQueryConsumer.Run(checks);
+PackageConsumer.Migration.MigrationConsumer.Run(checks);
 
 return checks.Complete();
 

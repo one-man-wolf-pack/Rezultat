@@ -23,7 +23,8 @@ usage: scripts/qualify.sh <command> [args]
                         run own tests of the solution, or of one tests/<project>; other arguments are forwarded
                         to the test platform (select the project when filtering: a project without matches fails)
   pack                  pack Rezultat, Rezultat.Testing.Xunit and Rezultat.Analyzers (Release) into artifacts/package
-  consumers             package consumers, compiler controls, packaged README examples and package inspection
+  consumers             package consumers, compiler controls, packaged README examples, the packaged Shouldly
+                        recipe in an isolated Shouldly consumer and package inspection
   assertions            Rezultat.Testing.Xunit consumers, compiler controls, README examples, xUnit v2/v3 runner
                         scenarios and package inspection
   analyzers             Rezultat.Analyzers package: RZT0001 corpus in warning/error/none/warnings-as-errors modes,
@@ -107,6 +108,7 @@ extract_readme_examples() {
     awk -v dir="$snippets" '
         /^```csharp$/ { file = sprintf("%s/example%02d.cs", dir, ++count); inside = 1; next }
         /^```ini$/ { file = sprintf("%s/example%02d.ini", dir, ++count); inside = 1; next }
+        /^```csharp shouldly$/ { file = sprintf("%s/recipe%02d.shouldly", dir, ++count); inside = 1; next }
         /^```$/ { if (inside) close(file); inside = 0; next }
         inside { print > file }
     ' "$readme"
@@ -133,12 +135,14 @@ consumers() {
     dotnet run --project "$root/qualification/NullableDisabledConsumer" -c Release --no-build
     compiler_controls CompilerControls
     readme_examples
+    shouldly_recipe
     build_clean "$root/qualification/PackageInspector"
     dotnet run --project "$root/qualification/PackageInspector" -c Release --no-build -- Rezultat \
         "$root" "$RezultatPackageVersion" "$feed/Rezultat.$RezultatPackageVersion.nupkg" \
         "$feed/Rezultat.$RezultatPackageVersion.snupkg" "$packages" \
         "$qualification/obj/PackageConsumer/project.assets.json" \
-        "$qualification/obj/NullableDisabledConsumer/project.assets.json"
+        "$qualification/obj/NullableDisabledConsumer/project.assets.json" \
+        "$qualification/obj/ShouldlyRecipeConsumer/project.assets.json"
 }
 
 # Runs one xUnit consumer pair. Expected-failure fixtures make the runner exit non-zero, so the exit
@@ -178,22 +182,36 @@ xunit_v2_pair() {
     cp "$qualification/obj/XunitV2Consumer/project.assets.json" "$qualification/assets/XunitV2Consumer/"
 }
 
-assertion_readme_examples() {
-    local project="$root/qualification/AssertionReadmeExamples" snippets="$qualification/assertion-readme" status=0
-    local report="$qualification/runner-reports/readme" facts total
-    extract_readme_examples "$packages/rezultat.testing.xunit/$RezultatPackageVersion/README.md" "$snippets"
+readme_facts() {
+    local label="$1" project="$2" snippets="$3" pattern="$4" status=0
+    local report="$qualification/runner-reports/$label" facts total
     build_clean "$project" -p:SnippetDirectory="$snippets"
     rm -rf "$report"
     dotnet test --project "$project" -c Release --no-build --results-directory "$report" \
         --report-xunit-xml --report-xunit-xml-filename results.xml || status=$?
-    facts="$(cat "$snippets"/*.cs | grep -c '\[Fact\]' || true)"
+    facts="$({ cat "$snippets"/$pattern; find "$project" -maxdepth 1 -name '*.cs' -exec cat {} +; } | grep -c '\[Fact\]' || true)"
     total="$(grep -oE '<assembly [^>]*' "$report/results.xml" | grep -oE ' (total|passed|failed|errors)="[0-9]+"' | tr -d ' ' | paste -sd' ' -)"
     if [[ $status -eq 0 && $facts -gt 0 && "$total" == *"total=\"$facts\""* && "$total" == *"passed=\"$facts\""* ]]; then
-        echo "PASS assertion README examples: $facts facts ($total)"
+        echo "PASS $label: $facts facts ($total)"
     else
-        echo "FAIL assertion README examples: exit $status, $facts facts, report $total"
+        echo "FAIL $label: exit $status, $facts facts, report $total"
         return 1
     fi
+}
+
+assertion_readme_examples() {
+    local snippets="$qualification/assertion-readme"
+    extract_readme_examples "$packages/rezultat.testing.xunit/$RezultatPackageVersion/README.md" "$snippets"
+    readme_facts readme "$root/qualification/AssertionReadmeExamples" "$snippets" '*.cs'
+}
+
+# Compiles the recipe from the installed package README, never from a checkout copy, so the shipped text is checked.
+shouldly_recipe() {
+    local snippets="$qualification/shouldly-readme"
+    extract_readme_examples "$packages/rezultat/$RezultatPackageVersion/README.md" "$snippets"
+    compgen -G "$snippets/*.shouldly" >/dev/null || { echo "FAIL packaged Rezultat README has no Shouldly recipe"; return 1; }
+    mkdir -p "$qualification/runner-reports"
+    readme_facts shouldly-recipe "$root/qualification/ShouldlyRecipeConsumer" "$snippets" '*.shouldly'
 }
 
 assertions() {
