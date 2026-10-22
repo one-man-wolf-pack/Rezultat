@@ -21,4 +21,19 @@ catch (Exception exception)
     checks.Text("wrong branch message", "Expected Result.Ok; actual Result.Error(null).", exception.Message);
 }
 
+checks.That("excluded payload keeps a null payload and the stored issues",
+    Result<string, string>.Ok(null).ShouldBeOk(includePayload: false) is null
+    && Validation<int, string>.InvalidMany(issues).ShouldBeInvalid(includePayload: false) == issues);
+try
+{
+    _ = Result<string, string>.Error(null).ShouldBeOk(includePayload: false);
+    checks.Fail("excluded wrong branch: no failure");
+}
+catch (Exception exception)
+{
+    checks.Text("excluded wrong branch failure type", "Xunit.Sdk.FailException", exception.GetType().FullName);
+    checks.That($"excluded wrong branch message names only the branches: {exception.Message}",
+        exception.Message.Contains("Result.Error", StringComparison.Ordinal) && !exception.Message.Contains("null", StringComparison.Ordinal));
+}
+
 return checks.Complete();

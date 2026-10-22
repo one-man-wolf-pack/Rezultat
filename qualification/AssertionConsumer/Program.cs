@@ -28,6 +28,21 @@ checks.That("unconstrained generic caller", Extract(Result<int?, string>.Ok(null
 CheckFailure("wrong branch", () => Result<int, string>.Error("evidence").ShouldBeOk(), "Result.Error(evidence)");
 CheckFailure("uninitialized", () => default(Validation<int, string>).ShouldBeInvalid(), "Validation.Uninitialized");
 CheckFailure("formatter", () => Result<Throwing, int>.Ok(new Throwing()).ShouldBeError(), "<ToString threw System.InvalidOperationException>");
+CheckFailure("included payload", () => Result<int, string>.Error("evidence").ShouldBeOk(includePayload: true), "Result.Error(evidence)");
+
+Throwing.Calls = 0;
+checks.That("excluded payload: success extracts exact values",
+    ReferenceEquals(reference, Result<object, Throwing>.Ok(reference).ShouldBeOk(includePayload: false))
+    && ReferenceEquals(reference, Result<Throwing, object>.Error(reference).ShouldBeError(includePayload: false))
+    && ReferenceEquals(reference, Validation<object, Throwing>.Valid(reference).ShouldBeValid(includePayload: false))
+    && Validation<Throwing, string?>.InvalidMany(issues).ShouldBeInvalid(includePayload: false) == issues
+    && Result<string?, string>.Ok(null).ShouldBeOk(includePayload: false) is null);
+CheckExcluded("excluded wrong Result branch", () => Result<int, Throwing>.Error(new Throwing()).ShouldBeOk(includePayload: false), "Result.Error");
+CheckExcluded("excluded wrong Ok branch", () => Result<Throwing, int>.Ok(new Throwing()).ShouldBeError(includePayload: false), "Result.Ok");
+CheckExcluded("excluded Invalid issues", () => Validation<int, Throwing>.InvalidMany([new Throwing(), new Throwing()]).ShouldBeValid(includePayload: false), "Validation.Invalid");
+CheckExcluded("excluded wrong Valid branch", () => Validation<Throwing, int>.Valid(new Throwing()).ShouldBeInvalid(includePayload: false), "Validation.Valid");
+CheckExcluded("excluded uninitialized", () => default(Result<Throwing, Throwing>).ShouldBeOk(includePayload: false), "Result.Uninitialized");
+checks.That($"excluded payload: no formatter call ({Throwing.Calls})", Throwing.Calls == 0);
 
 return checks.Complete();
 
@@ -38,31 +53,44 @@ void CheckOwner(Type owner, Type carrier, params (string Name, int Returned)[] e
     checks.That($"{owner.Name} is a public static extension owner",
         owner is { IsPublic: true, IsAbstract: true, IsSealed: true } && owner.IsDefined(typeof(ExtensionAttribute)));
     var methods = owner.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly);
-    checks.That($"{owner.Name} declares exactly {string.Join(", ", expected.Select(item => item.Name))}",
-        methods.Select(method => method.Name).Order(StringComparer.Ordinal).SequenceEqual(expected.Select(item => item.Name).Order(StringComparer.Ordinal)));
+    checks.That($"{owner.Name} declares exactly {string.Join(", ", expected.Select(item => item.Name))}, each without and with includePayload",
+        methods.Select(method => method.Name).Order(StringComparer.Ordinal)
+            .SequenceEqual(expected.SelectMany(item => new[] { item.Name, item.Name }).Order(StringComparer.Ordinal)));
     foreach (var (name, returned) in expected)
     {
-        var method = methods.SingleOrDefault(candidate => candidate.Name == name);
-        if (method is null)
+        var withoutFlag = methods.SingleOrDefault(candidate => candidate.Name == name && candidate.GetParameters().Length == 1);
+        var withFlag = methods.SingleOrDefault(candidate => candidate.Name == name && candidate.GetParameters().Length == 2);
+        if (withoutFlag is null || withFlag is null)
         {
-            checks.Fail($"{owner.Name}.{name} missing");
+            checks.Fail($"{owner.Name}.{name} overloads missing");
             continue;
         }
 
-        var arguments = method.GetGenericArguments();
-        var parameter = method.GetParameters().Single().ParameterType;
-        var returnType = returned < 0 ? typeof(ImmutableArray<>).MakeGenericType(arguments[1]) : arguments[returned];
-        checks.That($"{owner.Name}.{name} is an extension over {carrier.Name} with two unconstrained type parameters",
-            method.IsDefined(typeof(ExtensionAttribute)) && arguments.Length == 2
-            && arguments.All(argument => argument.GenericParameterAttributes == GenericParameterAttributes.None && argument.GetGenericParameterConstraints().Length == 0)
-            && parameter == carrier.MakeGenericType(arguments) && method.ReturnType == returnType);
-        checks.That($"{owner.Name}.{name} signature uses only Rezultat and BCL types",
-            new[] { method.ReturnType, parameter }.SelectMany(Flatten).All(type => type.Assembly == typeof(Unit).Assembly || type.Assembly == typeof(object).Assembly || type.Assembly == typeof(ImmutableArray).Assembly));
-        checks.That($"{owner.Name}.{name} declares carrier and payload without nullable annotations or flow attributes",
-            new[] { method.ReturnParameter, method.GetParameters()[0] }.All(item =>
-                NullableFlags(item, method).All(flag => flag != 2)
-                && !item.GetCustomAttributesData().Any(attribute => attribute.AttributeType.Namespace == "System.Diagnostics.CodeAnalysis")));
+        var flag = withFlag.GetParameters()[1];
+        checks.That($"{owner.Name}.{name} has a required bool includePayload",
+            flag is { Name: "includePayload", IsOptional: false, HasDefaultValue: false } && flag.ParameterType == typeof(bool)
+            && flag.GetCustomAttributesData().Count == 0);
+        CheckSignature(owner, carrier, name, returned, withoutFlag);
+        CheckSignature(owner, carrier, name, returned, withFlag);
     }
+}
+
+void CheckSignature(Type owner, Type carrier, string shortName, int returned, MethodInfo method)
+{
+    var name = $"{shortName}({string.Join(", ", method.GetParameters().Select(item => item.ParameterType.Name))})";
+    var arguments = method.GetGenericArguments();
+    var parameter = method.GetParameters()[0].ParameterType;
+    var returnType = returned < 0 ? typeof(ImmutableArray<>).MakeGenericType(arguments[1]) : arguments[returned];
+    checks.That($"{owner.Name}.{name} is an extension over {carrier.Name} with two unconstrained type parameters",
+        method.IsDefined(typeof(ExtensionAttribute)) && arguments.Length == 2
+        && arguments.All(argument => argument.GenericParameterAttributes == GenericParameterAttributes.None && argument.GetGenericParameterConstraints().Length == 0)
+        && parameter == carrier.MakeGenericType(arguments) && method.ReturnType == returnType);
+    checks.That($"{owner.Name}.{name} signature uses only Rezultat and BCL types",
+        new[] { method.ReturnType, parameter }.SelectMany(Flatten).All(type => type.Assembly == typeof(Unit).Assembly || type.Assembly == typeof(object).Assembly || type.Assembly == typeof(ImmutableArray).Assembly));
+    checks.That($"{owner.Name}.{name} declares carrier and payload without nullable annotations or flow attributes",
+        new[] { method.ReturnParameter, method.GetParameters()[0] }.All(item =>
+            NullableFlags(item, method).All(flag => flag != 2)
+            && !item.GetCustomAttributesData().Any(attribute => attribute.AttributeType.Namespace == "System.Diagnostics.CodeAnalysis")));
 }
 
 static byte[] NullableFlags(ParameterInfo parameter, MethodInfo method)
@@ -102,7 +130,43 @@ void CheckFailure(string name, Action action, string evidence)
     }
 }
 
+void CheckExcluded(string name, Action action, string actual)
+{
+    try
+    {
+        action();
+        checks.Fail($"{name}: no failure");
+    }
+    catch (Exception exception)
+    {
+        checks.Text($"{name}: failure type", "Xunit.Sdk.FailException", exception.GetType().FullName ?? string.Empty);
+        checks.That($"{name}: message names only the branches: {exception.Message}",
+            exception.Message.Contains(actual, StringComparison.Ordinal)
+            && !exception.Message.Contains("secret", StringComparison.Ordinal)
+            && !exception.Message.Contains("ToString", StringComparison.Ordinal)
+            && !exception.Message.Any(char.IsDigit));
+    }
+}
+
 internal sealed class Throwing
 {
-    public override string ToString() => throw new InvalidOperationException("formatter");
+    public static int Calls { get; set; }
+
+    public override string ToString()
+    {
+        Calls++;
+        throw new InvalidOperationException("secret formatter");
+    }
+
+    public override bool Equals(object? obj)
+    {
+        Calls++;
+        return ReferenceEquals(this, obj);
+    }
+
+    public override int GetHashCode()
+    {
+        Calls++;
+        return 0;
+    }
 }

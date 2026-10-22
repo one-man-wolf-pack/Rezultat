@@ -16,6 +16,15 @@ public sealed class Positive
     }
 
     [Fact]
+    public void ExtractsAllFourBranchesWithoutPayload()
+    {
+        Assert.Equal(42, Result<int, string>.Ok(42).ShouldBeOk(includePayload: false));
+        Assert.Equal("refused", Result<int, string>.Error("refused").ShouldBeError(includePayload: false));
+        Assert.Null(Validation<string?, string>.Valid(null).ShouldBeValid(includePayload: false));
+        Assert.Equal(new[] { "bad", "bad", null }, Validation<int, string?>.InvalidMany(["bad", "bad", null]).ShouldBeInvalid(includePayload: false));
+    }
+
+    [Fact]
     public void KeepsNullablePayloads()
     {
         string? text = Result<string?, string>.Ok(null).ShouldBeOk();
@@ -51,6 +60,16 @@ public sealed class ExpectedFailures
 
     [Fact]
     public void FormatterFault() => _ = Validation<int, ThrowingText>.Invalid(new ThrowingText()).ShouldBeValid();
+
+    [Fact]
+    public void WrongBranchWithoutPayload() => _ = Result<int, string>.Error("secret-sentinel").ShouldBeOk(includePayload: false);
+
+    [Fact]
+    public void InvalidWithoutPayload() =>
+        _ = Validation<int, ThrowingText>.InvalidMany([new ThrowingText(), new ThrowingText()]).ShouldBeValid(includePayload: false);
+
+    [Fact]
+    public void UninitializedWithoutPayload() => _ = default(Result<int, string>).ShouldBeError(includePayload: false);
 
     [Fact]
     public void InsideMultiple() => Assert.Multiple(

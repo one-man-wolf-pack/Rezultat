@@ -11,14 +11,18 @@ var pair = args[0] == "v3" ? $"xunit.v3 {args[1]}" : args[1];
 var framework = $"xUnit.net v3 {args[1]}+";
 var checks = new Checks();
 var family = args[0] == "v2" ? "Family.FailureIsTheV3FailExceptionNotTheV2AssertionFamily" : "Family.FailureIsTheV3FailException";
-string[] passing = ["Positive.ExtractsAllFourBranches", "Positive.KeepsNullablePayloads", "Positive.FailureStopsOnlyTheCurrentMultipleLambda", family];
+string[] passing = ["Positive.ExtractsAllFourBranches", "Positive.ExtractsAllFourBranchesWithoutPayload", "Positive.KeepsNullablePayloads", "Positive.FailureStopsOnlyTheCurrentMultipleLambda", family];
 var failing = new Dictionary<string, string>
 {
     ["ExpectedFailures.WrongBranch"] = "actual Result.Error(wrong-branch-evidence)",
     ["ExpectedFailures.Uninitialized"] = "actual Validation.Uninitialized",
     ["ExpectedFailures.FormatterFault"] = "<ToString threw System.InvalidOperationException>",
     ["ExpectedFailures.InsideMultiple"] = "actual Result.Ok(7)",
+    ["ExpectedFailures.WrongBranchWithoutPayload"] = "actual Result.Error.",
+    ["ExpectedFailures.InvalidWithoutPayload"] = "actual Validation.Invalid.",
+    ["ExpectedFailures.UninitializedWithoutPayload"] = "actual Result.Uninitialized",
 };
+string[] undisclosed = ["secret-sentinel", "ToString", "issues"];
 
 var report = args[0] == "v2" ? ReadTrx(args[2]) : ReadXunitXml(args[2]);
 if (args[0] == "v3")
@@ -44,6 +48,12 @@ foreach (var (name, evidence) in failing)
 
     checks.That($"{pair}: {name} is a failed test", result.Outcome == Outcome.Failed);
     checks.That($"{pair}: {name} message carries '{evidence}': {result.Message}", result.Message.Contains(evidence, StringComparison.Ordinal));
+    if (name.EndsWith("WithoutPayload", StringComparison.Ordinal))
+    {
+        checks.That($"{pair}: {name} message names only the branches: {result.Message}",
+            !undisclosed.Any(text => result.Message.Contains(text, StringComparison.Ordinal)) && !result.Message.Any(char.IsDigit));
+    }
+
     if (result.ExceptionType is not null)
     {
         checks.Text($"{pair}: {name} exception type", "Xunit.Sdk.FailException", result.ExceptionType);

@@ -6,8 +6,8 @@ namespace Rezultat.Testing.Xunit;
 
 internal static class FailureText
 {
-    public static string Uninitialized(string expected, string carrier) =>
-        $"Expected {expected}; actual {carrier}.Uninitialized.";
+    public static string Branch(string expected, string actual) =>
+        $"Expected {expected}; actual {actual}.";
 
     public static string WrongBranch<TPayload>(string expected, string actual, TPayload payload) =>
         $"Expected {expected}; actual {actual}({Payload(payload)}).";

@@ -12,14 +12,25 @@ public static class ValidationAssertions
 {
     /// <summary>
     /// Returns the exact valid payload, which stays nullable when <typeparamref name="T"/> is. A matching branch
-    /// formats nothing; Invalid and an uninitialized <c>default</c> fail without returning.
+    /// formats nothing; Invalid and an uninitialized <c>default</c> fail without returning. The failure message lists
+    /// every issue, as with <c>includePayload: true</c>.
     /// </summary>
     [StackTraceHidden]
-    public static T ShouldBeValid<T, TIssue>(this Validation<T, TIssue> validation)
+    public static T ShouldBeValid<T, TIssue>(this Validation<T, TIssue> validation) => ShouldBeValid(validation, includePayload: true);
+
+    /// <summary>
+    /// Returns the exact valid payload, which stays nullable when <typeparamref name="T"/> is. A matching branch
+    /// formats nothing; Invalid and an uninitialized <c>default</c> fail without returning.
+    /// With <c>includePayload: true</c> the failure message shows the issue count and every issue through its
+    /// <c>ToString()</c>. With <c>false</c> it names only the expected and actual branches, without the issues or their
+    /// count, and does not walk them; this limits only this failure message.
+    /// </summary>
+    [StackTraceHidden]
+    public static T ShouldBeValid<T, TIssue>(this Validation<T, TIssue> validation, bool includePayload)
     {
         if (!validation.IsInitialized)
         {
-            throw FailException.ForFailure(FailureText.Uninitialized("Validation.Valid", "Validation"));
+            throw FailException.ForFailure(FailureText.Branch("Validation.Valid", "Validation.Uninitialized"));
         }
 
         if (validation.TryGetValue(out var value, out var issues))
@@ -27,19 +38,33 @@ public static class ValidationAssertions
             return value;
         }
 
-        throw FailException.ForFailure(FailureText.Invalid("Validation.Valid", issues));
+        throw FailException.ForFailure(includePayload
+            ? FailureText.Invalid("Validation.Valid", issues)
+            : FailureText.Branch("Validation.Valid", "Validation.Invalid"));
     }
 
     /// <summary>
     /// Returns the stored issues as is: same buffer, original order, repeats and nulls kept. A matching branch
-    /// formats nothing; Valid and an uninitialized <c>default</c> fail without returning.
+    /// formats nothing; Valid and an uninitialized <c>default</c> fail without returning. The failure message shows the
+    /// active valid payload, as with <c>includePayload: true</c>.
     /// </summary>
     [StackTraceHidden]
-    public static ImmutableArray<TIssue> ShouldBeInvalid<T, TIssue>(this Validation<T, TIssue> validation)
+    public static ImmutableArray<TIssue> ShouldBeInvalid<T, TIssue>(this Validation<T, TIssue> validation) =>
+        ShouldBeInvalid(validation, includePayload: true);
+
+    /// <summary>
+    /// Returns the stored issues as is: same buffer, original order, repeats and nulls kept. A matching branch
+    /// formats nothing; Valid and an uninitialized <c>default</c> fail without returning.
+    /// With <c>includePayload: true</c> the failure message shows the active valid payload through its
+    /// <c>ToString()</c>. With <c>false</c> it names only the expected and actual branches and does not format the
+    /// payload; this limits only this failure message.
+    /// </summary>
+    [StackTraceHidden]
+    public static ImmutableArray<TIssue> ShouldBeInvalid<T, TIssue>(this Validation<T, TIssue> validation, bool includePayload)
     {
         if (!validation.IsInitialized)
         {
-            throw FailException.ForFailure(FailureText.Uninitialized("Validation.Invalid", "Validation"));
+            throw FailException.ForFailure(FailureText.Branch("Validation.Invalid", "Validation.Uninitialized"));
         }
 
         if (!validation.TryGetValue(out var value, out var issues))
@@ -47,6 +72,8 @@ public static class ValidationAssertions
             return issues;
         }
 
-        throw FailException.ForFailure(FailureText.WrongBranch("Validation.Invalid", "Validation.Valid", value));
+        throw FailException.ForFailure(includePayload
+            ? FailureText.WrongBranch("Validation.Invalid", "Validation.Valid", value)
+            : FailureText.Branch("Validation.Invalid", "Validation.Valid"));
     }
 }
