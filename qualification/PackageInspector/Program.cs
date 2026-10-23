@@ -357,11 +357,34 @@ internal sealed class Inspection(string packageId, string packageVersion)
         Check("packaged README.md is the authored consumer readme", packaged.AsSpan().SequenceEqual(authored));
 
         var text = System.Text.Encoding.UTF8.GetString(packaged);
-        var localLinks = Regex.Matches(text, @"\]\((?!https://)[^)]*\)").Select(match => match.Value).ToArray();
-        Check("README.md links only to absolute https targets", localLinks.Length == 0, string.Join(", ", localLinks));
+        var localLinks = Regex.Matches(text, @"\]\((?!https://|#)[^)]*\)").Select(match => match.Value).ToArray();
+        Check("README.md links only to absolute https targets or its own sections", localLinks.Length == 0, string.Join(", ", localLinks));
+        var sections = GitHubHeadingAnchors(text);
+        var anchors = Regex.Matches(text, @"\]\(#([^)]*)\)").Select(match => match.Groups[1].Value).ToArray();
+        var unknown = anchors.Where(anchor => !sections.Contains(anchor)).ToArray();
+        Report("README.md section links", anchors.Length.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        Check("README.md section links name its own headings", unknown.Length == 0, string.Join(", ", unknown));
         string[] checkoutMarkers = ["../", "scripts/", "qualify.sh", "rezultat-specification", "src/", "artifacts/"];
         var checkoutOnly = checkoutMarkers.Where(marker => text.Contains(marker, StringComparison.Ordinal)).ToArray();
         Check("README.md has no checkout-only paths or tooling", checkoutOnly.Length == 0, string.Join(", ", checkoutOnly));
+    }
+
+    private static HashSet<string> GitHubHeadingAnchors(string markdown)
+    {
+        var anchors = new HashSet<string>(StringComparer.Ordinal);
+        var fenced = false;
+        foreach (var line in markdown.Split('\n'))
+        {
+            fenced ^= line.StartsWith("```", StringComparison.Ordinal);
+            var heading = fenced ? null : Regex.Match(line, @"^#{1,6} (.+)$");
+            if (heading is { Success: true })
+            {
+                var title = heading.Groups[1].Value.Trim().ToLowerInvariant();
+                anchors.Add(Regex.Replace(title, @"[^\p{L}\p{N} _-]", string.Empty).Replace(' ', '-'));
+            }
+        }
+
+        return anchors;
     }
 
     private void Check(string name, bool condition, string? detail = null)

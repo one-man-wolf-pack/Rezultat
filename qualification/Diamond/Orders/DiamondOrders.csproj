@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <IsPackable>true</IsPackable>
+    <PackageId>Rezultat.Qualification.DiamondOrders</PackageId>
+    <AssemblyName>Rezultat.Qualification.DiamondOrders</AssemblyName>
+    <Version>1.0.0</Version>
+    <Authors>Rezultat qualification</Authors>
+    <Description>Qualification-only library that consumes Rezultat carriers for the reference diamond.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Rezultat" Version="$(RezultatPackageVersion)" />
+  </ItemGroup>
+
+</Project>

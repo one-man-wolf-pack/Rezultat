@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../Shared/Checks.cs" Link="Checks.cs" />
+    <Compile Include="$(SnippetDirectory)/*.jsonrecipe" Condition="'$(SnippetDirectory)' != ''" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Rezultat" Version="$(RezultatPackageVersion)" />
+  </ItemGroup>
+
+</Project>
