@@ -1,16 +1,79 @@
 # Rezultat
 
-Explicit outcome carriers for .NET: `Result<T, TError>` for success or a typed error, `Maybe<T>` for an
-optional value, `Presence<T>` for a missing, null or present value, `Validation<T, TIssue>` for accumulated
-issues and `Unit` for an outcome without a payload. All of them are value types with synchronous composition.
+Rezultat gives .NET code explicit outcome types. A method returns a value that says whether it succeeded, found
+something or passed its checks, and the caller handles each case with ordinary C#: `if`, early `return`, `switch`,
+or a short chain of operations where it reads better. The types are value types in one `net10.0` package without
+dependencies beyond the .NET framework; all operations are synchronous.
 
-The package targets `net10.0` and has no dependencies beyond the .NET framework.
+Contents: [Choose a type](#choose-a-type), [Install](#install), [Quickstart](#quickstart),
+[States, defaults and null](#states-defaults-and-null), [Carriers and composition](#carriers-and-composition),
+[Collection operations](#collection-operations), [Query syntax](#query-syntax), [HTTP responses](#http-responses),
+[Presence in JSON fields](#presence-in-json-fields), [Behavior to know](#behavior-to-know),
+[Moving from local outcome types](#moving-from-local-outcome-types), [Limits](#limits),
+[Release notes](#release-notes).
+
+## Choose a type
+
+| The operation tells the caller | Use |
+| --- | --- |
+| A value; there is no expected absence or failure | a plain `T` |
+| One kind of absence, and `null` is enough to say it | `T?` |
+| Whether a value is there, also when the found value itself may be `null` | `Maybe<T>` |
+| Whether an input field was not sent, sent as `null` or sent with a value | `Presence<T>` |
+| Success, or an expected failure whose reason the caller uses | `Result<T, TError>` |
+| The result of independent checks, with every problem they found | `Validation<T, TIssue>` |
+
+`Result` fits any expected failure the caller acts on, not only broken business rules: a private parser or an
+unavailable dependency can return one too, while unexpected defects and cancellation stay exceptions. `TError` is
+your type: a string, an enum or a record with the facts the caller needs. `Unit` is the payload of an outcome
+without a value, such as `Result<Unit, TError>`; outside generic code `void` and `Task` stay the natural choice.
+What a `Presence` state means for an update (clear, keep or reject) is decided by each field's contract, not by the
+type. Several domain states with different data that are not simply success or failure deserve a type of your own.
 
 ## Install
+
+The package is distributed through a private NuGet feed, not nuget.org. With that feed among your package sources:
 
 ```sh
 dotnet add package Rezultat
 ```
+
+`using Rezultat;` is enough to start. Test assertions for xUnit (`Rezultat.Testing.Xunit`) and a warning for a
+discarded outcome (`Rezultat.Analyzers`) are separate optional packages; this package does not bring them.
+
+## Quickstart
+
+```csharp
+using Rezultat;
+
+Result<int, string> ParseQuantity(string text) =>
+    int.TryParse(text, out var value) && value > 0
+        ? Result<int, string>.Ok(value)
+        : Result<int, string>.Error($"'{text}' is not a positive quantity");
+
+foreach (var input in new[] { "3", "zero" })
+{
+    if (!ParseQuantity(input).TryGetValue(out var quantity, out var error))
+    {
+        Console.WriteLine($"rejected: {error}");
+        continue;
+    }
+
+    Console.WriteLine($"ordering {quantity}");
+}
+
+Validation<string, string> CheckName(string name) =>
+    name.Length > 0 ? Validation<string, string>.Valid(name) : Validation<string, string>.Invalid("name is empty");
+
+Validation<int, string> CheckAge(int age) =>
+    age >= 0 ? Validation<int, string>.Valid(age) : Validation<int, string>.Invalid("age is negative");
+
+var person = CheckName("").Zip(CheckAge(-1), static (name, age) => $"{name}, {age}");
+Console.WriteLine(person.Match(static text => $"valid: {text}", static issues => string.Join("; ", issues)));
+```
+
+`TryGetValue` checks the outcome once and gives either the value or the error. `Zip` runs both checks and keeps
+every issue, here `name is empty; age is negative`.
 
 ## States, defaults and null
 
@@ -197,6 +260,135 @@ Console.WriteLine(from width in Parse("3") from height in Parse("x") select widt
 Console.WriteLine(from found in Find(2) where found > 10 select found + 1);
 Console.WriteLine(from found in Find(1) where found > 10 select found + 1);
 ```
+
+## HTTP responses
+
+Turning an outcome into an HTTP response is the job of your endpoint. Choose a response for each error case the
+operation can produce: an Error does not mean 404 by itself. With ASP.NET Core:
+
+```csharp http
+using Microsoft.AspNetCore.Http;
+using Rezultat;
+
+public sealed record Order(int Id, string Status);
+
+public abstract record OrderError
+{
+    public sealed record NotFound(int OrderId) : OrderError;
+
+    public sealed record AlreadyShipped(int OrderId) : OrderError;
+}
+
+public static class OrderResponses
+{
+    public static IResult Cancel(Result<Order, OrderError> outcome) => outcome.Match<IResult>(
+        static order => TypedResults.Ok(order),
+        static error => error switch
+        {
+            OrderError.NotFound => TypedResults.NotFound(),
+            OrderError.AlreadyShipped shipped => TypedResults.Conflict($"order {shipped.OrderId} has already shipped"),
+            _ => throw new ArgumentOutOfRangeException(nameof(error), error.GetType().Name, "Map every new OrderError case."),
+        });
+
+    public static IResult Create(Validation<Order, string> outcome) => outcome.Match<IResult>(
+        static order => TypedResults.Created($"/orders/{order.Id}", order),
+        static issues => TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["order"] = [.. issues] }));
+}
+```
+
+A missing order is 404, an order that has already shipped is 409 with a message, a created order is 201, and invalid
+input is 400 with every issue in its order. Endpoint handlers return these `IResult` values. The package does not
+depend on ASP.NET Core and contains no HTTP mapping of its own.
+
+## Presence in JSON fields
+
+`Presence<T>` keeps the difference between a field that was not sent, sent as `null` and sent with a value. The
+serializer does not know that difference by itself: the DTO omits Missing properties and a small converter of your
+own maps `null` and values. With System.Text.Json:
+
+```csharp json
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
+using Rezultat;
+
+public sealed class ProfilePatch
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    [JsonConverter(typeof(PresenceFieldConverter<string>))]
+    public Presence<string> Nickname { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    [JsonConverter(typeof(PresenceFieldConverter<int>))]
+    public Presence<int> Age { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    [JsonConverter(typeof(PresenceFieldConverter<bool>))]
+    public Presence<bool> Newsletter { get; init; }
+}
+
+public sealed class PresenceFieldConverter<T> : JsonConverter<Presence<T>>
+    where T : notnull
+{
+    public override Presence<T> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Null)
+        {
+            return Presence<T>.Null;
+        }
+
+        T? value;
+        try
+        {
+            value = JsonSerializer.Deserialize(ref reader, (JsonTypeInfo<T>)options.GetTypeInfo(typeof(T)));
+        }
+        catch (JsonException exception)
+        {
+            throw new JsonException("Invalid field payload; see the inner exception for the payload path.", exception);
+        }
+
+        return value is null
+            ? throw new JsonException("A non-null JSON value was read as a null payload.")
+            : Presence<T>.Value(value);
+    }
+
+    public override void Write(Utf8JsonWriter writer, Presence<T> value, JsonSerializerOptions options)
+    {
+        if (value.TryGetValue(out var payload))
+        {
+            try
+            {
+                JsonSerializer.Serialize(writer, payload, (JsonTypeInfo<T>)options.GetTypeInfo(typeof(T)));
+            }
+            catch (JsonException exception)
+            {
+                throw new JsonException("Invalid field payload; see the inner exception for the payload path.", exception);
+            }
+        }
+        else if (value.IsNull)
+        {
+            writer.WriteNullValue();
+        }
+        else
+        {
+            throw new JsonException("Missing must be omitted by the containing property.");
+        }
+    }
+}
+```
+
+| JSON property | State |
+| --- | --- |
+| Absent | `Missing` |
+| `null` | `Null` |
+| Any other value, including `0`, `false` and `""` | `Value` |
+
+`WhenWritingDefault` omits a Missing property because `default(Presence<T>)` is Missing; `WhenWritingNull` does not
+replace it. A converter cannot remove a property that is already being written, so it rejects Missing, for example
+at the document root or in an array. `null` is handled before the payload is read, and a payload that reads as
+`null` from another token is rejected. Whether a field may be Null or Missing, and what an update does in each
+state, is the contract of that field. This converter is a recipe for your code, not part of the package; with
+source-generated metadata, register the DTO and every payload type in your context and check the exact DTO there.
 
 ## Behavior to know
 
@@ -411,8 +603,25 @@ public sealed class RezultatShouldlyRecipeTests
 - If you add a `customMessage` parameter, its content is your responsibility: interpolating the payload into it
   shows the data again. Later Shouldly assertions such as `ShouldBe` format their own values.
 
+## Limits
+
+- The package targets only `net10.0`. Its qualification runs on Linux ARM64 with glibc and the .NET 10 SDK,
+  including a trimmed and a Native AOT publication of a consumer there; other platforms are not qualified by it.
+- There is no general zero-allocation or zero-overhead promise. Delegates, captured variables, issue arrays and
+  large value payloads have their usual cost; measure the paths that matter to you.
+- Two libraries packed separately and referencing this package exchange its `Result` and `Validation` values
+  directly in one application. That was checked with both libraries built against this version, and with one of
+  them built against 0.8.0 and run with this version. Versions `0.y.z` make no compatibility promise for other or
+  future version pairs.
+- A copy of the package loaded into another `AssemblyLoadContext` defines different types; sharing a carrier needs
+  the same loaded assembly.
+
 ## Release notes
 
+- 0.8.3: documentation only. The README starts with choosing a type, installation and a quickstart, and adds the
+  HTTP response and Presence JSON examples and the limits. Compared with 0.8.2, operations, signatures, nullable
+  annotations, guards and exceptions, namespaces and overload binding are unchanged; no action is needed besides
+  updating the version.
 - 0.8.2: documentation only. Adds the formatting warning next to the states table, the guide for moving from
   local outcome types and the Shouldly recipe. Compared with 0.8.1, operations, signatures, nullable annotations,
   guards and exceptions, namespaces and overload binding are unchanged; no action is needed besides updating the

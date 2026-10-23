@@ -7,6 +7,11 @@ feed="$artifacts/package"
 qualification="$artifacts/qualification"
 packages="$qualification/packages"
 linux_image="mcr.microsoft.com/dotnet/sdk:10.0.402-noble-aot"
+issued_feed="${REZULTAT_LOCAL_FEED:-$HOME/.local/share/nuget/rezultat}"
+# The mixed-version diamond must consume the archive that was actually issued as 0.8.0 (review/096). A repack or a
+# different file under the same version would compile the old library against other bytes and prove nothing.
+issued_core_version=0.8.0
+issued_core_sha256=4f2d6cdd7e84380515e559cdf42c2c14e8d9d357373b7d5e82e5c33389cc5469
 . "$root/scripts/release-record.sh"
 
 export DOTNET_NOLOGO=1 DOTNET_CLI_TELEMETRY_OPTOUT=1 TESTINGPLATFORM_TELEMETRY_OPTOUT=1
@@ -23,8 +28,12 @@ usage: scripts/qualify.sh <command> [args]
                         run own tests of the solution, or of one tests/<project>; other arguments are forwarded
                         to the test platform (select the project when filtering: a project without matches fails)
   pack                  pack Rezultat, Rezultat.Testing.Xunit and Rezultat.Analyzers (Release) into artifacts/package
-  consumers             package consumers, compiler controls, packaged README examples, the packaged Shouldly
-                        recipe in an isolated Shouldly consumer and package inspection
+  consumers             package consumers, compiler controls, root and packaged README examples, the packaged
+                        Shouldly, HTTP and Presence JSON recipes in isolated consumers, the reference diamond and
+                        package inspection
+  diamond               reference diamond: two separately packed fixture libraries exchange Result/Validation in an
+                        app, with both libraries on the candidate core and with one library compiled against the
+                        issued Rezultat 0.8.0 from the local feed (REZULTAT_LOCAL_FEED)
   assertions            Rezultat.Testing.Xunit consumers, compiler controls, README examples, xUnit v2/v3 runner
                         scenarios and package inspection
   analyzers             Rezultat.Analyzers package: RZT0001 corpus in warning/error/none/warnings-as-errors modes,
@@ -69,12 +78,16 @@ reset_package_cache() {
 }
 
 build_clean() {
-    local project="$1"
+    dotnet_clean build "$1" --no-incremental "${@:2}"
+}
+
+dotnet_clean() {
+    local verb="$1" project="$2"
     local output
-    output="$(dotnet build "$project" -c Release --no-incremental "${@:2}" 2>&1)" || { echo "$output"; return 1; }
+    output="$(dotnet "$verb" "$project" -c Release "${@:3}" 2>&1)" || { echo "$output"; return 1; }
     if grep -Eq 'warning [A-Z]+[0-9]+' <<<"$output"; then
         echo "$output"
-        echo "FAIL $project built with warnings"
+        echo "FAIL $verb $project with warnings"
         return 1
     fi
 }
@@ -109,22 +122,39 @@ extract_readme_examples() {
         /^```csharp$/ { file = sprintf("%s/example%02d.cs", dir, ++count); inside = 1; next }
         /^```ini$/ { file = sprintf("%s/example%02d.ini", dir, ++count); inside = 1; next }
         /^```csharp shouldly$/ { file = sprintf("%s/recipe%02d.shouldly", dir, ++count); inside = 1; next }
+        /^```csharp http$/ { file = sprintf("%s/recipe%02d.httprecipe", dir, ++count); inside = 1; next }
+        /^```csharp json$/ { file = sprintf("%s/recipe%02d.jsonrecipe", dir, ++count); inside = 1; next }
         /^```$/ { if (inside) close(file); inside = 0; next }
         inside { print > file }
     ' "$readme"
-    compgen -G "$snippets/*.cs" >/dev/null || { echo "FAIL packaged $readme has no csharp examples"; return 1; }
+    compgen -G "$snippets/*.cs" >/dev/null || { echo "FAIL $readme has no csharp examples"; return 1; }
 }
 
 readme_examples() {
     local project="$root/qualification/ReadmeExamples"
-    local snippets="$qualification/readme" snippet
+    local label readme snippets snippet
     dotnet restore "$project" >/dev/null
-    extract_readme_examples "$packages/rezultat/$RezultatPackageVersion/README.md" "$snippets"
-    for snippet in "$snippets"/*.cs; do
-        build_clean "$project" -p:Snippet="$snippet"
-        dotnet run --project "$project" -c Release --no-build
-        echo "PASS README example $(basename "$snippet")"
+    for label in package root; do
+        readme="$packages/rezultat/$RezultatPackageVersion/README.md"
+        [[ "$label" == root ]] && readme="$root/README.md"
+        snippets="$qualification/readme-$label"
+        extract_readme_examples "$readme" "$snippets"
+        for snippet in "$snippets"/*.cs; do
+            build_clean "$project" -p:Snippet="$snippet"
+            dotnet run --project "$project" -c Release --no-build
+            echo "PASS $label README example $(basename "$snippet")"
+        done
     done
+}
+
+readme_recipe() {
+    local project="$root/qualification/$1" extension="$2"
+    local snippets="$qualification/$1"
+    extract_readme_examples "$packages/rezultat/$RezultatPackageVersion/README.md" "$snippets"
+    compgen -G "$snippets/*.$extension" >/dev/null || { echo "FAIL packaged Rezultat README has no $extension block"; return 1; }
+    build_clean "$project" -p:SnippetDirectory="$snippets"
+    dotnet run --project "$project" -c Release --no-build
+    echo "PASS $1"
 }
 
 consumers() {
@@ -136,13 +166,56 @@ consumers() {
     compiler_controls CompilerControls
     readme_examples
     shouldly_recipe
+    readme_recipe HttpReadmeRecipe httprecipe
+    readme_recipe JsonReadmeRecipe jsonrecipe
     build_clean "$root/qualification/PackageInspector"
     dotnet run --project "$root/qualification/PackageInspector" -c Release --no-build -- Rezultat \
         "$root" "$RezultatPackageVersion" "$feed/Rezultat.$RezultatPackageVersion.nupkg" \
         "$feed/Rezultat.$RezultatPackageVersion.snupkg" "$packages" \
         "$qualification/obj/PackageConsumer/project.assets.json" \
         "$qualification/obj/NullableDisabledConsumer/project.assets.json" \
-        "$qualification/obj/ShouldlyRecipeConsumer/project.assets.json"
+        "$qualification/obj/ShouldlyRecipeConsumer/project.assets.json" \
+        "$qualification/obj/HttpReadmeRecipe/project.assets.json" \
+        "$qualification/obj/JsonReadmeRecipe/project.assets.json"
+    diamond
+}
+
+diamond_case() {
+    local name="$1" candidate_sha="$2" inventory_core="$3" inventory_feed="$4" inventory_sha="$5"
+    local d="$root/qualification/Diamond" out="$qualification/diamond/$name" library_feed="$qualification/diamond/feed"
+    local restore
+    rm -rf "$out" "$library_feed"
+    mkdir -p "$out/assets" "$library_feed"
+    restore=(-p:RestorePackagesPath="$out/packages")
+    build_clean "$d/Inventory" "${restore[@]}" -p:RezultatPackageVersion="$inventory_core"
+    dotnet_clean pack "$d/Inventory" --no-build -o "$library_feed" "${restore[@]}" -p:RezultatPackageVersion="$inventory_core"
+    cp "$qualification/obj/DiamondInventory/project.assets.json" "$out/assets/DiamondInventory.json"
+    build_clean "$d/Orders" "${restore[@]}"
+    dotnet_clean pack "$d/Orders" --no-build -o "$library_feed" "${restore[@]}"
+    cp "$qualification/obj/DiamondOrders/project.assets.json" "$out/assets/DiamondOrders.json"
+    build_clean "$d/App" "${restore[@]}"
+    cp "$qualification/obj/DiamondApp/project.assets.json" "$out/assets/DiamondApp.json"
+    cp -R "$library_feed" "$out/feed"
+    dotnet run --project "$d/App" -c Release --no-build -- "$RezultatPackageVersion.0" "$inventory_core.0"
+    dotnet run --project "$d/Inspector" -c Release --no-build -- "$name" "$out/packages" "$library_feed" \
+        "$qualification/bin/DiamondApp/release" "$out/assets" \
+        "$RezultatPackageVersion" "$feed" "$candidate_sha" "$inventory_core" "$inventory_feed" "$inventory_sha"
+}
+
+diamond() {
+    local issued="$qualification/diamond/issued" archive="$issued_feed/Rezultat.$issued_core_version.nupkg" actual candidate_sha
+    reset_package_cache
+    [[ "$RezultatPackageVersion" != "$issued_core_version" ]] || { echo "FAIL candidate must differ from issued $issued_core_version"; return 1; }
+    [[ -f "$archive" ]] || { echo "FAIL issued Rezultat $issued_core_version not found: $archive (set REZULTAT_LOCAL_FEED)"; return 1; }
+    actual="$(sha256sum "$archive" | cut -d' ' -f1)"
+    [[ "$actual" == "$issued_core_sha256" ]] || { echo "FAIL $archive has sha256 $actual, issued $issued_core_sha256"; return 1; }
+    rm -rf "$issued"
+    mkdir -p "$issued"
+    cp "$archive" "$issued/"
+    build_clean "$root/qualification/Diamond/Inspector"
+    candidate_sha="$(sha256sum "$feed/Rezultat.$RezultatPackageVersion.nupkg" | cut -d' ' -f1)"
+    diamond_case same-version "$candidate_sha" "$RezultatPackageVersion" "$feed" "$candidate_sha"
+    diamond_case mixed-version "$candidate_sha" "$issued_core_version" "$issued" "$issued_core_sha256"
 }
 
 # Runs one xUnit consumer pair. Expected-failure fixtures make the runner exit non-zero, so the exit
@@ -326,8 +399,10 @@ linux() {
         return 1
     fi
     mkdir -p "$host_output/home"
+    local mounts=()
+    [[ -d "$issued_feed" ]] && mounts=(-v "$(cd "$issued_feed" && pwd):/issued-feed:ro" -e REZULTAT_LOCAL_FEED=/issued-feed)
     docker run --rm --platform linux/arm64 \
-        --user "$(id -u):$(id -g)" \
+        --user "$(id -u):$(id -g)" ${mounts[@]+"${mounts[@]}"} \
         -e HOME=/work/artifacts/home -e DOTNET_CLI_HOME=/work/artifacts/home -e NUGET_PACKAGES=/work/artifacts/nuget \
         -v "$root:/work:ro" -v "$host_output:/work/artifacts" -w /work \
         "$linux_image" \
@@ -375,6 +450,7 @@ case "$command" in
     test) run_tests "$@" ;;
     pack) pack ;;
     consumers) consumers ;;
+    diamond) diamond ;;
     assertions) assertions ;;
     alloc) alloc ;;
     publish) publish "$@" ;;
