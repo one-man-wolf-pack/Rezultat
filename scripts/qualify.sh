@@ -435,8 +435,10 @@ linux() {
     mkdir -p "$host_output/home"
     local mounts=()
     [[ -d "$issued_feed" ]] && mounts=(-v "$(cd "$issued_feed" && pwd):/issued-feed:ro" -e REZULTAT_LOCAL_FEED=/issued-feed)
+    # UseSharedCompilation=false: a one-shot container compiles with the standalone compiler, not a reused
+    # Roslyn compiler server. MSBuild reads the variable as a property in every nested build.
     docker run --rm --platform linux/arm64 \
-        --user "$(id -u):$(id -g)" ${mounts[@]+"${mounts[@]}"} \
+        --user "$(id -u):$(id -g)" ${mounts[@]+"${mounts[@]}"} -e UseSharedCompilation=false \
         -e HOME=/work/artifacts/home -e DOTNET_CLI_HOME=/work/artifacts/home -e NUGET_PACKAGES=/work/artifacts/nuget \
         -v "$root:/work:ro" -v "$host_output:/work/artifacts" -w /work \
         "$linux_image" \

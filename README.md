@@ -129,7 +129,8 @@ only commands that change sources.
 
 `consumers`, `diamond`, `assertions`, `analyzers`, `alloc` and `publish` consume the packages from
 `artifacts/package` through `qualification/NuGet.Config` and an isolated package folder, so run `pack` first.
-Linux container outputs are kept separately in `artifacts/linux-arm64`.
+Linux container outputs are kept separately in `artifacts/linux-arm64`; the container compiles with
+`UseSharedCompilation=false` (standalone compiler, no reused compiler server) and does not retry failed builds.
 `assertions` runs expected-failure fixtures on purpose and checks the native reports kept in
 `artifacts/qualification/runner-reports`. `analyzers` compares every diagnostic of each build with the markers in the
 checked sources: `/*ID*/` expects the diagnostic at the following token (the next line's first token when the marker
