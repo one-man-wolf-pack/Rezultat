@@ -1,18 +1,16 @@
 using Rezultat;
+using Rezultat.Qualification;
 
 namespace PackageConsumer.Legacy;
 
-internal static class LegacyRecipes
-{
+internal static class LegacyRecipes {
     public static int Calls { get; set; }
 
-    public static Result<T, E> ObserveSuccess<T, E>(this Result<T, E> result, Action<T> action)
-    {
+    public static Result<T, E> ObserveSuccess<T, E>(this Result<T, E> result, Action<T> action) {
         Calls++;
         ArgumentNullException.ThrowIfNull(action);
         var snapshot = result;
-        if (snapshot.TryGetValue(out var value, out _))
-        {
+        if (snapshot.TryGetValue(out var value, out _)) {
             action(value);
         }
 
@@ -21,8 +19,7 @@ internal static class LegacyRecipes
 
     public static Result<Presence<U>, E> ConvertField<T, U, E>(this Presence<T> field, Func<T, Result<U, E>> convert)
         where T : notnull
-        where U : notnull
-    {
+        where U : notnull {
         Calls++;
         return field.Match(
             value => convert(value).Map(Presence<U>.Value),
@@ -30,31 +27,26 @@ internal static class LegacyRecipes
             static () => Result<Presence<U>, E>.Ok(Presence<U>.Missing));
     }
 
-    public static Result<T, E> Inspect<T, E>(this Result<T, E> result, Action<T> action)
-    {
+    public static Result<T, E> Inspect<T, E>(this Result<T, E> result, Action<T> action) {
         Calls++;
         return result.ObserveSuccess(action);
     }
 
-    public static Validation<T, E> ToValidation<T, E>(this Result<T, E> result)
-    {
+    public static Validation<T, E> ToValidation<T, E>(this Result<T, E> result) {
         Calls++;
         return result.Match(Validation<T, E>.Valid, Validation<T, E>.Invalid);
     }
 
     public static Result<Presence<U>, E> Traverse<T, U, E>(this Presence<T> field, Func<T, Result<U, E>> convert)
         where T : notnull
-        where U : notnull
-    {
+        where U : notnull {
         Calls++;
         return field.ConvertField(convert);
     }
 }
 
-internal static class LegacyRecipeConsumer
-{
-    public static void Run(Checks checks)
-    {
+internal static class LegacyRecipeConsumer {
+    public static void Run(Checks checks) {
         var seen = 0;
         checks.Text("legacy observe success", "Result.Ok(1)", Result<int, string>.Ok(1).ObserveSuccess(_ => seen++).ToString());
         checks.Text("legacy convert field", "Result.Ok(Presence.Null)", Presence<string>.Null.ConvertField(Parse).ToString());

@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <!-- The restored package graph of this consumer is inspected evidence: no private development analyzers. -->
+    <RezultatDevelopmentAnalyzers>false</RezultatDevelopmentAnalyzers>
     <OutputType>Exe</OutputType>
     <Nullable>enable</Nullable>
   </PropertyGroup>

@@ -6,8 +6,11 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Xml.Linq;
 
-if (args.Length != 11)
-{
+// S6966/S3903: a synchronous top-level program; nothing awaits here, and its file-local helper types share the
+// global namespace of the generated Program class.
+#pragma warning disable S6966, S3903
+
+if (args.Length != 11) {
     Console.Error.WriteLine("usage: DiamondInspector <case> <packages-folder> <library-feed> <app-bin> <assets-dir> "
         + "<core-version> <core-feed> <core-sha256> <inventory-core-version> <inventory-core-feed> <inventory-core-sha256>");
     return 2;
@@ -25,8 +28,7 @@ return inspection.Complete();
 
 internal sealed record Core(string Version, string Feed, string Sha256);
 
-internal sealed class Inspection(string label, string packagesFolder, string libraryFeed)
-{
+internal sealed class Inspection(string label, string packagesFolder, string libraryFeed) {
     public const string InventoryId = "Rezultat.Qualification.DiamondInventory";
     public const string OrdersId = "Rezultat.Qualification.DiamondOrders";
     private const string CoreId = "Rezultat";
@@ -35,8 +37,7 @@ internal sealed class Inspection(string label, string packagesFolder, string lib
 
     private int _failures;
 
-    public byte[] Library(string id, Core core, string assetsPath)
-    {
+    public byte[] Library(string id, Core core, string assetsPath) {
         var name = id.Split('.')[^1];
         using var assets = JsonDocument.Parse(File.ReadAllBytes(assetsPath));
         var root = assets.RootElement;
@@ -63,13 +64,11 @@ internal sealed class Inspection(string label, string packagesFolder, string lib
         return dll;
     }
 
-    public void App(string assetsPath, string appBin, Core candidate, Core inventoryCore, byte[] inventoryDll, byte[] ordersDll)
-    {
+    public void App(string assetsPath, string appBin, Core candidate, Core inventoryCore, byte[] inventoryDll, byte[] ordersDll) {
         using var assets = JsonDocument.Parse(File.ReadAllBytes(assetsPath));
         var root = assets.RootElement;
         Check($"App: exact Rezultat {candidate.Version} reference", DirectDependency(root, CoreId) == $"[{candidate.Version}, {candidate.Version}]", DirectDependency(root, CoreId));
-        foreach (var id in new[] { InventoryId, OrdersId })
-        {
+        foreach (var id in new[] { InventoryId, OrdersId }) {
             Check($"App: exact {id} {LibraryVersion} reference", DirectDependency(root, id) == $"[{LibraryVersion}, {LibraryVersion}]", DirectDependency(root, id));
         }
 
@@ -97,8 +96,7 @@ internal sealed class Inspection(string label, string packagesFolder, string lib
         Check($"App: Inventory keeps its declared minimum {inventoryCore.Version}", Declared(InventoryId) == inventoryCore.Version, Declared(InventoryId));
         Check($"App: Orders keeps its declared minimum {candidate.Version}", Declared(OrdersId) == candidate.Version, Declared(OrdersId));
 
-        foreach (var (id, dll) in new[] { (InventoryId, inventoryDll), (OrdersId, ordersDll) })
-        {
+        foreach (var (id, dll) in new[] { (InventoryId, inventoryDll), (OrdersId, ordersDll) }) {
             var installed = Path.Combine(packagesFolder, id.ToLowerInvariant(), LibraryVersion);
             Check($"App: installed {id} dll is the packed binary", SameBytes(Path.Combine(installed, "lib", Framework, $"{id}.dll"), dll));
             Check($"App: {id} restored from the fixture feed", RestoreSource(installed) == libraryFeed, RestoreSource(installed));
@@ -110,14 +108,12 @@ internal sealed class Inspection(string label, string packagesFolder, string lib
         Check($"App: output Rezultat.dll is the {candidate.Version} package dll", SameBytes(Path.Combine(appBin, $"{CoreId}.dll"), coreDll));
     }
 
-    public int Complete()
-    {
+    public int Complete() {
         Console.WriteLine(_failures == 0 ? $"diamond {label} inspection passed" : $"diamond {label} inspection failed: {_failures}");
         return _failures == 0 ? 0 : 1;
     }
 
-    private void CheckResolvedCore(string name, JsonElement root, Core core)
-    {
+    private void CheckResolvedCore(string name, JsonElement root, Core core) {
         var resolved = root.GetProperty("libraries").EnumerateObject()
             .Where(library => library.Name.Split('/')[0].Equals(CoreId, StringComparison.OrdinalIgnoreCase))
             .Select(library => library.Name)
@@ -138,8 +134,7 @@ internal sealed class Inspection(string label, string packagesFolder, string lib
         Check($"{name}: Rezultat {core.Version} restored from its chosen feed", RestoreSource(installed) == core.Feed, RestoreSource(installed));
     }
 
-    private void CheckNoRestoreLogs(string name, JsonElement root)
-    {
+    private void CheckNoRestoreLogs(string name, JsonElement root) {
         var logs = root.TryGetProperty("logs", out var value) ? value.EnumerateArray().Select(log => log.GetRawText()).ToArray() : [];
         Check($"{name}: restore reported no warnings (NU1605/NU1608 included)", logs.Length == 0, string.Join(", ", logs));
     }
@@ -148,11 +143,9 @@ internal sealed class Inspection(string label, string packagesFolder, string lib
         root.GetProperty("project").GetProperty("frameworks").GetProperty(Framework).GetProperty("dependencies")
             .TryGetProperty(id, out var dependency) ? dependency.GetProperty("version").GetString() : null;
 
-    private static string? RestoreSource(string installed)
-    {
+    private static string? RestoreSource(string installed) {
         var metadata = Path.Combine(installed, ".nupkg.metadata");
-        if (!File.Exists(metadata))
-        {
+        if (!File.Exists(metadata)) {
             return null;
         }
 
@@ -160,14 +153,12 @@ internal sealed class Inspection(string label, string packagesFolder, string lib
         return Path.TrimEndingDirectorySeparator(Path.GetFullPath(document.RootElement.GetProperty("source").GetString()!));
     }
 
-    private static Version AssemblyVersion(string version)
-    {
+    private static Version AssemblyVersion(string version) {
         var parsed = Version.Parse(version);
         return new Version(parsed.Major, parsed.Minor, parsed.Build, 0);
     }
 
-    private static Version? CoreReference(byte[] dll)
-    {
+    private static Version? CoreReference(byte[] dll) {
         using var peReader = new PEReader(ImmutableArray.Create(dll));
         var metadata = peReader.GetMetadataReader();
         return metadata.AssemblyReferences
@@ -177,8 +168,7 @@ internal sealed class Inspection(string label, string packagesFolder, string lib
             .SingleOrDefault();
     }
 
-    private static Guid Mvid(byte[] dll)
-    {
+    private static Guid Mvid(byte[] dll) {
         using var peReader = new PEReader(ImmutableArray.Create(dll));
         var metadata = peReader.GetMetadataReader();
         return metadata.GetGuid(metadata.GetModuleDefinition().Mvid);
@@ -188,8 +178,7 @@ internal sealed class Inspection(string label, string packagesFolder, string lib
 
     private static string Sha256(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
 
-    private static byte[] ReadAll(ZipArchiveEntry entry)
-    {
+    private static byte[] ReadAll(ZipArchiveEntry entry) {
         using var stream = entry.Open();
         using var buffer = new MemoryStream();
         stream.CopyTo(buffer);
@@ -198,8 +187,7 @@ internal sealed class Inspection(string label, string packagesFolder, string lib
 
     private static void Report(string name, string value) => Console.WriteLine($"INFO {name}: {value}");
 
-    private void Check(string name, bool condition, string? detail = null)
-    {
+    private void Check(string name, bool condition, string? detail = null) {
         Console.WriteLine($"{(condition ? "PASS" : "FAIL")} {name}{(condition || detail is null ? string.Empty : $": {detail}")}");
         _failures += condition ? 0 : 1;
     }

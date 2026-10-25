@@ -6,8 +6,7 @@ using Rezultat.Collections;
 
 namespace Rezultat.Tests;
 
-public static class ValidationValues
-{
+public static class ValidationValues {
     public static Arbitrary<Validation<int, int>> Initialized() =>
         Gen.OneOf(
                 Gen.Choose(-3, 3).Select(Validation<int, int>.Valid),
@@ -31,8 +30,9 @@ public static class ValidationValues
 }
 
 [Properties(Arbitrary = [typeof(ValidationValues)])]
-public sealed class ValidationPropertyTests
-{
+public sealed class ValidationPropertyTests {
+    // S1940: the negated operator form is the subject of this equality law.
+#pragma warning disable S1940
     [Property]
     public bool Equality_forms_agree_and_are_symmetric(Validation<int, int> left, Validation<int, int> right) =>
         left.Equals(right) == (left == right)
@@ -40,10 +40,10 @@ public sealed class ValidationPropertyTests
         && left.Equals((object)right) == left.Equals(right)
         && left.Equals(right) == right.Equals(left)
         && (!left.Equals(right) || left.GetHashCode() == right.GetHashCode());
+#pragma warning restore S1940
 
     [Property]
-    public bool Copied_issue_buffer_is_equal_with_equal_hash(Validation<int, int> validation)
-    {
+    public bool Copied_issue_buffer_is_equal_with_equal_hash(Validation<int, int> validation) {
         var copy = validation.TryGetValue(out _, out var issues)
             ? validation
             : Validation<int, int>.InvalidMany([.. issues.ToArray()]);
@@ -114,8 +114,7 @@ public sealed class ValidationPropertyTests
         Validation<int, int>.Valid(value).ToResult().ToValidation() == Validation<int, ImmutableArray<int>>.Valid(value);
 
     [Property]
-    public bool OrElse_on_invalid_equals_fallback(NonEmptyArray<int> issues, Func<ImmutableArray<int>, Validation<int, int>> fallback)
-    {
+    public bool OrElse_on_invalid_equals_fallback(NonEmptyArray<int> issues, Func<ImmutableArray<int>, Validation<int, int>> fallback) {
         ImmutableArray<int> input = [.. issues.Get];
 
         return Validation<int, int>.InvalidMany(input).OrElse(fallback) == fallback(input);
@@ -144,23 +143,25 @@ public sealed class ValidationPropertyTests
     [Theory]
     [InlineData(int.MaxValue, 1)]
     [InlineData(int.MinValue, -1)]
-    public void Generated_fallbacks_are_total_and_lawful_at_overflow_boundaries(int first, int second)
-    {
+    public void Generated_fallbacks_are_total_and_lawful_at_overflow_boundaries(int first, int second) {
         ImmutableArray<int> issues = [first, second];
         var fallbacks = ValidationValues.Fallbacks().Generator.Sample(100);
 
         var outcomes = fallbacks.Select(fallback => fallback(issues)).ToArray();
 
-        Assert.All(outcomes, outcome => Assert.True(outcome.IsInitialized));
-        Assert.Contains(outcomes, static outcome => outcome.IsValid);
-        Assert.Contains(outcomes, static outcome => !outcome.IsValid);
-        Assert.All(fallbacks, fallback => Assert.Equal(fallback(issues), Validation<int, int>.InvalidMany(issues).OrElse(fallback)));
-        Assert.All(fallbacks.Zip(fallbacks.Reverse()), pair =>
-        {
+        foreach (var outcome in outcomes) {
+            outcome.IsInitialized.ShouldBeTrue();
+        }
+        outcomes.ShouldContain(outcome => outcome.IsValid);
+        outcomes.ShouldContain(outcome => !outcome.IsValid);
+        foreach (var fallback in fallbacks) {
+            Validation<int, int>.InvalidMany(issues).OrElse(fallback).ShouldBe(fallback(issues));
+        }
+        foreach (var pair in fallbacks.Zip(fallbacks.Reverse())) {
             var (f, g) = pair;
             var invalid = Validation<int, int>.InvalidMany(issues);
-            Assert.Equal(invalid.OrElse(f).OrElse(g), invalid.OrElse(xs => f(xs).OrElse(g)));
-        });
+            invalid.OrElse(xs => f(xs).OrElse(g)).ShouldBe(invalid.OrElse(f).OrElse(g));
+        }
     }
 
     private static Validation<string, int> Normalize(Validation<int[], int> validation) =>

@@ -1,6 +1,7 @@
 using Rezultat;
 using Rezultat.Collections;
 using Rezultat.Linq;
+using Rezultat.Qualification;
 
 var checks = new Checks();
 
@@ -64,7 +65,7 @@ checks.Throws<ArgumentNullException>("get or none null source", () => ((Dictiona
 var nullItems = new string[] { null, "a" }.Traverse(v => Maybe<string>.Some(v));
 checks.That("maybe traverse null payload", nullItems.TryGetValue(out var collectedItems) && collectedItems.Length == 2 && collectedItems[0] == null);
 checks.That("choose null payload", new string[] { null }.Choose(v => Maybe<string>.Some(v)).Single() == null);
-checks.Throws<ArgumentNullException>("choose null selector", () => new string[0].Choose<string, string>(null));
+checks.Throws<ArgumentNullException>("choose null selector", () => Array.Empty<string>().Choose<string, string>(null));
 checks.That("to result null payload and error", someNull.ToResult<string>(null) == Result<string, string>.Ok(null)
     && Maybe<string>.None.ToResult<string>(null) == Result<string, string>.Error(null));
 checks.That("to result else null error", Maybe<string>.None.ToResultElse<string>(() => null) == Result<string, string>.Error(null));
@@ -123,7 +124,7 @@ checks.That("null payload validate all selector", new string[] { null }.Validate
 checks.Throws<ArgumentNullException>("null validate all source", () => ((Validation<string, string>[])null).ValidateAll());
 checks.That("null element at most one", new string[] { null }.AtMostOne(() => "many") == Result<Maybe<string>, string>.Ok(Maybe<string>.Some(null)));
 checks.That("null error at most one", new string[] { null, null }.AtMostOne(() => (string)null) == Result<Maybe<string>, string>.Error(null));
-checks.Throws<ArgumentNullException>("null at most one factory", () => new string[0].AtMostOne<string, string>(null));
+checks.Throws<ArgumentNullException>("null at most one factory", () => Array.Empty<string>().AtMostOne<string, string>(null));
 checks.That("null payload query", (from a in okNull from b in okNull select a == null && b == null) == Result<bool, string>.Ok(true));
 checks.That("null project result", okNull.SelectMany(v => okNull, (a, b) => (string)null) == Result<string, string>.Ok(null));
 checks.Throws<ArgumentNullException>("null select many next", () => errorNull.SelectMany<string, string, string, string>(null, null));

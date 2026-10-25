@@ -2,8 +2,7 @@ using System;
 
 namespace Rezultat;
 
-public static class ResultExtensions
-{
+public static class ResultExtensions {
     /// <summary>
     /// Ok becomes Some, including a <see langword="null"/> payload; Error becomes None, intentionally discarding the
     /// error without observing it.

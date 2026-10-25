@@ -1,100 +1,89 @@
 namespace Rezultat.Tests;
 
-public sealed class ResultStateTests
-{
+public sealed class ResultStateTests {
     [Fact]
-    public void Default_and_parameterless_new_are_uninitialized()
-    {
-        Assert.False(default(Result<int, string>).IsInitialized);
-        Assert.False(new Result<int, string>().IsInitialized);
-        Assert.False(default(Result<Unit, Unit>).IsInitialized);
+    public void Default_and_parameterless_new_are_uninitialized() {
+        default(Result<int, string>).IsInitialized.ShouldBeFalse();
+        new Result<int, string>().IsInitialized.ShouldBeFalse();
+        default(Result<Unit, Unit>).IsInitialized.ShouldBeFalse();
     }
 
     [Fact]
-    public void Created_branches_are_initialized_even_with_null_or_default_payload()
-    {
-        Assert.True(Result<string?, string?>.Ok(null).IsInitialized);
-        Assert.True(Result<string?, string?>.Error(null).IsInitialized);
-        Assert.True(Result<int, bool>.Ok(0).IsInitialized);
-        Assert.True(Result<int, bool>.Error(false).IsInitialized);
-        Assert.True(Result<int?, int?>.Ok(null).IsInitialized);
-        Assert.True(Result<Unit, Unit>.Ok(default).IsInitialized);
+    public void Created_branches_are_initialized_even_with_null_or_default_payload() {
+        Result<string?, string?>.Ok(null).IsInitialized.ShouldBeTrue();
+        Result<string?, string?>.Error(null).IsInitialized.ShouldBeTrue();
+        Result<int, bool>.Ok(0).IsInitialized.ShouldBeTrue();
+        Result<int, bool>.Error(false).IsInitialized.ShouldBeTrue();
+        Result<int?, int?>.Ok(null).IsInitialized.ShouldBeTrue();
+        Result<Unit, Unit>.Ok(default).IsInitialized.ShouldBeTrue();
     }
 
     [Fact]
-    public void IsSuccess_reports_explicitly_selected_branch_for_same_type_payload()
-    {
-        Assert.True(Result<int, int>.Ok(7).IsSuccess);
-        Assert.False(Result<int, int>.Error(7).IsSuccess);
-        Assert.True(Result<Unit, Unit>.Ok(Unit.Value).IsSuccess);
-        Assert.False(Result<Unit, Unit>.Error(Unit.Value).IsSuccess);
-        Assert.True(Result<string?, string?>.Ok(null).IsSuccess);
-        Assert.False(Result<string?, string?>.Error(null).IsSuccess);
+    public void IsSuccess_reports_explicitly_selected_branch_for_same_type_payload() {
+        Result<int, int>.Ok(7).IsSuccess.ShouldBeTrue();
+        Result<int, int>.Error(7).IsSuccess.ShouldBeFalse();
+        Result<Unit, Unit>.Ok(Unit.Value).IsSuccess.ShouldBeTrue();
+        Result<Unit, Unit>.Error(Unit.Value).IsSuccess.ShouldBeFalse();
+        Result<string?, string?>.Ok(null).IsSuccess.ShouldBeTrue();
+        Result<string?, string?>.Error(null).IsSuccess.ShouldBeFalse();
     }
 
     [Fact]
-    public void Factories_accept_upcast_payload_and_keep_its_identity()
-    {
+    public void Factories_accept_upcast_payload_and_keep_its_identity() {
         var error = new ArgumentException("bad");
         Result<object, Exception> result = Result<object, Exception>.Error(error);
 
-        Assert.False(result.TryGetValue(out _, out var observed));
-        Assert.Same(error, observed);
+        result.TryGetValue(out _, out var observed).ShouldBeFalse();
+        observed.ShouldBeSameAs(error);
     }
 
     [Fact]
-    public void Empty_with_copies_without_selecting_a_branch()
-    {
+    public void Empty_with_copies_without_selecting_a_branch() {
         var uninitialized = default(Result<int, string>) with { };
         var success = Result<int, string>.Ok(3) with { };
 
-        Assert.False(uninitialized.IsInitialized);
-        Assert.Equal(Result<int, string>.Ok(3), success);
+        uninitialized.IsInitialized.ShouldBeFalse();
+        success.ShouldBe(Result<int, string>.Ok(3));
     }
 
     [Fact]
-    public void IsSuccess_on_uninitialized_throws()
-    {
-        Assert.Throws<InvalidOperationException>(() => default(Result<int, string>).IsSuccess);
-        Assert.Throws<InvalidOperationException>(() => default(Result<Unit, Unit>).IsSuccess);
+    public void IsSuccess_on_uninitialized_throws() {
+        Should.Throw<InvalidOperationException>(() => default(Result<int, string>).IsSuccess).ShouldBeOfType<InvalidOperationException>();
+        Should.Throw<InvalidOperationException>(() => default(Result<Unit, Unit>).IsSuccess).ShouldBeOfType<InvalidOperationException>();
     }
 
     [Fact]
-    public void TryGetValue_on_uninitialized_throws()
-    {
-        Assert.Throws<InvalidOperationException>(() => default(Result<string, string>).TryGetValue(out _, out _));
+    public void TryGetValue_on_uninitialized_throws() {
+        Should.Throw<InvalidOperationException>(() => default(Result<string, string>).TryGetValue(out _, out _)).ShouldBeOfType<InvalidOperationException>();
     }
 
     [Fact]
-    public void TryGetValue_success_returns_active_value_and_default_error()
-    {
+    public void TryGetValue_success_returns_active_value_and_default_error() {
         var payload = new ReferenceProbe(1);
 
-        Assert.True(Result<ReferenceProbe, string>.Ok(payload).TryGetValue(out var value, out var error));
-        Assert.Same(payload, value);
-        Assert.Null(error);
+        Result<ReferenceProbe, string>.Ok(payload).TryGetValue(out var value, out var error).ShouldBeTrue();
+        value.ShouldBeSameAs(payload);
+        error.ShouldBeNull();
     }
 
     [Fact]
-    public void TryGetValue_failure_returns_active_error_and_default_value()
-    {
-        Assert.False(Result<int, string>.Error("e").TryGetValue(out var value, out var error));
-        Assert.Equal(0, value);
-        Assert.Equal("e", error);
+    public void TryGetValue_failure_returns_active_error_and_default_value() {
+        Result<int, string>.Error("e").TryGetValue(out var value, out var error).ShouldBeFalse();
+        value.ShouldBe(0);
+        error.ShouldBe("e");
     }
 
     [Fact]
-    public void TryGetValue_bool_selects_branch_independently_of_null_or_default_outputs()
-    {
-        Assert.True(Result<string?, string?>.Ok(null).TryGetValue(out var okValue, out var okError));
-        Assert.Null(okValue);
-        Assert.Null(okError);
+    public void TryGetValue_bool_selects_branch_independently_of_null_or_default_outputs() {
+        Result<string?, string?>.Ok(null).TryGetValue(out var okValue, out var okError).ShouldBeTrue();
+        okValue.ShouldBeNull();
+        okError.ShouldBeNull();
 
-        Assert.False(Result<Unit, Unit>.Error(Unit.Value).TryGetValue(out var unitValue, out var unitError));
-        Assert.Equal(Unit.Value, unitValue);
-        Assert.Equal(Unit.Value, unitError);
+        Result<Unit, Unit>.Error(Unit.Value).TryGetValue(out var unitValue, out var unitError).ShouldBeFalse();
+        unitValue.ShouldBe(Unit.Value);
+        unitError.ShouldBe(Unit.Value);
 
-        Assert.True(Result<int?, int?>.Ok(null).TryGetValue(out var nullableValue, out _));
-        Assert.False(nullableValue.HasValue);
+        Result<int?, int?>.Ok(null).TryGetValue(out var nullableValue, out _).ShouldBeTrue();
+        nullableValue.HasValue.ShouldBeFalse();
     }
 }

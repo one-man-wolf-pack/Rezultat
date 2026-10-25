@@ -5,8 +5,7 @@ using Rezultat.Collections;
 
 namespace Rezultat.Tests;
 
-public static class CompositionArbitraries
-{
+public static class CompositionArbitraries {
     public static Arbitrary<Func<int, Result<int, int>>> Steps() =>
         (from isSuccess in ArbMap.Default.GeneratorFor<Func<int, bool>>()
          from value in ArbMap.Default.GeneratorFor<Func<int, int>>()
@@ -17,8 +16,7 @@ public static class CompositionArbitraries
 }
 
 [Properties(Arbitrary = [typeof(InitializedResults), typeof(CompositionArbitraries)])]
-public sealed class ResultCompositionLawTests
-{
+public sealed class ResultCompositionLawTests {
     [Property]
     public bool Map_preserves_identity(Result<int, string?> result) => result.Map(static value => value) == result;
 
@@ -112,13 +110,10 @@ public sealed class ResultCompositionLawTests
         == a.Zip(b.Zip(c, static (y, z) => (y, z)), static (x, yz) => (x, yz.y, yz.z));
 
     [Property]
-    public bool Traverse_returns_first_failure_in_source_order_or_all_values(int[] source, Func<int, Result<int, int>> step)
-    {
+    public bool Traverse_returns_first_failure_in_source_order_or_all_values(int[] source, Func<int, Result<int, int>> step) {
         var expected = Result<int[], int>.Ok([.. source.Select(item => Value(step(item)))]);
-        foreach (var item in source)
-        {
-            if (!step(item).IsSuccess)
-            {
+        foreach (var item in source) {
+            if (!step(item).IsSuccess) {
                 expected = Result<int[], int>.Error(Error(step(item)));
                 break;
             }

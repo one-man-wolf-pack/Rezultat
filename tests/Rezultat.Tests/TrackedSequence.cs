@@ -2,8 +2,7 @@ using System.Collections;
 
 namespace Rezultat.Tests;
 
-internal sealed class TrackedSequence<T>(params T[] items) : IEnumerable<T>
-{
+internal sealed class TrackedSequence<T>(params T[] items) : IEnumerable<T> {
     private readonly T[] _items = items;
 
     public int Enumerations { get; private set; }
@@ -18,22 +17,18 @@ internal sealed class TrackedSequence<T>(params T[] items) : IEnumerable<T>
 
     public Exception? DisposeException { get; init; }
 
-    public IEnumerator<T> GetEnumerator()
-    {
+    public IEnumerator<T> GetEnumerator() {
         Enumerations++;
         return new Enumerator(this);
     }
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    private sealed class Enumerator(TrackedSequence<T> owner) : IEnumerator<T>
-    {
+    private sealed class Enumerator(TrackedSequence<T> owner) : IEnumerator<T> {
         private int _index = -1;
 
-        public T Current
-        {
-            get
-            {
+        public T Current {
+            get {
                 owner.CurrentReads++;
                 return owner._items[_index];
             }
@@ -41,11 +36,9 @@ internal sealed class TrackedSequence<T>(params T[] items) : IEnumerable<T>
 
         object? IEnumerator.Current => Current;
 
-        public bool MoveNext()
-        {
+        public bool MoveNext() {
             owner.MoveNextCalls++;
-            if (_index + 1 >= owner.PoisonFrom)
-            {
+            if (_index + 1 >= owner.PoisonFrom) {
                 throw new ProbeException($"poisoned element {_index + 1}");
             }
 
@@ -54,12 +47,13 @@ internal sealed class TrackedSequence<T>(params T[] items) : IEnumerable<T>
 
         public void Reset() => throw new NotSupportedException();
 
-        public void Dispose()
-        {
+        public void Dispose() {
             owner.Disposals++;
-            if (owner.DisposeException is not null)
-            {
+            if (owner.DisposeException is not null) {
+                // S3877: an opt-in Dispose fault whose propagation is under test.
+#pragma warning disable S3877
                 throw owner.DisposeException;
+#pragma warning restore S3877
             }
         }
     }

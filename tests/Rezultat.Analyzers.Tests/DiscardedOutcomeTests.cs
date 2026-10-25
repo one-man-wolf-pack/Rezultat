@@ -4,8 +4,7 @@ using static Rezultat.Analyzers.Tests.AnalyzerHarness;
 
 namespace Rezultat.Analyzers.Tests;
 
-public sealed class DiscardedOutcomeTests
-{
+public sealed class DiscardedOutcomeTests {
     private const string Prelude = """
         using System;
         using System.Collections.Generic;
@@ -124,10 +123,9 @@ public sealed class DiscardedOutcomeTests
 
     [Theory]
     [MemberData(nameof(Lost))]
-    public async Task ReportsEachDirectlyDiscardedOutcome(string name, string member)
-    {
+    public async Task ReportsEachDirectlyDiscardedOutcome(string name, string member) {
         var markup = Parse(Prelude + Wrap(member));
-        Assert.True(markup.Spans.Length > 0, name);
+        (markup.Spans.Length > 0).ShouldBeTrue(name);
 
         var diagnostics = await AnalyzeAsync(Compilation(WithCore, (ConsumerPath, markup.Source)));
 
@@ -136,18 +134,16 @@ public sealed class DiscardedOutcomeTests
 
     [Theory]
     [MemberData(nameof(Kept))]
-    public async Task DoesNotReportKeptOrOutOfScopeValues(string name, string member)
-    {
+    public async Task DoesNotReportKeptOrOutOfScopeValues(string name, string member) {
         var markup = Parse(Prelude + Wrap(member));
 
         var diagnostics = await AnalyzeAsync(Compilation(WithCore, (ConsumerPath, markup.Source)));
 
-        Assert.True(diagnostics.IsEmpty, $"{name}: {string.Join("; ", diagnostics)}");
+        diagnostics.IsEmpty.ShouldBeTrue($"{name}: {string.Join("; ", diagnostics)}");
     }
 
     [Fact]
-    public async Task ReportsOutcomeOfProducerFromAnotherAssembly()
-    {
+    public async Task ReportsOutcomeOfProducerFromAnotherAssembly() {
         var producers = Library("Producers", """
             using System.Threading.Tasks;
             using Rezultat;
@@ -183,16 +179,15 @@ public sealed class DiscardedOutcomeTests
     }
 
     [Fact]
-    public async Task ReportsMessageWithTheDiscardedCarrierType()
-    {
+    public async Task ReportsMessageWithTheDiscardedCarrierType() {
         var markup = Parse(Prelude + Wrap("async Task M() { [|await ValidateAsync()|]; }"));
 
-        var diagnostic = Assert.Single(await AnalyzeAsync(Compilation(WithCore, (ConsumerPath, markup.Source))));
+        var diagnostic = (await AnalyzeAsync(Compilation(WithCore, (ConsumerPath, markup.Source)))).ShouldHaveSingleItem();
 
         var message = diagnostic.GetMessage(CultureInfo.InvariantCulture);
-        Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
-        Assert.Contains("Validation<int, string>", message, StringComparison.Ordinal);
-        Assert.Contains("_ =", message, StringComparison.Ordinal);
+        diagnostic.Severity.ShouldBe(DiagnosticSeverity.Warning);
+        message.ShouldContain("Validation<int, string>", Case.Sensitive);
+        message.ShouldContain("_ =", Case.Sensitive);
     }
 
     private static string Wrap(string member) => $$"""

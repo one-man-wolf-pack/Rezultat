@@ -1,13 +1,8 @@
-using Rezultat;
-
 namespace Rezultat.Qualification.DiamondOrders;
 
-public static class Orders
-{
-    public static string DescribeNote(Result<string?, string> note)
-    {
-        if (!note.TryGetValue(out var text, out var error))
-        {
+public static class Orders {
+    public static string DescribeNote(Result<string?, string> note) {
+        if (!note.TryGetValue(out var text, out var error)) {
             return $"rejected: {error}";
         }
 

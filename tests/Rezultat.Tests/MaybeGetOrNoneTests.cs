@@ -3,112 +3,101 @@ using Rezultat.Collections;
 
 namespace Rezultat.Tests;
 
-public sealed class MaybeGetOrNoneTests
-{
+public sealed class MaybeGetOrNoneTests {
     [Fact]
-    public void Null_source_is_rejected_for_both_interfaces()
-    {
-        Assert.Equal("source", Assert.Throws<ArgumentNullException>(() => ((IReadOnlyDictionary<string, int>)null!).GetOrNone("a")).ParamName);
-        Assert.Equal("source", Assert.Throws<ArgumentNullException>(() => ((IDictionary<string, int>)null!).GetOrNone("a")).ParamName);
+    public void Null_source_is_rejected_for_both_interfaces() {
+        Should.Throw<ArgumentNullException>(() => ((IReadOnlyDictionary<string, int>)null!).GetOrNone("a")).ShouldBeOfType<ArgumentNullException>().ParamName.ShouldBe("source");
+        Should.Throw<ArgumentNullException>(() => ((IDictionary<string, int>)null!).GetOrNone("a")).ShouldBeOfType<ArgumentNullException>().ParamName.ShouldBe("source");
     }
 
     [Fact]
-    public void Type_with_both_interfaces_binds_to_read_only_overload()
-    {
+    public void Type_with_both_interfaces_binds_to_read_only_overload() {
         var source = new TrackedDictionary<string, string>(
             [new("key", "dictionary")],
             [new("key", "read-only")]);
 
-        Assert.Equal(Maybe<string>.Some("read-only"), source.GetOrNone("key"));
-        Assert.Equal((0, 1), (source.DictionaryLookups, source.ReadOnlyLookups));
+        source.GetOrNone("key").ShouldBe(Maybe<string>.Some("read-only"));
+        (source.DictionaryLookups, source.ReadOnlyLookups).ShouldBe((0, 1));
     }
 
     [Fact]
-    public void Static_interface_type_keeps_its_own_dispatch()
-    {
+    public void Static_interface_type_keeps_its_own_dispatch() {
         var source = new TrackedDictionary<string, string>(
             [new("key", "dictionary")],
             [new("key", "read-only")]);
 
-        Assert.Equal(Maybe<string>.Some("dictionary"), ((IDictionary<string, string>)source).GetOrNone("key"));
-        Assert.Equal(Maybe<string>.Some("read-only"), ((IReadOnlyDictionary<string, string>)source).GetOrNone("key"));
-        Assert.Equal((1, 1), (source.DictionaryLookups, source.ReadOnlyLookups));
+        ((IDictionary<string, string>)source).GetOrNone("key").ShouldBe(Maybe<string>.Some("dictionary"));
+        ((IReadOnlyDictionary<string, string>)source).GetOrNone("key").ShouldBe(Maybe<string>.Some("read-only"));
+        (source.DictionaryLookups, source.ReadOnlyLookups).ShouldBe((1, 1));
     }
 
     [Fact]
-    public void Miss_is_none_regardless_of_out_value_with_one_lookup()
-    {
+    public void Miss_is_none_regardless_of_out_value_with_one_lookup() {
         var source = new TrackedDictionary<string, string> { MissValue = "leaked" };
 
-        Assert.False(source.GetOrNone("absent").IsSome);
-        Assert.False(((IDictionary<string, string>)source).GetOrNone("absent").IsSome);
-        Assert.Equal((1, 1), (source.DictionaryLookups, source.ReadOnlyLookups));
-        Assert.Equal(["absent", "absent"], source.LookedUpKeys);
+        source.GetOrNone("absent").IsSome.ShouldBeFalse();
+        ((IDictionary<string, string>)source).GetOrNone("absent").IsSome.ShouldBeFalse();
+        (source.DictionaryLookups, source.ReadOnlyLookups).ShouldBe((1, 1));
+        source.LookedUpKeys.ShouldBe(["absent", "absent"]);
     }
 
     [Fact]
-    public void Found_null_default_and_nested_values_are_some()
-    {
+    public void Found_null_default_and_nested_values_are_some() {
         var references = new TrackedDictionary<int, string?>(new KeyValuePair<int, string?>(1, null));
         var values = new Dictionary<string, int> { ["zero"] = 0 };
         var nullables = new Dictionary<string, int?> { ["empty"] = null };
         var nested = new Dictionary<string, Maybe<int>> { ["none"] = Maybe<int>.None };
         var results = new Dictionary<string, Result<int, string>> { ["default"] = default };
 
-        Assert.Equal(Maybe<string?>.Some(null), references.GetOrNone(1));
-        Assert.Equal(Maybe<int>.Some(0), values.GetOrNone("zero"));
-        Assert.Equal(Maybe<int?>.Some(null), nullables.GetOrNone("empty"));
-        Assert.Equal(Maybe<Maybe<int>>.Some(Maybe<int>.None), nested.GetOrNone("none"));
-        Assert.True(results.GetOrNone("default").TryGetValue(out var inner) && !inner.IsInitialized);
+        references.GetOrNone(1).ShouldBe(Maybe<string?>.Some(null));
+        values.GetOrNone("zero").ShouldBe(Maybe<int>.Some(0));
+        nullables.GetOrNone("empty").ShouldBe(Maybe<int?>.Some(null));
+        nested.GetOrNone("none").ShouldBe(Maybe<Maybe<int>>.Some(Maybe<int>.None));
+        (results.GetOrNone("default").TryGetValue(out var inner) && !inner.IsInitialized).ShouldBeTrue();
     }
 
     [Fact]
-    public void Found_reference_value_keeps_identity_without_payload_members()
-    {
+    public void Found_reference_value_keeps_identity_without_payload_members() {
         var probe = new ReferenceProbe(1);
         var source = new Dictionary<int, ReferenceProbe> { [1] = probe };
 
-        Assert.True(source.GetOrNone(1).TryGetValue(out var found) && ReferenceEquals(probe, found));
-        Assert.Equal((0, 0, 0), (probe.EqualsCalls, probe.HashCalls, probe.ToStringCalls));
+        (source.GetOrNone(1).TryGetValue(out var found) && ReferenceEquals(probe, found)).ShouldBeTrue();
+        (probe.EqualsCalls, probe.HashCalls, probe.ToStringCalls).ShouldBe((0, 0, 0));
     }
 
     [Fact]
-    public void Key_is_passed_unchecked_and_its_policy_belongs_to_the_source()
-    {
+    public void Key_is_passed_unchecked_and_its_policy_belongs_to_the_source() {
         var nullKeys = new TrackedDictionary<string?, int>(new KeyValuePair<string?, int>(null, 7));
         var standard = new Dictionary<string, int>();
 
-        Assert.Equal(Maybe<int>.Some(7), nullKeys.GetOrNone(null));
-        Assert.Equal([null], nullKeys.LookedUpKeys);
-        Assert.Throws<ArgumentNullException>(() => standard.GetOrNone(null!));
+        nullKeys.GetOrNone(null).ShouldBe(Maybe<int>.Some(7));
+        nullKeys.LookedUpKeys.ShouldBe([null]);
+        Should.Throw<ArgumentNullException>(() => standard.GetOrNone(null!)).ShouldBeOfType<ArgumentNullException>();
     }
 
     [Fact]
-    public void Source_comparer_decides_the_match()
-    {
+    public void Source_comparer_decides_the_match() {
         var source = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["Key"] = 1 };
 
-        Assert.Equal(Maybe<int>.Some(1), source.GetOrNone("KEY"));
-        Assert.Equal(Maybe<int>.Some(1), new ReadOnlyDictionary<string, int>(source).GetOrNone("key"));
+        source.GetOrNone("KEY").ShouldBe(Maybe<int>.Some(1));
+        new ReadOnlyDictionary<string, int>(source).GetOrNone("key").ShouldBe(Maybe<int>.Some(1));
     }
 
     [Fact]
-    public void Lookup_exceptions_propagate_unchanged()
-    {
+    public void Lookup_exceptions_propagate_unchanged() {
         var canceled = new OperationCanceledException();
         var source = new TrackedDictionary<string, int> { LookupException = canceled };
 
-        Assert.Same(canceled, Assert.Throws<OperationCanceledException>(() => source.GetOrNone("a")));
-        Assert.Same(canceled, Assert.Throws<OperationCanceledException>(() => ((IDictionary<string, int>)source).GetOrNone("a")));
+        Should.Throw<OperationCanceledException>(() => source.GetOrNone("a")).ShouldBeOfType<OperationCanceledException>().ShouldBeSameAs(canceled);
+        Should.Throw<OperationCanceledException>(() => ((IDictionary<string, int>)source).GetOrNone("a")).ShouldBeOfType<OperationCanceledException>().ShouldBeSameAs(canceled);
     }
 
     [Fact]
-    public void Repeated_call_looks_up_again()
-    {
+    public void Repeated_call_looks_up_again() {
         var source = new Dictionary<string, int> { ["a"] = 1 };
 
-        Assert.True(source.GetOrNone("a").IsSome);
+        source.GetOrNone("a").IsSome.ShouldBeTrue();
         source.Remove("a");
-        Assert.False(source.GetOrNone("a").IsSome);
+        source.GetOrNone("a").IsSome.ShouldBeFalse();
     }
 }

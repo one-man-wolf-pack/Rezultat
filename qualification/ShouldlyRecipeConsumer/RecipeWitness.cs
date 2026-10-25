@@ -4,13 +4,11 @@ using Rezultat;
 using Shouldly;
 using Xunit;
 
-public sealed class RecipeWitness
-{
+public sealed class RecipeWitness {
     private const string Secret = "secret-sentinel";
 
     [Fact]
-    public void SuccessReturnsExactPayloadsWithoutTouchingThem()
-    {
+    public void SuccessReturnsExactPayloadsWithoutTouchingThem() {
         var payload = new Probe();
         var other = new Probe();
 
@@ -22,8 +20,7 @@ public sealed class RecipeWitness
     }
 
     [Fact]
-    public void SuccessKeepsNullablePayloads()
-    {
+    public void SuccessKeepsNullablePayloads() {
         string? ok = Result<string?, string>.Ok(null).ShouldBeOk();
         string? error = Result<int, string?>.Error(null).ShouldBeError();
         int? valid = Validation<int?, string>.Valid(null).ShouldBeValid();
@@ -36,8 +33,7 @@ public sealed class RecipeWitness
     }
 
     [Fact]
-    public void ShouldBeInvalidReturnsTheStoredIssueBuffer()
-    {
+    public void ShouldBeInvalidReturnsTheStoredIssueBuffer() {
         var stored = ImmutableArray.Create<string?>("b", null, "b");
 
         var extracted = Validation<int, string?>.InvalidMany(stored).ShouldBeInvalid();
@@ -46,8 +42,7 @@ public sealed class RecipeWitness
     }
 
     [Fact]
-    public void WrongBranchesThrowShouldAssertExceptionWithoutFormatting()
-    {
+    public void WrongBranchesThrowShouldAssertExceptionWithoutFormatting() {
         var payload = new Probe(Secret) { Throws = true };
         var second = new Probe(Secret) { Throws = true };
         Action[] wrong =
@@ -58,8 +53,7 @@ public sealed class RecipeWitness
             () => Validation<Probe, int>.Valid(payload).ShouldBeInvalid(),
         ];
 
-        foreach (var action in wrong)
-        {
+        foreach (var action in wrong) {
             var failure = Assert.Throws<ShouldAssertException>(action);
             Assert.DoesNotContain(Secret, failure.Message, StringComparison.Ordinal);
             Assert.DoesNotContain(failure.Message, char.IsDigit);
@@ -70,8 +64,7 @@ public sealed class RecipeWitness
     }
 
     [Fact]
-    public void UninitializedKeepsTheNativeGuard()
-    {
+    public void UninitializedKeepsTheNativeGuard() {
         Action[] uninitialized =
         [
             () => default(Result<Probe, Probe>).ShouldBeOk(),
@@ -80,8 +73,7 @@ public sealed class RecipeWitness
             () => default(Validation<Probe, Probe>).ShouldBeInvalid(),
         ];
 
-        foreach (var action in uninitialized)
-        {
+        foreach (var action in uninitialized) {
             Assert.IsType<InvalidOperationException>(Record.Exception(action));
         }
     }
@@ -90,26 +82,22 @@ public sealed class RecipeWitness
     public void RecipeDoesNotNeedTheXunitAssertionsPackage() =>
         Assert.Null(Type.GetType("Rezultat.Testing.Xunit.ResultAssertions, Rezultat.Testing.Xunit"));
 
-    private sealed class Probe(string text = "probe")
-    {
+    private sealed class Probe(string text = "probe") {
         public int Calls { get; private set; }
 
         public bool Throws { get; init; }
 
-        public override string ToString()
-        {
+        public override string ToString() {
             Calls++;
             return Throws ? throw new InvalidOperationException(text) : text;
         }
 
-        public override bool Equals(object? obj)
-        {
+        public override bool Equals(object? obj) {
             Calls++;
             return ReferenceEquals(this, obj);
         }
 
-        public override int GetHashCode()
-        {
+        public override int GetHashCode() {
             Calls++;
             return 0;
         }

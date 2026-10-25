@@ -3,9 +3,9 @@ using System.Runtime.Loader;
 using Rezultat;
 using Rezultat.Qualification.DiamondInventory;
 using Rezultat.Qualification.DiamondOrders;
+using Rezultat.Qualification;
 
-if (args.Length != 2 || !Version.TryParse(args[0], out var coreVersion) || !Version.TryParse(args[1], out var inventoryCoreVersion))
-{
+if (args.Length != 2 || !Version.TryParse(args[0], out var coreVersion) || !Version.TryParse(args[1], out var inventoryCoreVersion)) {
     Console.Error.WriteLine("usage: DiamondApp <resolved-core-assembly-version> <inventory-compile-core-assembly-version>");
     return 2;
 }

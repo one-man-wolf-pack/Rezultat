@@ -4,101 +4,90 @@ using FsCheck.Xunit;
 
 namespace Rezultat.Tests;
 
-public sealed class PresenceMapTests
-{
+public sealed class PresenceMapTests {
     [Fact]
-    public void Value_invokes_selector_once_with_the_exact_payload()
-    {
+    public void Value_invokes_selector_once_with_the_exact_payload() {
         var payload = new ReferenceProbe(1);
         var seen = new List<ReferenceProbe>();
 
         var mapped = Presence<ReferenceProbe>.Value(payload).Map(value => { seen.Add(value); return value.Id + 1; });
 
-        Assert.Equal(Presence<int>.Value(2), mapped);
-        Assert.Same(payload, Assert.Single(seen));
+        mapped.ShouldBe(Presence<int>.Value(2));
+        seen.ShouldHaveSingleItem().ShouldBeSameAs(payload);
     }
 
     [Fact]
-    public void Missing_and_null_are_kept_without_invoking_the_selector()
-    {
+    public void Missing_and_null_are_kept_without_invoking_the_selector() {
         var calls = 0;
 
-        Assert.True(Presence<int>.Missing.Map(value => ++calls).IsMissing);
-        Assert.True(default(Presence<int>).Map(value => ++calls).IsMissing);
-        Assert.True(Presence<int>.Null.Map(value => ++calls).IsNull);
-        Assert.Equal(0, calls);
+        Presence<int>.Missing.Map(value => ++calls).IsMissing.ShouldBeTrue();
+        default(Presence<int>).Map(value => ++calls).IsMissing.ShouldBeTrue();
+        Presence<int>.Null.Map(value => ++calls).IsNull.ShouldBeTrue();
+        calls.ShouldBe(0);
     }
 
     [Theory]
     [InlineData("missing")]
     [InlineData("null")]
     [InlineData("value")]
-    public void Null_selector_is_rejected_in_every_state(string state)
-    {
+    public void Null_selector_is_rejected_in_every_state(string state) {
         var presence = state switch { "value" => Presence<int>.Value(1), "null" => Presence<int>.Null, _ => Presence<int>.Missing };
 
-        Assert.Equal("selector", Assert.Throws<ArgumentNullException>(() => presence.Map<int>(null!)).ParamName);
+        Should.Throw<ArgumentNullException>(() => presence.Map<int>(null!)).ShouldBeOfType<ArgumentNullException>().ParamName.ShouldBe("selector");
     }
 
     [Fact]
-    public void Default_like_selector_results_are_values()
-    {
-        Assert.Equal(Presence<int>.Value(0), Presence<int>.Value(5).Map(static _ => 0));
-        Assert.Equal(Presence<bool>.Value(false), Presence<int>.Value(5).Map(static _ => false));
-        Assert.Equal(Presence<string>.Value(string.Empty), Presence<int>.Value(5).Map(static _ => string.Empty));
+    public void Default_like_selector_results_are_values() {
+        Presence<int>.Value(5).Map(static _ => 0).ShouldBe(Presence<int>.Value(0));
+        Presence<int>.Value(5).Map(static _ => false).ShouldBe(Presence<bool>.Value(false));
+        Presence<int>.Value(5).Map(static _ => string.Empty).ShouldBe(Presence<string>.Value(string.Empty));
     }
 
     [Fact]
-    public void Null_selector_result_is_an_invalid_operation_not_a_null_state_or_factory_argument_error()
-    {
-        Assert.Throws<InvalidOperationException>(() => Presence<int>.Value(1).Map<string>(static _ => null!));
-        Assert.Equal("value", Assert.Throws<ArgumentNullException>(() => Presence<string>.Value(null!)).ParamName);
+    public void Null_selector_result_is_an_invalid_operation_not_a_null_state_or_factory_argument_error() {
+        Should.Throw<InvalidOperationException>(() => Presence<int>.Value(1).Map<string>(static _ => null!)).ShouldBeOfType<InvalidOperationException>();
+        Should.Throw<ArgumentNullException>(() => Presence<string>.Value(null!)).ShouldBeOfType<ArgumentNullException>().ParamName.ShouldBe("value");
     }
 
 #pragma warning disable CS8714 // Bypassed notnull constraint: the runtime guard must hold without the warning.
     [Fact]
-    public void Empty_nullable_selector_result_is_rejected_and_non_empty_one_is_kept()
-    {
-        Assert.Throws<InvalidOperationException>(() => Presence<int>.Value(1).Map<int?>(static _ => null));
+    public void Empty_nullable_selector_result_is_rejected_and_non_empty_one_is_kept() {
+        Should.Throw<InvalidOperationException>(() => Presence<int>.Value(1).Map<int?>(static _ => null)).ShouldBeOfType<InvalidOperationException>();
 
         var kept = Presence<int>.Value(1).Map<int?>(static value => value + 1);
-        Assert.True(kept.TryGetValue(out var value) && value.HasValue && value.Value == 2);
+        (kept.TryGetValue(out var value) && value.HasValue && value.Value == 2).ShouldBeTrue();
     }
 #pragma warning restore CS8714
 
     [Fact]
-    public void Selector_exceptions_propagate_unchanged_including_invalid_operation()
-    {
+    public void Selector_exceptions_propagate_unchanged_including_invalid_operation() {
         var invalid = new InvalidOperationException("selector");
         var canceled = new OperationCanceledException();
 
-        Assert.Same(invalid, Assert.Throws<InvalidOperationException>(() => Presence<int>.Value(1).Map<int>(_ => throw invalid)));
-        Assert.Same(canceled, Assert.Throws<OperationCanceledException>(() => Presence<int>.Value(1).Map<int>(_ => throw canceled)));
+        Should.Throw<InvalidOperationException>(() => Presence<int>.Value(1).Map<int>(_ => throw invalid)).ShouldBeOfType<InvalidOperationException>().ShouldBeSameAs(invalid);
+        Should.Throw<OperationCanceledException>(() => Presence<int>.Value(1).Map<int>(_ => throw canceled)).ShouldBeOfType<OperationCanceledException>().ShouldBeSameAs(canceled);
     }
 
     [Fact]
-    public void Nested_carriers_and_tasks_are_ordinary_payloads()
-    {
+    public void Nested_carriers_and_tasks_are_ordinary_payloads() {
         var nested = Presence<int>.Value(1).Map(static _ => Presence<int>.Missing);
         var task = Presence<int>.Value(1).Map(static _ => Task.FromException<int>(new ProbeException("task")));
 
-        Assert.True(nested.IsValue && nested.TryGetValue(out var inner) && inner.IsMissing);
-        Assert.True(task.IsValue && task.TryGetValue(out var pending) && pending.IsFaulted);
+        (nested.IsValue && nested.TryGetValue(out var inner) && inner.IsMissing).ShouldBeTrue();
+        (task.IsValue && task.TryGetValue(out var pending) && pending.IsFaulted).ShouldBeTrue();
     }
 
     [Fact]
-    public void Receiver_is_not_changed()
-    {
+    public void Receiver_is_not_changed() {
         var presence = Presence<int>.Value(1);
 
         _ = presence.Map(static value => value + 1);
 
-        Assert.Equal(Presence<int>.Value(1), presence);
+        presence.ShouldBe(Presence<int>.Value(1));
     }
 }
 
-public static class PresenceValues
-{
+public static class PresenceValues {
     public static Arbitrary<Presence<int>> SmallInts() =>
         Gen.OneOf(
                 Gen.Constant(Presence<int>.Missing),
@@ -109,8 +98,7 @@ public static class PresenceValues
     public static Arbitrary<Func<int, Presence<int>>> Steps() =>
         (from state in ArbMap.Default.GeneratorFor<Func<int, int>>()
          from value in ArbMap.Default.GeneratorFor<Func<int, int>>()
-         select (Func<int, Presence<int>>)(input => (state(input) & 3) switch
-         {
+         select (Func<int, Presence<int>>)(input => (state(input) & 3) switch {
              0 => Presence<int>.Missing,
              1 => Presence<int>.Null,
              2 => default,
@@ -120,8 +108,9 @@ public static class PresenceValues
 }
 
 [Properties(Arbitrary = [typeof(PresenceValues)])]
-public sealed class PresencePropertyTests
-{
+public sealed class PresencePropertyTests {
+    // S1940: the negated operator form is the subject of this equality law.
+#pragma warning disable S1940
     [Property]
     public bool Equality_forms_agree_and_are_symmetric(Presence<int> left, Presence<int> right) =>
         left.Equals(right) == (left == right)
@@ -129,6 +118,7 @@ public sealed class PresencePropertyTests
         && left.Equals((object)right) == left.Equals(right)
         && left.Equals(right) == right.Equals(left)
         && (!left.Equals(right) || left.GetHashCode() == right.GetHashCode());
+#pragma warning restore S1940
 
     [Property]
     public bool Exactly_one_flag_is_set(Presence<int> presence) =>

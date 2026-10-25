@@ -1,4 +1,7 @@
 <Project>
+  <!-- Versions stay owned by the repository file; qualification projects keep explicit Version attributes. -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Packages.props', '$(MSBuildThisFileDirectory)../'))" />
+
   <PropertyGroup>
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
   </PropertyGroup>

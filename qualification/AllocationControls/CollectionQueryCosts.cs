@@ -5,8 +5,9 @@ using Rezultat;
 using Rezultat.Collections;
 using Rezultat.Linq;
 
-internal static class CollectionQueryCosts
-{
+namespace Rezultat.Qualification.AllocationControls;
+
+internal static class CollectionQueryCosts {
     private const int Length = 64;
     private const int ExpectedSum = Length * (Length - 1) / 2;
 
@@ -34,10 +35,12 @@ internal static class CollectionQueryCosts
     private static Result<int, string> _resultSink;
     private static Result<long, string> _longResultSink;
     private static Maybe<int> _maybeSink;
+    // IDE0044: deliberately not readonly, so the JIT cannot fold the threshold into the measured kernels.
+#pragma warning disable IDE0044
     private static int _threshold = -1;
+#pragma warning restore IDE0044
 
-    public static int Run()
-    {
+    public static int Run() {
         (string Name, (string Form, Action<int> Kernel)[] Forms, Func<bool> Expected)[] comparisons =
         [
             ("Result.Sequence vs identity Traverse over 64 Ok", [("Sequence", ResultSequence), ("Traverse", ResultTraverse)],
@@ -74,22 +77,18 @@ internal static class CollectionQueryCosts
         ];
 
         var failures = 0;
-        foreach (var (name, forms, expected) in comparisons)
-        {
-            foreach (var (form, kernel) in forms)
-            {
+        foreach (var (name, forms, expected) in comparisons) {
+            foreach (var (form, kernel) in forms) {
                 failures += Validate($"{name} ({form})", kernel, expected);
             }
         }
 
-        if (failures != 0)
-        {
+        if (failures != 0) {
             Console.WriteLine("FAIL collection/query cost workloads differ from their expected results; comparisons skipped");
             return failures;
         }
 
-        foreach (var (name, forms, _) in comparisons)
-        {
+        foreach (var (name, forms, _) in comparisons) {
             var measured = forms.Select(static form => (form.Form, CostMeasurement.Measure(form.Kernel))).ToArray();
             Console.WriteLine($"INFO {name}: allocation {string.Join(" vs ", measured.Select(static m => $"{m.Form} {m.Item2.Bytes}"))} B/op (no budget)");
             Console.WriteLine($"INFO {name}: time {string.Join(" vs ", measured.Select(static m => $"{m.Form} {m.Item2.Nanoseconds:F1}"))} ns/op (no budget)");
@@ -99,8 +98,7 @@ internal static class CollectionQueryCosts
         return failures;
     }
 
-    private static int Validate(string name, Action<int> kernel, Func<bool> expected)
-    {
+    private static int Validate(string name, Action<int> kernel, Func<bool> expected) {
         _resultArraySink = default;
         _maybeArraySink = default;
         _validationArraySink = default;
@@ -122,141 +120,109 @@ internal static class CollectionQueryCosts
     private static Maybe<int> TextLength(string text) => Maybe<int>.Some(text.Length);
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ResultSequence(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ResultSequence(int n) {
+        for (var i = 0; i < n; i++) {
             _resultArraySink = _oks.Sequence();
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ResultTraverse(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ResultTraverse(int n) {
+        for (var i = 0; i < n; i++) {
             _resultArraySink = _oks.Traverse(static item => item);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void MaybeSequence(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void MaybeSequence(int n) {
+        for (var i = 0; i < n; i++) {
             _maybeArraySink = _somes.Sequence();
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void MaybeTraverse(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void MaybeTraverse(int n) {
+        for (var i = 0; i < n; i++) {
             _maybeArraySink = _somes.Traverse(static item => item);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ValidationSequence(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ValidationSequence(int n) {
+        for (var i = 0; i < n; i++) {
             _validationArraySink = _mixed.Sequence();
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ValidationTraverse(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ValidationTraverse(int n) {
+        for (var i = 0; i < n; i++) {
             _validationArraySink = _mixed.Traverse(static item => item);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ValidateAllValid(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ValidateAllValid(int n) {
+        for (var i = 0; i < n; i++) {
             _unitSink = _valids.ValidateAll();
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ValidateAllValidRecipe(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ValidateAllValidRecipe(int n) {
+        for (var i = 0; i < n; i++) {
             _unitSink = _valids.Traverse(static item => item).Map(static _ => Unit.Value);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ValidateAllLarge(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ValidateAllLarge(int n) {
+        for (var i = 0; i < n; i++) {
             _unitSink = _largeValids.ValidateAll();
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ValidateAllLargeRecipe(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ValidateAllLargeRecipe(int n) {
+        for (var i = 0; i < n; i++) {
             _unitSink = _largeValids.Traverse(static item => item).Map(static _ => Unit.Value);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ValidateAllReference(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ValidateAllReference(int n) {
+        for (var i = 0; i < n; i++) {
             _unitSink = _referenceValids.ValidateAll();
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ValidateAllReferenceRecipe(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ValidateAllReferenceRecipe(int n) {
+        for (var i = 0; i < n; i++) {
             _unitSink = _referenceValids.Traverse(static item => item).Map(static _ => Unit.Value);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ValidateAllMixed(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ValidateAllMixed(int n) {
+        for (var i = 0; i < n; i++) {
             _unitSink = _mixed.ValidateAll();
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ValidateAllMixedRecipe(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ValidateAllMixedRecipe(int n) {
+        for (var i = 0; i < n; i++) {
             _unitSink = _mixed.Traverse(static item => item).Map(static _ => Unit.Value);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ValidateAllMixedBuilder(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ValidateAllMixedBuilder(int n) {
+        for (var i = 0; i < n; i++) {
             var builder = ImmutableArray.CreateBuilder<string>();
-            foreach (var outcome in _mixed)
-            {
-                if (!outcome.TryGetValue(out _, out var issues))
-                {
+            foreach (var outcome in _mixed) {
+                if (!outcome.TryGetValue(out _, out var issues)) {
                     builder.AddRange(issues);
                 }
             }
@@ -268,99 +234,78 @@ internal static class CollectionQueryCosts
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ValidateAllOne(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ValidateAllOne(int n) {
+        for (var i = 0; i < n; i++) {
             _unitSink = _oneInvalid.ValidateAll();
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ValidateAllOneRecipe(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ValidateAllOneRecipe(int n) {
+        for (var i = 0; i < n; i++) {
             _unitSink = _oneInvalid.Traverse(static item => item).Map(static _ => Unit.Value);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ValidateAllSelector(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ValidateAllSelector(int n) {
+        for (var i = 0; i < n; i++) {
             _unitSink = _numbers.ValidateAll(static value => value >= 0 ? Validation<int, string>.Valid(value) : Validation<int, string>.Invalid("negative"));
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ValidateAllSelectorRecipe(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ValidateAllSelectorRecipe(int n) {
+        for (var i = 0; i < n; i++) {
             _unitSink = _numbers.Traverse(static value => value >= 0 ? Validation<int, string>.Valid(value) : Validation<int, string>.Invalid("negative"))
                 .Map(static _ => Unit.Value);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ValidateAllCaptured(int n)
-    {
+    private static void ValidateAllCaptured(int n) {
         var threshold = _threshold;
-        for (var i = 0; i < n; i++)
-        {
+        for (var i = 0; i < n; i++) {
             _unitSink = _numbers.ValidateAll(value => value > threshold ? Validation<int, string>.Valid(value) : Validation<int, string>.Invalid("small"));
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ValidateAllCapturedRecipe(int n)
-    {
+    private static void ValidateAllCapturedRecipe(int n) {
         var threshold = _threshold;
-        for (var i = 0; i < n; i++)
-        {
+        for (var i = 0; i < n; i++) {
             _unitSink = _numbers.Traverse(value => value > threshold ? Validation<int, string>.Valid(value) : Validation<int, string>.Invalid("small"))
                 .Map(static _ => Unit.Value);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ResultQuery2(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ResultQuery2(int n) {
+        for (var i = 0; i < n; i++) {
             _resultSink = from x in _oks[5] from y in Step(x) select x + y;
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ResultDirect2(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ResultDirect2(int n) {
+        for (var i = 0; i < n; i++) {
             _resultSink = _oks[5].AndThen(static x => Step(x).Map(y => x + y));
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ResultNative2(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ResultNative2(int n) {
+        for (var i = 0; i < n; i++) {
             _resultSink = Native2(_oks[5]);
         }
     }
 
-    private static Result<int, string> Native2(Result<int, string> source)
-    {
-        if (!source.TryGetValue(out var x, out var error))
-        {
+    private static Result<int, string> Native2(Result<int, string> source) {
+        if (!source.TryGetValue(out var x, out var error)) {
             return Result<int, string>.Error(error);
         }
 
-        if (!Step(x).TryGetValue(out var y, out error))
-        {
+        if (!Step(x).TryGetValue(out var y, out error)) {
             return Result<int, string>.Error(error);
         }
 
@@ -368,10 +313,8 @@ internal static class CollectionQueryCosts
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ResultQuery3(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ResultQuery3(int n) {
+        for (var i = 0; i < n; i++) {
             _resultSink =
                 from x in _oks[3]
                 let doubled = x * 2
@@ -382,34 +325,27 @@ internal static class CollectionQueryCosts
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ResultDirect3(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ResultDirect3(int n) {
+        for (var i = 0; i < n; i++) {
             _resultSink = _oks[3].Map(static x => (x, doubled: x * 2))
                 .AndThen(static t => Step(t.x).AndThen(y => Step(y).Map(z => t.doubled + y + z)));
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ResultNative3(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ResultNative3(int n) {
+        for (var i = 0; i < n; i++) {
             _resultSink = Native3(_oks[3]);
         }
     }
 
-    private static Result<int, string> Native3(Result<int, string> source)
-    {
-        if (!source.TryGetValue(out var x, out var error))
-        {
+    private static Result<int, string> Native3(Result<int, string> source) {
+        if (!source.TryGetValue(out var x, out var error)) {
             return Result<int, string>.Error(error);
         }
 
         var doubled = x * 2;
-        if (!Step(x).TryGetValue(out var y, out error) || !Step(y).TryGetValue(out var z, out error))
-        {
+        if (!Step(x).TryGetValue(out var y, out error) || !Step(y).TryGetValue(out var z, out error)) {
             return Result<int, string>.Error(error);
         }
 
@@ -417,68 +353,57 @@ internal static class CollectionQueryCosts
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ResultQueryError(int n)
-    {
+    private static void ResultQueryError(int n) {
         var error = Result<int, string>.Error("e");
-        for (var i = 0; i < n; i++)
-        {
+        for (var i = 0; i < n; i++) {
             _resultSink = from x in error from y in Step(x) select x + y;
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ResultNativeError(int n)
-    {
+    private static void ResultNativeError(int n) {
         var error = Result<int, string>.Error("e");
-        for (var i = 0; i < n; i++)
-        {
+        for (var i = 0; i < n; i++) {
             _resultSink = Native2(error);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ResultQueryLarge(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ResultQueryLarge(int n) {
+        for (var i = 0; i < n; i++) {
             _longResultSink = from large in _okLarge from y in Step((int)large[0]) select large[0] + y;
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ResultNativeLarge(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ResultNativeLarge(int n) {
+        for (var i = 0; i < n; i++) {
+            // S3358: the nested conditional is the hand-written native form this control measures.
+#pragma warning disable S3358
             _longResultSink = _okLarge.TryGetValue(out var large, out var error)
                 ? Step((int)large[0]).TryGetValue(out var y, out error) ? Result<long, string>.Ok(large[0] + y) : Result<long, string>.Error(error)
                 : Result<long, string>.Error(error);
+#pragma warning restore S3358
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void MaybeQuery(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void MaybeQuery(int n) {
+        for (var i = 0; i < n; i++) {
             _maybeSink = from text in _someReference where text.Length > 3 from length in TextLength(text) select length * 2;
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void MaybeDirect(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void MaybeDirect(int n) {
+        for (var i = 0; i < n; i++) {
             _maybeSink = _someReference.Filter(static text => text.Length > 3).AndThen(static text => TextLength(text).Map(static length => length * 2));
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void MaybeNative(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void MaybeNative(int n) {
+        for (var i = 0; i < n; i++) {
             _maybeSink = _someReference.TryGetValue(out var text) && text.Length > 3 && TextLength(text).TryGetValue(out var length)
                 ? Maybe<int>.Some(length * 2)
                 : Maybe<int>.None;

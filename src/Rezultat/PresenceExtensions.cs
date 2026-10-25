@@ -2,8 +2,7 @@ using System;
 
 namespace Rezultat;
 
-public static class PresenceExtensions
-{
+public static class PresenceExtensions {
     /// <summary>
     /// Missing and Null become <c>Ok</c> with the same state without invoking <paramref name="selector"/>; for Value
     /// the selector's Ok becomes <c>Ok(Value)</c> and its Error, including <see langword="null"/>, is returned as is.
@@ -18,27 +17,22 @@ public static class PresenceExtensions
         this Presence<T> source,
         Func<T, Result<TResult, TError>> selector)
         where T : notnull
-        where TResult : notnull
-    {
+        where TResult : notnull {
         ArgumentNullException.ThrowIfNull(selector);
-        if (!source.TryGetValue(out var value))
-        {
+        if (!source.TryGetValue(out var value)) {
             return Result<Presence<TResult>, TError>.Ok(source.IsNull ? Presence<TResult>.Null : Presence<TResult>.Missing);
         }
 
         var result = selector(value);
-        if (!result.IsInitialized)
-        {
+        if (!result.IsInitialized) {
             ThrowHelper.ThrowUninitializedReturnedResult(nameof(selector));
         }
 
-        if (!result.TryGetValue(out var mapped, out var error))
-        {
+        if (!result.TryGetValue(out var mapped, out var error)) {
             return Result<Presence<TResult>, TError>.Error(error);
         }
 
-        if (mapped is null)
-        {
+        if (mapped is null) {
             ThrowHelper.ThrowNullPresenceTraverseResult();
         }
 

@@ -2,8 +2,7 @@ using System;
 
 namespace Rezultat.Linq;
 
-public static class ResultQueryExtensions
-{
+public static class ResultQueryExtensions {
     /// <summary>Query <c>select</c> and <c>let</c> form of <see cref="Result{T, TError}.Map{TResult}"/> with its exact contract.</summary>
     /// <exception cref="InvalidOperationException"><paramref name="source"/> is uninitialized; checked before the selector.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="selector"/> is null, regardless of the active branch.</exception>
@@ -28,28 +27,23 @@ public static class ResultQueryExtensions
     public static Result<TResult, TError> SelectMany<T, TNext, TResult, TError>(
         this Result<T, TError> source,
         Func<T, Result<TNext, TError>> next,
-        Func<T, TNext, TResult> project)
-    {
-        if (!source.IsInitialized)
-        {
+        Func<T, TNext, TResult> project) {
+        if (!source.IsInitialized) {
             ThrowHelper.ThrowUninitializedResult();
         }
 
         ArgumentNullException.ThrowIfNull(next);
         ArgumentNullException.ThrowIfNull(project);
-        if (!source.TryGetValue(out var value, out var error))
-        {
+        if (!source.TryGetValue(out var value, out var error)) {
             return Result<TResult, TError>.Error(error);
         }
 
         var second = next(value);
-        if (!second.IsInitialized)
-        {
+        if (!second.IsInitialized) {
             ThrowHelper.ThrowUninitializedReturnedResult(nameof(next));
         }
 
-        if (!second.TryGetValue(out var nextValue, out var nextError))
-        {
+        if (!second.TryGetValue(out var nextValue, out var nextError)) {
             return Result<TResult, TError>.Error(nextError);
         }
 

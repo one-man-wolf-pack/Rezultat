@@ -3,8 +3,7 @@ using System.Collections.Immutable;
 
 namespace Rezultat;
 
-public static class ValidationExtensions
-{
+public static class ValidationExtensions {
     /// <summary>
     /// Valid becomes Ok; Invalid becomes Error with the same issue storage, keeping order, duplicates and
     /// <see langword="null"/> issues. The Error compares its array by <see cref="ImmutableArray{T}"/> equality, not

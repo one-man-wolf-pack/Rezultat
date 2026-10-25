@@ -14,6 +14,11 @@ issued_core_version=0.8.0
 issued_core_sha256=4f2d6cdd7e84380515e559cdf42c2c14e8d9d357373b7d5e82e5c33389cc5469
 . "$root/scripts/release-record.sh"
 
+# Intentional consumer inputs under qualification/ keep their own layout: diagnostic corpus, compiler controls and
+# runner fixtures, whose sources and positions are the checked input (paths relative to qualification/).
+qualification_inputs=(CompilerControls AssertionCompilerControls AnalyzerConsumer AnalyzerLibrary AnalyzerDownstream
+    AnalyzerPackedConsumer AnalyzerCoreOnly AnalyzerWrapperHomonyms XunitV2Consumer XunitV3Consumer Shared/RunnerScenarios.cs)
+
 export DOTNET_NOLOGO=1 DOTNET_CLI_TELEMETRY_OPTOUT=1 TESTINGPLATFORM_TELEMETRY_OPTOUT=1
 
 package_version() {
@@ -23,10 +28,16 @@ package_version() {
 usage() {
     cat <<'EOF'
 usage: scripts/qualify.sh <command> [args]
-  check                 format verification and warning-free Release build of the solution
-  test [project] [mtp-args...]
-                        run own tests of the solution, or of one tests/<project>; other arguments are forwarded
-                        to the test platform (select the project when filtering: a project without matches fails)
+  check                 non-mutating managed candidate check: format/style verification, strict Release build of the
+                        solution and every test module of the solution
+  test [project] [args...]
+                        run every test module of the solution, or one tests/<project> with its references; other
+                        arguments go to dotnet test (native filters such as --filter-class). Each module must run at
+                        least one test: an empty or all-skipped module fails
+  fmt                   apply whitespace formatting to the solution and owned qualification sources
+  fix [workspace] [dotnet-format-args...]
+                        apply code-style and analyzer fixes to the solution or the named project/solution, e.g.
+                        fix --diagnostics IDE0011
   pack                  pack Rezultat, Rezultat.Testing.Xunit and Rezultat.Analyzers (Release) into artifacts/package
   consumers             package consumers, compiler controls, root and packaged README examples, the packaged
                         Shouldly, HTTP and Presence JSON recipes in isolated consumers, the reference diamond and
@@ -41,7 +52,7 @@ usage: scripts/qualify.sh <command> [args]
                         README examples and package inspection
   alloc                 warmed Release allocation controls against the package
   publish <rid>         rooted trimmed and Native AOT publication of the package consumer, then run both
-  all <rid>             check, test, pack, consumers, assertions, analyzers, alloc, publish
+  all <rid>             check, pack, consumers, assertions, analyzers, alloc, publish
   linux [command...]    run a command (default "all linux-arm64") in the native Linux ARM64/glibc container
   release <commit> <package-id>...
                         export the committed tree to artifacts/release/<full-commit>, pack it with its own
@@ -50,18 +61,41 @@ usage: scripts/qualify.sh <command> [args]
 EOF
 }
 
+# The build is strict through Directory.Build.props; --no-incremental keeps the check off outputs of an earlier build.
 check() {
     dotnet format "$root/Rezultat.slnx" --verify-no-changes
-    dotnet format whitespace "$root/qualification" --folder --verify-no-changes
-    dotnet build "$root/Rezultat.slnx" -c Release -warnaserror --no-incremental
+    dotnet format whitespace "$root/qualification" --folder --verify-no-changes --exclude "${qualification_inputs[@]}"
+    dotnet build "$root/Rezultat.slnx" -c Release --no-incremental
+    run_tests -c Release --no-build
 }
 
+# --minimum-expected-tests after the SDK "--" goes to every test module; before "--" it would be one global total
+# that also counts skipped tests.
 run_tests() {
+    local selection=(--solution "$root/Rezultat.slnx") separator=(--) arg
     if [[ $# -gt 0 && -d "$root/tests/$1" ]]; then
-        dotnet test --project "$root/tests/$1" "${@:2}"
-    else
-        dotnet test --solution "$root/Rezultat.slnx" "$@"
+        selection=(--project "$root/tests/$1")
+        shift
     fi
+    for arg in "$@"; do
+        [[ "$arg" == -- ]] && separator=()
+    done
+    dotnet test "${selection[@]}" "$@" ${separator[@]+"${separator[@]}"} --minimum-expected-tests 1
+}
+
+fmt() {
+    dotnet format whitespace "$root/Rezultat.slnx"
+    dotnet format whitespace "$root/qualification" --folder --exclude "${qualification_inputs[@]}"
+}
+
+fix() {
+    local workspace="$root/Rezultat.slnx"
+    if [[ $# -gt 0 && -e "$1" ]]; then
+        workspace="$1"
+        shift
+    fi
+    dotnet format style "$workspace" "$@"
+    dotnet format analyzers "$workspace" "$@"
 }
 
 pack() {
@@ -448,6 +482,8 @@ command="${1:-}"
 case "$command" in
     check) check ;;
     test) run_tests "$@" ;;
+    fmt) fmt ;;
+    fix) fix "$@" ;;
     pack) pack ;;
     consumers) consumers ;;
     diamond) diamond ;;
@@ -455,7 +491,7 @@ case "$command" in
     alloc) alloc ;;
     publish) publish "$@" ;;
     analyzers) analyzers ;;
-    all) check; run_tests; pack; consumers; assertions; analyzers; alloc; publish "$@" ;;
+    all) check; pack; consumers; assertions; analyzers; alloc; publish "$@" ;;
     linux) linux "$@" ;;
     release) release "$@" ;;
     release-controls) bash "$root/qualification/ReleaseControls/run.sh" "$root" ;;

@@ -1,0 +1,16 @@
+<Project>
+  <!-- RezultatConsumerInput=true marks a project whose sources are the checked consumer input: diagnostic corpus,
+       compiler controls, compiled README text or runner fixtures. It compiles with ordinary consumer settings, so
+       development diagnostics neither add to nor mask the diagnostics and outcomes under check. Owned support code
+       keeps the profile. -->
+  <PropertyGroup Condition="'$(RezultatConsumerInput)' == 'true'">
+    <RezultatDevelopmentAnalyzers>false</RezultatDevelopmentAnalyzers>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <AnalysisLevel></AnalysisLevel>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- The consumer value without the profile's documentation suppressions: what the SDK props give an empty
+         NoWarn. CoreCompile appends its own 1701;1702 to whatever reaches it. -->
+    <NoWarn>1701;1702</NoWarn>
+  </PropertyGroup>
+</Project>

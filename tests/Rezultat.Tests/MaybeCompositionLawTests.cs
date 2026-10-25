@@ -5,8 +5,7 @@ using Rezultat.Collections;
 
 namespace Rezultat.Tests;
 
-public static class MaybeCompositionArbitraries
-{
+public static class MaybeCompositionArbitraries {
     public static Arbitrary<Func<int, Maybe<int>>> Steps() =>
         (from isSome in ArbMap.Default.GeneratorFor<Func<int, bool>>()
          from value in ArbMap.Default.GeneratorFor<Func<int, int>>()
@@ -18,8 +17,7 @@ public static class MaybeCompositionArbitraries
 }
 
 [Properties(Arbitrary = [typeof(MaybeValues), typeof(MaybeCompositionArbitraries)])]
-public sealed class MaybeCompositionLawTests
-{
+public sealed class MaybeCompositionLawTests {
     [Property]
     public bool Map_preserves_identity(Maybe<int> maybe) => maybe.Map(static value => value) == maybe;
 

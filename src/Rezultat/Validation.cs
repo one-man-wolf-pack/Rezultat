@@ -12,8 +12,7 @@ namespace Rezultat;
 /// <c>new()</c> are an uninitialized carrier that equals neither outcome; observing it as an outcome throws
 /// <see cref="InvalidOperationException"/>. Neither payload is null-checked by the carrier.
 /// </summary>
-public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
-{
+public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>> {
     private const byte Uninitialized = 0;
     private const byte ValidState = 1;
     private const byte InvalidState = 2;
@@ -22,8 +21,7 @@ public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
     private readonly ImmutableArray<TIssue> _issues;
     private readonly byte _state;
 
-    private Validation(byte state, T value, ImmutableArray<TIssue> issues)
-    {
+    private Validation(byte state, T value, ImmutableArray<TIssue> issues) {
         _state = state;
         _value = value;
         _issues = issues;
@@ -41,10 +39,8 @@ public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
     /// before the call.
     /// </summary>
     /// <exception cref="ArgumentException"><paramref name="issues"/> is default or empty.</exception>
-    public static Validation<T, TIssue> InvalidMany(ImmutableArray<TIssue> issues)
-    {
-        if (issues.IsDefaultOrEmpty)
-        {
+    public static Validation<T, TIssue> InvalidMany(ImmutableArray<TIssue> issues) {
+        if (issues.IsDefaultOrEmpty) {
             ThrowHelper.ThrowEmptyIssues(nameof(issues));
         }
 
@@ -60,10 +56,8 @@ public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
     /// Reports the outcome without extracting the payload; it does not promise a non-null payload.
     /// </summary>
     /// <exception cref="InvalidOperationException">The carrier is uninitialized.</exception>
-    public bool IsValid
-    {
-        get
-        {
+    public bool IsValid {
+        get {
             EnsureInitialized();
             return _state == ValidState;
         }
@@ -74,8 +68,7 @@ public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
     /// stored non-empty issues without copying them.
     /// </summary>
     /// <exception cref="InvalidOperationException">The carrier is uninitialized.</exception>
-    public bool TryGetValue([MaybeNullWhen(false)] out T value, out ImmutableArray<TIssue> issues)
-    {
+    public bool TryGetValue([MaybeNullWhen(false)] out T value, out ImmutableArray<TIssue> issues) {
         EnsureInitialized();
         value = _value;
         issues = _state == ValidState ? ImmutableArray<TIssue>.Empty : _issues;
@@ -89,8 +82,7 @@ public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
     /// The carrier is uninitialized; checked before the handlers, so null handlers do not change it.
     /// </exception>
     /// <exception cref="ArgumentNullException">Either handler is null, regardless of the active outcome.</exception>
-    public TResult Match<TResult>(Func<T, TResult> onValid, Func<ImmutableArray<TIssue>, TResult> onInvalid)
-    {
+    public TResult Match<TResult>(Func<T, TResult> onValid, Func<ImmutableArray<TIssue>, TResult> onInvalid) {
         EnsureInitialized();
         ArgumentNullException.ThrowIfNull(onValid);
         ArgumentNullException.ThrowIfNull(onInvalid);
@@ -102,8 +94,7 @@ public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
     /// </summary>
     /// <exception cref="InvalidOperationException">The carrier is uninitialized; checked before the selector.</exception>
     /// <exception cref="ArgumentNullException">The selector is null, even for Invalid.</exception>
-    public Validation<TResult, TIssue> Map<TResult>(Func<T, TResult> selector)
-    {
+    public Validation<TResult, TIssue> Map<TResult>(Func<T, TResult> selector) {
         EnsureInitialized();
         ArgumentNullException.ThrowIfNull(selector);
         return _state == ValidState
@@ -122,13 +113,11 @@ public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
     /// <exception cref="ArgumentNullException">
     /// A callback is null, even for Invalid; <paramref name="predicate"/> is checked first.
     /// </exception>
-    public Validation<T, TIssue> Ensure(Func<T, bool> predicate, Func<T, TIssue> issueFactory)
-    {
+    public Validation<T, TIssue> Ensure(Func<T, bool> predicate, Func<T, TIssue> issueFactory) {
         EnsureInitialized();
         ArgumentNullException.ThrowIfNull(predicate);
         ArgumentNullException.ThrowIfNull(issueFactory);
-        if (_state != ValidState)
-        {
+        if (_state != ValidState) {
             return this;
         }
 
@@ -143,8 +132,7 @@ public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
     /// </summary>
     /// <exception cref="InvalidOperationException">The carrier is uninitialized; checked before the selector.</exception>
     /// <exception cref="ArgumentNullException">The selector is null, even for Valid.</exception>
-    public Validation<T, TNewIssue> MapIssues<TNewIssue>(Func<TIssue, TNewIssue> selector)
-    {
+    public Validation<T, TNewIssue> MapIssues<TNewIssue>(Func<TIssue, TNewIssue> selector) {
         EnsureInitialized();
         ArgumentNullException.ThrowIfNull(selector);
         return _state == ValidState
@@ -160,8 +148,7 @@ public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
     /// This carrier or <paramref name="other"/> is uninitialized, even next to Invalid; checked before the selector.
     /// </exception>
     /// <exception cref="ArgumentNullException">The selector is null, regardless of the outcomes.</exception>
-    public Validation<TResult, TIssue> Zip<TOther, TResult>(Validation<TOther, TIssue> other, Func<T, TOther, TResult> selector)
-    {
+    public Validation<TResult, TIssue> Zip<TOther, TResult>(Validation<TOther, TIssue> other, Func<T, TOther, TResult> selector) {
         EnsureInitialized();
         other.EnsureInitialized();
         ArgumentNullException.ThrowIfNull(selector);
@@ -179,8 +166,7 @@ public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
     public Validation<TResult, TIssue> Zip<TB, TC, TResult>(
         Validation<TB, TIssue> b,
         Validation<TC, TIssue> c,
-        Func<T, TB, TC, TResult> selector)
-    {
+        Func<T, TB, TC, TResult> selector) {
         EnsureInitialized();
         b.EnsureInitialized();
         c.EnsureInitialized();
@@ -200,8 +186,7 @@ public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
         Validation<TB, TIssue> b,
         Validation<TC, TIssue> c,
         Validation<TD, TIssue> d,
-        Func<T, TB, TC, TD, TResult> selector)
-    {
+        Func<T, TB, TC, TD, TResult> selector) {
         EnsureInitialized();
         b.EnsureInitialized();
         c.EnsureInitialized();
@@ -221,18 +206,15 @@ public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
     /// uninitialized Validation. Nested carriers inside its payload are not checked.
     /// </exception>
     /// <exception cref="ArgumentNullException"><paramref name="next"/> is null, regardless of the outcome.</exception>
-    public Validation<TResult, TIssue> AndThen<TResult>(Func<T, Validation<TResult, TIssue>> next)
-    {
+    public Validation<TResult, TIssue> AndThen<TResult>(Func<T, Validation<TResult, TIssue>> next) {
         EnsureInitialized();
         ArgumentNullException.ThrowIfNull(next);
-        if (_state != ValidState)
-        {
+        if (_state != ValidState) {
             return Validation<TResult, TIssue>.FromIssues(_issues);
         }
 
         var result = next(_value);
-        if (result._state == Uninitialized)
-        {
+        if (result._state == Uninitialized) {
             ThrowHelper.ThrowUninitializedReturnedValidation(nameof(next));
         }
 
@@ -248,18 +230,15 @@ public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
     /// returned an uninitialized Validation. Nested carriers inside its payload are not checked.
     /// </exception>
     /// <exception cref="ArgumentNullException"><paramref name="fallback"/> is null, even for Valid.</exception>
-    public Validation<T, TNewIssue> OrElse<TNewIssue>(Func<ImmutableArray<TIssue>, Validation<T, TNewIssue>> fallback)
-    {
+    public Validation<T, TNewIssue> OrElse<TNewIssue>(Func<ImmutableArray<TIssue>, Validation<T, TNewIssue>> fallback) {
         EnsureInitialized();
         ArgumentNullException.ThrowIfNull(fallback);
-        if (_state == ValidState)
-        {
+        if (_state == ValidState) {
             return Validation<T, TNewIssue>.Valid(_value);
         }
 
         var result = fallback(_issues);
-        if (result._state == Uninitialized)
-        {
+        if (result._state == Uninitialized) {
             ThrowHelper.ThrowUninitializedReturnedValidation(nameof(fallback));
         }
 
@@ -270,15 +249,12 @@ public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
     /// Invalid outcomes are equal when their issues are equal position by position, independently of the backing
     /// storage.
     /// </summary>
-    public bool Equals(Validation<T, TIssue> other)
-    {
-        if (_state != other._state)
-        {
+    public bool Equals(Validation<T, TIssue> other) {
+        if (_state != other._state) {
             return false;
         }
 
-        return _state switch
-        {
+        return _state switch {
             ValidState => EqualityComparer<T>.Default.Equals(_value, other._value),
             InvalidState => IssuesEqual(_issues, other._issues),
             _ => true,
@@ -287,8 +263,7 @@ public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
 
     public override bool Equals(object? obj) => obj is Validation<T, TIssue> other && Equals(other);
 
-    public override int GetHashCode() => _state switch
-    {
+    public override int GetHashCode() => _state switch {
         ValidState => HashCode.Combine(ValidState, _value is null ? 0 : EqualityComparer<T>.Default.GetHashCode(_value)),
         InvalidState => IssuesHash(_issues),
         _ => 0,
@@ -298,8 +273,7 @@ public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
 
     public static bool operator !=(Validation<T, TIssue> left, Validation<T, TIssue> right) => !left.Equals(right);
 
-    public override string ToString() => _state switch
-    {
+    public override string ToString() => _state switch {
         ValidState => string.Concat("Validation.Valid(", Format(_value), ")"),
         InvalidState => FormatIssues(_issues),
         _ => "Validation.Uninitialized",
@@ -307,39 +281,37 @@ public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
 
     private static Validation<T, TIssue> FromIssues(ImmutableArray<TIssue> issues) => new(InvalidState, default!, issues);
 
+    // S1168: a default array is the "no issues contributed" marker that the combining code tests with IsDefault;
+    // an empty array would be a different value.
+#pragma warning disable S1168
     private static ImmutableArray<TIssue> IssuesOf<TAny>(in Validation<TAny, TIssue> validation) =>
         validation._state == InvalidState ? validation._issues : default;
+#pragma warning restore S1168
 
     private static ImmutableArray<TIssue> Concat(
         ImmutableArray<TIssue> a,
         ImmutableArray<TIssue> b,
         ImmutableArray<TIssue> c,
-        ImmutableArray<TIssue> d)
-    {
+        ImmutableArray<TIssue> d) {
         ReadOnlySpan<ImmutableArray<TIssue>> parts = [a, b, c, d];
         var failed = 0;
         var total = 0;
         var single = default(ImmutableArray<TIssue>);
-        foreach (var part in parts)
-        {
-            if (!part.IsDefault)
-            {
+        foreach (var part in parts) {
+            if (!part.IsDefault) {
                 failed++;
                 total += part.Length;
                 single = part;
             }
         }
 
-        if (failed == 1)
-        {
+        if (failed == 1) {
             return single;
         }
 
         var builder = ImmutableArray.CreateBuilder<TIssue>(total);
-        foreach (var part in parts)
-        {
-            if (!part.IsDefault)
-            {
+        foreach (var part in parts) {
+            if (!part.IsDefault) {
                 builder.AddRange(part);
             }
         }
@@ -347,18 +319,14 @@ public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
         return builder.MoveToImmutable();
     }
 
-    private static bool IssuesEqual(ImmutableArray<TIssue> left, ImmutableArray<TIssue> right)
-    {
-        if (left.Length != right.Length)
-        {
+    private static bool IssuesEqual(ImmutableArray<TIssue> left, ImmutableArray<TIssue> right) {
+        if (left.Length != right.Length) {
             return false;
         }
 
         var comparer = EqualityComparer<TIssue>.Default;
-        for (var i = 0; i < left.Length; i++)
-        {
-            if (!comparer.Equals(left[i], right[i]))
-            {
+        for (var i = 0; i < left.Length; i++) {
+            if (!comparer.Equals(left[i], right[i])) {
                 return false;
             }
         }
@@ -366,25 +334,20 @@ public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
         return true;
     }
 
-    private static int IssuesHash(ImmutableArray<TIssue> issues)
-    {
+    private static int IssuesHash(ImmutableArray<TIssue> issues) {
         var hash = default(HashCode);
         hash.Add(InvalidState);
-        foreach (var issue in issues)
-        {
+        foreach (var issue in issues) {
             hash.Add(issue, EqualityComparer<TIssue>.Default);
         }
 
         return hash.ToHashCode();
     }
 
-    private static string FormatIssues(ImmutableArray<TIssue> issues)
-    {
+    private static string FormatIssues(ImmutableArray<TIssue> issues) {
         var text = new StringBuilder("Validation.Invalid([");
-        for (var i = 0; i < issues.Length; i++)
-        {
-            if (i > 0)
-            {
+        for (var i = 0; i < issues.Length; i++) {
+            if (i > 0) {
                 text.Append(", ");
             }
 
@@ -397,10 +360,8 @@ public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
     private static string Format<TPayload>(TPayload payload) =>
         payload is null ? "null" : payload.ToString() ?? string.Empty;
 
-    private void EnsureInitialized()
-    {
-        if (_state == Uninitialized)
-        {
+    private void EnsureInitialized() {
+        if (_state == Uninitialized) {
             ThrowHelper.ThrowUninitializedValidation();
         }
     }

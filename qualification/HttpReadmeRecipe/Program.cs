@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using Rezultat;
+using Rezultat.Qualification;
 
 var checks = new Checks();
 var order = new Order(7, "cancelled");

@@ -1,16 +1,13 @@
-internal sealed class Checks
-{
+namespace Rezultat.Qualification;
+
+internal sealed class Checks {
     private int _failures;
     private int _passed;
 
-    public void That(string name, bool condition)
-    {
-        if (condition)
-        {
+    public void That(string name, bool condition) {
+        if (condition) {
             _passed++;
-        }
-        else
-        {
+        } else {
             Fail(name);
         }
     }
@@ -19,27 +16,21 @@ internal sealed class Checks
         That($"{name}: expected '{expected}', got '{actual}'", expected == actual);
 
     public void Throws<TException>(string name, Action action)
-        where TException : Exception
-    {
-        try
-        {
+        where TException : Exception {
+        try {
             action();
             Fail($"{name}: no exception");
-        }
-        catch (Exception exception) when (exception.GetType() == typeof(TException))
-        {
+        } catch (Exception exception) when (exception.GetType() == typeof(TException)) {
             _passed++;
         }
     }
 
-    public void Fail(string name)
-    {
+    public void Fail(string name) {
         _failures++;
         Console.Error.WriteLine($"FAIL {name}");
     }
 
-    public int Complete()
-    {
+    public int Complete() {
         Console.WriteLine($"{AppContext.GetData("RUNTIME_IDENTIFIER") ?? "unknown-rid"}: {_passed} passed, {_failures} failed");
         return _failures == 0 ? 0 : 1;
     }

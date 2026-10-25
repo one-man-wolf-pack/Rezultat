@@ -1,10 +1,10 @@
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using Rezultat;
 
-internal static class ScalarCosts
-{
+namespace Rezultat.Qualification.AllocationControls;
+
+internal static class ScalarCosts {
     private static readonly ImmutableArray<string> _issues = ["a", "b"];
     private static readonly Validation<int, string> _valid = Validation<int, string>.Valid(6);
     private static readonly Validation<int, string> _invalid = Validation<int, string>.InvalidMany(_issues);
@@ -27,8 +27,7 @@ internal static class ScalarCosts
     private static Presence<Large> _presenceLargeSink;
     private static long _counter;
 
-    public static int Run()
-    {
+    public static int Run() {
         (string Name, Action<int> Library, Action<int> Recipe, Func<bool> Expected)[] pairs =
         [
             ("Validation.Map Valid vs AndThen+Valid", ValidationMap, ValidationMapRecipe,
@@ -64,21 +63,18 @@ internal static class ScalarCosts
         ];
 
         var failures = 0;
-        foreach (var (name, library, recipe, expected) in pairs)
-        {
+        foreach (var (name, library, recipe, expected) in pairs) {
             failures += Validate($"{name} (library)", library, expected) + Validate($"{name} (recipe)", recipe, expected);
         }
 
         failures += Validate("Validation.Invalid singleton baseline", DirectInvalid, static () => _validationSink == Validation<int, string>.Invalid("e"));
 
-        if (failures != 0)
-        {
+        if (failures != 0) {
             Console.WriteLine("FAIL scalar cost workloads differ from their expected results; comparisons skipped");
             return failures;
         }
 
-        foreach (var (name, library, recipe, _) in pairs)
-        {
+        foreach (var (name, library, recipe, _) in pairs) {
             var (libraryBytes, libraryNanoseconds) = CostMeasurement.Measure(library);
             var (recipeBytes, recipeNanoseconds) = CostMeasurement.Measure(recipe);
             Console.WriteLine($"INFO {name}: allocation {libraryBytes} vs {recipeBytes} B/op (no budget)");
@@ -96,8 +92,7 @@ internal static class ScalarCosts
         return 0;
     }
 
-    private static int Validate(string name, Action<int> kernel, Func<bool> expected)
-    {
+    private static int Validate(string name, Action<int> kernel, Func<bool> expected) {
         _validationSink = default;
         _resultSink = default;
         _largeResultSink = default;
@@ -121,91 +116,71 @@ internal static class ScalarCosts
         ReferenceEquals(ImmutableCollectionsMarshal.AsArray(issues), ImmutableCollectionsMarshal.AsArray(_issues));
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ValidationMap(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ValidationMap(int n) {
+        for (var i = 0; i < n; i++) {
             _validationSink = _valid.Map(static x => x + 1);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ValidationMapRecipe(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ValidationMapRecipe(int n) {
+        for (var i = 0; i < n; i++) {
             _validationSink = _valid.AndThen(static x => Validation<int, string>.Valid(x + 1));
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ValidationMapInvalid(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ValidationMapInvalid(int n) {
+        for (var i = 0; i < n; i++) {
             _validationSink = _invalid.Map(static x => x + 1);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ValidationMapInvalidRecipe(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ValidationMapInvalidRecipe(int n) {
+        for (var i = 0; i < n; i++) {
             _validationSink = _invalid.AndThen(static x => Validation<int, string>.Valid(x + 1));
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ValidationEnsureFails(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ValidationEnsureFails(int n) {
+        for (var i = 0; i < n; i++) {
             _validationSink = _valid.Ensure(static x => x < 0, static _ => "negative");
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ValidationEnsureFailsRecipe(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ValidationEnsureFailsRecipe(int n) {
+        for (var i = 0; i < n; i++) {
             _validationSink = _valid.AndThen(static x => x < 0 ? Validation<int, string>.Valid(x) : Validation<int, string>.Invalid("negative"));
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ValidationEnsureInvalid(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ValidationEnsureInvalid(int n) {
+        for (var i = 0; i < n; i++) {
             _validationSink = _invalid.Ensure(static x => x < 0, static _ => "negative");
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ValidationEnsureInvalidRecipe(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ValidationEnsureInvalidRecipe(int n) {
+        for (var i = 0; i < n; i++) {
             _validationSink = _invalid.AndThen(static x => x < 0 ? Validation<int, string>.Valid(x) : Validation<int, string>.Invalid("negative"));
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void PresenceAndThen(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void PresenceAndThen(int n) {
+        for (var i = 0; i < n; i++) {
             _presenceSink = _value.AndThen(static x => x > 0 ? Presence<int>.Value(x) : Presence<int>.Null);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void PresenceAndThenRecipe(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void PresenceAndThenRecipe(int n) {
+        for (var i = 0; i < n; i++) {
             _presenceSink = _value.Match(
                 static x => x > 0 ? Presence<int>.Value(x) : Presence<int>.Null,
                 static () => Presence<int>.Null,
@@ -214,19 +189,15 @@ internal static class ScalarCosts
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void PresenceFilter(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void PresenceFilter(int n) {
+        for (var i = 0; i < n; i++) {
             _presenceSink = _value.FilterToMissing(static x => x > 0);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void PresenceFilterRecipe(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void PresenceFilterRecipe(int n) {
+        for (var i = 0; i < n; i++) {
             var source = _value;
             _presenceSink = source.Match(
                 static x => x > 0 ? Presence<int>.Value(x) : Presence<int>.Missing,
@@ -236,176 +207,144 @@ internal static class ScalarCosts
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void Inspect(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void Inspect(int n) {
+        for (var i = 0; i < n; i++) {
             _resultSink = _ok.Inspect(static x => _counter += x);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void InspectRecipe(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void InspectRecipe(int n) {
+        for (var i = 0; i < n; i++) {
             _resultSink = ObserveSuccess(_ok, static x => _counter += x);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void InspectCaptured(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void InspectCaptured(int n) {
+        for (var i = 0; i < n; i++) {
             var offset = i;
             _resultSink = _ok.Inspect(x => _counter += x + offset);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void InspectCapturedRecipe(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void InspectCapturedRecipe(int n) {
+        for (var i = 0; i < n; i++) {
             var offset = i;
             _resultSink = ObserveSuccess(_ok, x => _counter += x + offset);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void InspectLarge(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void InspectLarge(int n) {
+        for (var i = 0; i < n; i++) {
             _largeResultSink = _okLarge.Inspect(static x => _counter += x[0]);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void InspectLargeRecipe(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void InspectLargeRecipe(int n) {
+        for (var i = 0; i < n; i++) {
             _largeResultSink = ObserveSuccess(_okLarge, static x => _counter += x[0]);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void InspectReference(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void InspectReference(int n) {
+        for (var i = 0; i < n; i++) {
             _referenceResultSink = _okReference.Inspect(static x => _counter += x.Length);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void InspectReferenceRecipe(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void InspectReferenceRecipe(int n) {
+        for (var i = 0; i < n; i++) {
             _referenceResultSink = ObserveSuccess(_okReference, static x => _counter += x.Length);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void FilterLarge(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void FilterLarge(int n) {
+        for (var i = 0; i < n; i++) {
             _presenceLargeSink = _valueLarge.FilterToNull(static x => x[0] == 3);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void FilterLargeRecipe(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void FilterLargeRecipe(int n) {
+        for (var i = 0; i < n; i++) {
             var source = _valueLarge;
+            // S3358: the nested conditional is the hand-written recipe this control measures.
+#pragma warning disable S3358
             _presenceLargeSink = source.TryGetValue(out var value) ? value[0] == 3 ? source : Presence<Large>.Null : source;
+#pragma warning restore S3358
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void FilterReference(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void FilterReference(int n) {
+        for (var i = 0; i < n; i++) {
             _presenceStringSink = _valueReference.FilterToNull(static x => x.Length > 0);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void FilterReferenceRecipe(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void FilterReferenceRecipe(int n) {
+        for (var i = 0; i < n; i++) {
             var source = _valueReference;
+            // S3358: the nested conditional is the hand-written recipe this control measures.
+#pragma warning disable S3358
             _presenceStringSink = source.TryGetValue(out var value) ? value.Length > 0 ? source : Presence<string>.Null : source;
+#pragma warning restore S3358
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ToValidationError(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ToValidationError(int n) {
+        for (var i = 0; i < n; i++) {
             _validationSink = _error.ToValidation();
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ToValidationErrorRecipe(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ToValidationErrorRecipe(int n) {
+        for (var i = 0; i < n; i++) {
             _validationSink = _error.Match(Validation<int, string>.Valid, Validation<int, string>.Invalid);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void DirectInvalid(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void DirectInvalid(int n) {
+        for (var i = 0; i < n; i++) {
             _validationSink = Validation<int, string>.Invalid("e");
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ToResultInvalid(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ToResultInvalid(int n) {
+        for (var i = 0; i < n; i++) {
             _bridgedSink = _invalid.ToResult();
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ToResultInvalidRecipe(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void ToResultInvalidRecipe(int n) {
+        for (var i = 0; i < n; i++) {
             _bridgedSink = _invalid.Match(Result<int, ImmutableArray<string>>.Ok, Result<int, ImmutableArray<string>>.Error);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void PresenceTraverse(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void PresenceTraverse(int n) {
+        for (var i = 0; i < n; i++) {
             _traversedSink = _value.Traverse(static x => Result<int, string>.Ok(x + 1));
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void PresenceTraverseRecipe(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    private static void PresenceTraverseRecipe(int n) {
+        for (var i = 0; i < n; i++) {
             _traversedSink = _value.Match(
                 static x => Result<int, string>.Ok(x + 1).Map(Presence<int>.Value),
                 static () => Result<Presence<int>, string>.Ok(Presence<int>.Null),
@@ -413,11 +352,9 @@ internal static class ScalarCosts
         }
     }
 
-    private static Result<T, E> ObserveSuccess<T, E>(Result<T, E> result, Action<T> action)
-    {
+    private static Result<T, E> ObserveSuccess<T, E>(Result<T, E> result, Action<T> action) {
         ArgumentNullException.ThrowIfNull(action);
-        if (result.TryGetValue(out var value, out _))
-        {
+        if (result.TryGetValue(out var value, out _)) {
             action(value);
         }
 

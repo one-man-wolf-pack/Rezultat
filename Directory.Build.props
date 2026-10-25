@@ -5,6 +5,28 @@
     <NuGetAuditMode>all</NuGetAuditMode>
     <NuGetAuditLevel>low</NuGetAuditLevel>
     <WarningsAsErrors>$(WarningsAsErrors);NU1901;NU1902;NU1903;NU1904</WarningsAsErrors>
-    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
   </PropertyGroup>
+
+  <!-- Development diagnostics profile: an ordinary build is strict without an external -warnaserror. -->
+  <PropertyGroup>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>10.0-recommended</AnalysisLevel>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <!-- XML output backs the compiler-based unused-using check (IDE0005); XML completeness is not required. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591;CS1573;CS1712</NoWarn>
+  </PropertyGroup>
+
+  <!-- Private build-time analyzers: no compile/runtime asset and no dependency of a packed package. Versions are
+       owned by Directory.Packages.props; projects outside central package management take them from its
+       properties. -->
+  <ItemGroup Condition="'$(RezultatDevelopmentAnalyzers)' != 'false'">
+    <PackageReference Include="Roslynator.Analyzers" PrivateAssets="all" IncludeAssets="analyzers;build;buildtransitive">
+      <Version Condition="'$(ManagePackageVersionsCentrally)' != 'true'">$(RoslynatorAnalyzersVersion)</Version>
+    </PackageReference>
+    <PackageReference Include="SonarAnalyzer.CSharp" PrivateAssets="all" IncludeAssets="analyzers;build;buildtransitive">
+      <Version Condition="'$(ManagePackageVersionsCentrally)' != 'true'">$(SonarAnalyzerCSharpVersion)</Version>
+    </PackageReference>
+  </ItemGroup>
 </Project>

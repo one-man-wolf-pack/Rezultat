@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using Rezultat;
 using Rezultat.Testing.Xunit;
+using Rezultat.Qualification;
 
 var checks = new Checks();
 var assembly = typeof(ResultAssertions).Assembly;
@@ -48,20 +49,17 @@ return checks.Complete();
 
 static T Extract<T>(Result<T, string> result) => result.ShouldBeOk();
 
-void CheckOwner(Type owner, Type carrier, params (string Name, int Returned)[] expected)
-{
+void CheckOwner(Type owner, Type carrier, params (string Name, int Returned)[] expected) {
     checks.That($"{owner.Name} is a public static extension owner",
         owner is { IsPublic: true, IsAbstract: true, IsSealed: true } && owner.IsDefined(typeof(ExtensionAttribute)));
     var methods = owner.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly);
     checks.That($"{owner.Name} declares exactly {string.Join(", ", expected.Select(item => item.Name))}, each without and with includePayload",
         methods.Select(method => method.Name).Order(StringComparer.Ordinal)
             .SequenceEqual(expected.SelectMany(item => new[] { item.Name, item.Name }).Order(StringComparer.Ordinal)));
-    foreach (var (name, returned) in expected)
-    {
+    foreach (var (name, returned) in expected) {
         var withoutFlag = methods.SingleOrDefault(candidate => candidate.Name == name && candidate.GetParameters().Length == 1);
         var withFlag = methods.SingleOrDefault(candidate => candidate.Name == name && candidate.GetParameters().Length == 2);
-        if (withoutFlag is null || withFlag is null)
-        {
+        if (withoutFlag is null || withFlag is null) {
             checks.Fail($"{owner.Name}.{name} overloads missing");
             continue;
         }
@@ -75,8 +73,7 @@ void CheckOwner(Type owner, Type carrier, params (string Name, int Returned)[] e
     }
 }
 
-void CheckSignature(Type owner, Type carrier, string shortName, int returned, MethodInfo method)
-{
+void CheckSignature(Type owner, Type carrier, string shortName, int returned, MethodInfo method) {
     var name = $"{shortName}({string.Join(", ", method.GetParameters().Select(item => item.ParameterType.Name))})";
     var arguments = method.GetGenericArguments();
     var parameter = method.GetParameters()[0].ParameterType;
@@ -93,14 +90,12 @@ void CheckSignature(Type owner, Type carrier, string shortName, int returned, Me
             && !item.GetCustomAttributesData().Any(attribute => attribute.AttributeType.Namespace == "System.Diagnostics.CodeAnalysis")));
 }
 
-static byte[] NullableFlags(ParameterInfo parameter, MethodInfo method)
-{
+static byte[] NullableFlags(ParameterInfo parameter, MethodInfo method) {
     static CustomAttributeData? Find(IEnumerable<CustomAttributeData> attributes, string name) =>
         attributes.FirstOrDefault(attribute => attribute.AttributeType.FullName == $"System.Runtime.CompilerServices.{name}");
 
     var nullable = Find(parameter.GetCustomAttributesData(), "NullableAttribute");
-    if (nullable is not null)
-    {
+    if (nullable is not null) {
         var value = nullable.ConstructorArguments[0];
         return value.Value is byte flag ? [flag] : ((IEnumerable<CustomAttributeTypedArgument>)value.Value!).Select(item => (byte)item.Value!).ToArray();
     }
@@ -113,15 +108,11 @@ static byte[] NullableFlags(ParameterInfo parameter, MethodInfo method)
 static IEnumerable<Type> Flatten(Type type) =>
     type.IsGenericParameter ? [] : type.IsGenericType ? [type.GetGenericTypeDefinition(), .. type.GetGenericArguments().SelectMany(Flatten)] : [type];
 
-void CheckFailure(string name, Action action, string evidence)
-{
-    try
-    {
+void CheckFailure(string name, Action action, string evidence) {
+    try {
         action();
         checks.Fail($"{name}: no failure");
-    }
-    catch (Exception exception)
-    {
+    } catch (Exception exception) {
         var type = exception.GetType();
         checks.Text($"{name}: failure type", "Xunit.Sdk.FailException", type.FullName ?? string.Empty);
         checks.Text($"{name}: failure assembly", "xunit.v3.assert", type.Assembly.GetName().Name ?? string.Empty);
@@ -130,15 +121,11 @@ void CheckFailure(string name, Action action, string evidence)
     }
 }
 
-void CheckExcluded(string name, Action action, string actual)
-{
-    try
-    {
+void CheckExcluded(string name, Action action, string actual) {
+    try {
         action();
         checks.Fail($"{name}: no failure");
-    }
-    catch (Exception exception)
-    {
+    } catch (Exception exception) {
         checks.Text($"{name}: failure type", "Xunit.Sdk.FailException", exception.GetType().FullName ?? string.Empty);
         checks.That($"{name}: message names only the branches: {exception.Message}",
             exception.Message.Contains(actual, StringComparison.Ordinal)
@@ -148,24 +135,20 @@ void CheckExcluded(string name, Action action, string actual)
     }
 }
 
-internal sealed class Throwing
-{
+internal sealed class Throwing {
     public static int Calls { get; set; }
 
-    public override string ToString()
-    {
+    public override string ToString() {
         Calls++;
         throw new InvalidOperationException("secret formatter");
     }
 
-    public override bool Equals(object? obj)
-    {
+    public override bool Equals(object? obj) {
         Calls++;
         return ReferenceEquals(this, obj);
     }
 
-    public override int GetHashCode()
-    {
+    public override int GetHashCode() {
         Calls++;
         return 0;
     }

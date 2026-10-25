@@ -8,8 +8,7 @@ namespace Rezultat.Testing.Xunit;
 /// A failed assertion throws <c>Xunit.Sdk.FailException</c> from the xunit.v3.assert assembly, including in xUnit v2
 /// tests, where it is not the v2 <c>Xunit.Sdk.XunitException</c>.
 /// </summary>
-public static class ValidationAssertions
-{
+public static class ValidationAssertions {
     /// <summary>
     /// Returns the exact valid payload, which stays nullable when <typeparamref name="T"/> is. A matching branch
     /// formats nothing; Invalid and an uninitialized <c>default</c> fail without returning. The failure message lists
@@ -26,15 +25,12 @@ public static class ValidationAssertions
     /// count, and does not walk them; this limits only this failure message.
     /// </summary>
     [StackTraceHidden]
-    public static T ShouldBeValid<T, TIssue>(this Validation<T, TIssue> validation, bool includePayload)
-    {
-        if (!validation.IsInitialized)
-        {
+    public static T ShouldBeValid<T, TIssue>(this Validation<T, TIssue> validation, bool includePayload) {
+        if (!validation.IsInitialized) {
             throw FailException.ForFailure(FailureText.Branch("Validation.Valid", "Validation.Uninitialized"));
         }
 
-        if (validation.TryGetValue(out var value, out var issues))
-        {
+        if (validation.TryGetValue(out var value, out var issues)) {
             return value;
         }
 
@@ -60,15 +56,12 @@ public static class ValidationAssertions
     /// payload; this limits only this failure message.
     /// </summary>
     [StackTraceHidden]
-    public static ImmutableArray<TIssue> ShouldBeInvalid<T, TIssue>(this Validation<T, TIssue> validation, bool includePayload)
-    {
-        if (!validation.IsInitialized)
-        {
+    public static ImmutableArray<TIssue> ShouldBeInvalid<T, TIssue>(this Validation<T, TIssue> validation, bool includePayload) {
+        if (!validation.IsInitialized) {
             throw FailException.ForFailure(FailureText.Branch("Validation.Invalid", "Validation.Uninitialized"));
         }
 
-        if (!validation.TryGetValue(out var value, out var issues))
-        {
+        if (!validation.TryGetValue(out var value, out var issues)) {
             return issues;
         }
 

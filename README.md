@@ -82,6 +82,14 @@ by `qualification/ShouldlyRecipeConsumer` (with Shouldly and xUnit v3, without `
 `qualification/JsonReadmeRecipe`. All packages share the version and packaging settings in
 `src/Directory.Build.props`.
 
+`.editorconfig` (K&R braces, file-scoped namespaces, naming) and `Directory.Build.props` make every ordinary build
+strict: warnings are errors, with the .NET 10 recommended analysis, enforced code style and the private
+Roslynator and SonarAnalyzer.CSharp analyzers. `Directory.Packages.props` owns the versions, including those used by
+`qualification/` projects outside central package management. Owned qualification support code inherits this profile;
+consumers whose restored package graph is inspected keep it without the private analyzers. Projects marked
+`RezultatConsumerInput` (diagnostic corpus, compiler controls, compiled README text and runner fixtures) compile with
+ordinary consumer settings and keep their source layout, so development diagnostics do not change what they check.
+
 ## Prerequisites
 
 - .NET SDK pinned in `global.json`; tests use Microsoft.Testing.Platform mode of `dotnet test`. The xUnit v2
@@ -94,9 +102,11 @@ by `qualification/ShouldlyRecipeConsumer` (with Shouldly and xUnit v3, without `
 All recurring operations go through `scripts/qualify.sh`; run it without arguments for the list.
 
 ```sh
-scripts/qualify.sh check                 # format verification, warning-free Release build
-scripts/qualify.sh test                  # own tests of the solution; extra arguments go to the test platform
-scripts/qualify.sh test Rezultat.Tests --filter-class Rezultat.Tests.ResultMapTests   # one test project, filtered
+scripts/qualify.sh check                 # format/style verification, strict Release build, every test module; changes no source
+scripts/qualify.sh test                  # every test module of the solution
+scripts/qualify.sh test Rezultat.Tests --filter-class Rezultat.Tests.ResultMapTests   # one test project and its references, filtered
+scripts/qualify.sh fmt                   # apply whitespace formatting (solution and owned qualification sources)
+scripts/qualify.sh fix --diagnostics IDE0011   # apply code-style/analyzer fixes to the solution, optionally scoped
 scripts/qualify.sh pack                  # artifacts/package/{Rezultat,Rezultat.Testing.Xunit}.<version>.nupkg/.snupkg, Rezultat.Analyzers.<version>.nupkg
 scripts/qualify.sh consumers             # package consumers, compiler controls, README examples and recipes, reference diamond, package inspection
 scripts/qualify.sh diamond               # only the reference diamond (needs the issued Rezultat 0.8.0, see below)
@@ -110,13 +120,20 @@ scripts/qualify.sh release <commit> Rezultat   # commit-bound package build with
 scripts/qualify.sh release-controls      # release/publish controls in a disposable Git fixture (host Git and Docker)
 ```
 
+`test` arguments after the optional project go to `dotnet test`; native filters such as `--filter-class` pass
+through to each selected test module. Each module receives `--minimum-expected-tests 1` after the SDK `--`
+separator (appended after an existing `--`), so a required module that runs no test, because it is empty or every
+selected test is skipped, fails even when other modules pass. A global `--minimum-expected-tests` before `--` would
+count one total including skips and does not replace it. `check` and `test` never format; `fmt` and `fix` are the
+only commands that change sources.
+
 `consumers`, `diamond`, `assertions`, `analyzers`, `alloc` and `publish` consume the packages from
 `artifacts/package` through `qualification/NuGet.Config` and an isolated package folder, so run `pack` first.
-Linux container outputs are kept separately in `artifacts/linux-arm64`. `assertions` runs expected-failure
-fixtures on purpose and checks the native reports kept in `artifacts/qualification/runner-reports`. `analyzers`
-compares every diagnostic of each build with the markers in the checked sources: `/*ID*/` expects the diagnostic at
-the following token (the next line's first token when the marker stands alone), a trailing `// ID` anywhere on its
-line. Build logs are kept in `artifacts/qualification/analyzer-logs`.
+Linux container outputs are kept separately in `artifacts/linux-arm64`.
+`assertions` runs expected-failure fixtures on purpose and checks the native reports kept in
+`artifacts/qualification/runner-reports`. `analyzers` compares every diagnostic of each build with the markers in the
+checked sources: `/*ID*/` expects the diagnostic at the following token (the next line's first token when the marker
+stands alone), a trailing `// ID` anywhere on its line. Build logs are kept in `artifacts/qualification/analyzer-logs`.
 
 `diamond` packs `qualification/Diamond/Inventory` and `qualification/Diamond/Orders` separately and restores them as
 packages into `qualification/Diamond/App`, which passes `Result` and `Validation` values from one to the other. It
@@ -213,7 +230,7 @@ switch and qualification of their API, adapters and deployment profiles.
 | `src/Rezultat` | The core library and package; collection extensions in `Collections/`, query extensions in `Linq/`, consumer `README.md`. |
 | `src/Rezultat.Testing.Xunit` | The test-only assertions package and its consumer `README.md`. |
 | `src/Rezultat.Analyzers` | The `RZT0001` analyzer package and its consumer `README.md`. |
-| `tests/Rezultat.Tests`, `tests/Rezultat.Testing.Xunit.Tests`, `tests/Rezultat.Analyzers.Tests` | Own behavioral and property tests (xUnit v3, FsCheck) and in-process Roslyn analyzer tests. |
+| `tests/Rezultat.Tests`, `tests/Rezultat.Testing.Xunit.Tests`, `tests/Rezultat.Analyzers.Tests` | Own behavioral and property tests (xUnit v3 on Microsoft.Testing.Platform, Shouldly assertions, FsCheck) and in-process Roslyn analyzer tests. |
 | `qualification/` | Package consumers, compiler controls, README examples and recipe consumers, xUnit v2/v3 runner consumers and report checks, analyzer corpus/isolation consumers and diagnostic report checks, allocation controls and package inspectors; outside the solution and restored only from the built packages. |
 | `qualification/Diamond` | Reference diamond fixtures: two packable libraries, the consuming app and the graph inspector, with their own package sources. |
 | `qualification/ReleaseControls` | Release build and publication controls against a disposable Git fixture and temporary feeds. |

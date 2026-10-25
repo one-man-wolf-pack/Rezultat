@@ -1,12 +1,11 @@
 using System.Collections.Immutable;
 using Rezultat;
+using Rezultat.Qualification;
 
 namespace PackageConsumer.Migration;
 
-internal static class MigrationConsumer
-{
-    public static void Run(Checks checks)
-    {
+internal static class MigrationConsumer {
+    public static void Run(Checks checks) {
         checks.Text("two-out success uses the value", "next 42", Handle(Parse("41")));
         checks.Text("two-out failure uses the error", "rejected, not a number: x", Handle(Parse("x")));
         checks.Throws<InvalidOperationException>("two-out rejects an uninitialized carrier", () => Handle(default));
@@ -18,22 +17,19 @@ internal static class MigrationConsumer
             () => Validation<string?, string>.Valid(null).Map(static name => new CustomerName(name)));
 
         var constructed = 0;
-        var invalid = CheckName("").Zip(CheckAge(-1), (name, age) =>
-        {
+        var invalid = CheckName("").Zip(CheckAge(-1), (name, age) => {
             constructed++;
             return new Person(name, age);
         });
         checks.That("invalid inputs construct nothing and keep issue order",
             constructed == 0 && !invalid.TryGetValue(out _, out var issues)
             && issues.SequenceEqual(["name is empty", "age is negative"]));
-        var partly = CheckName("Ada").Zip(CheckAge(-1), (name, age) =>
-        {
+        var partly = CheckName("Ada").Zip(CheckAge(-1), (name, age) => {
             constructed++;
             return new Person(name, age);
         });
         checks.That("one invalid input constructs nothing", constructed == 0 && !partly.TryGetValue(out _, out var single) && single.Length == 1);
-        var valid = CheckName("Ada").Zip(CheckAge(36), (name, age) =>
-        {
+        var valid = CheckName("Ada").Zip(CheckAge(36), (name, age) => {
             constructed++;
             return new Person(name, age);
         });
@@ -51,10 +47,8 @@ internal static class MigrationConsumer
         checks.That("the carrier text itself shows the card number", payment.ToString().Contains("4111", StringComparison.Ordinal));
     }
 
-    private static string Handle(Result<int, string> result)
-    {
-        if (!result.TryGetValue(out var value, out var error))
-        {
+    private static string Handle(Result<int, string> result) {
+        if (!result.TryGetValue(out var value, out var error)) {
             return $"rejected, {error}";
         }
 
@@ -74,8 +68,7 @@ internal static class MigrationConsumer
 
     private sealed record PaymentError(string Code, string CardNumber);
 
-    private sealed class CustomerName
-    {
+    private sealed class CustomerName {
         public CustomerName(string? value) => Value = value ?? throw new ArgumentNullException(nameof(value));
 
         public string Value { get; }

@@ -8,8 +8,7 @@ using Microsoft.CodeAnalysis.Operations;
 namespace Rezultat.Analyzers;
 
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
-public sealed class DiscardedOutcomeAnalyzer : DiagnosticAnalyzer
-{
+public sealed class DiscardedOutcomeAnalyzer : DiagnosticAnalyzer {
     public const string DiagnosticId = "RZT0001";
 
     private const string CarrierAssembly = "Rezultat";
@@ -27,21 +26,18 @@ public sealed class DiscardedOutcomeAnalyzer : DiagnosticAnalyzer
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => [_rule];
 
-    public override void Initialize(AnalysisContext context)
-    {
+    public override void Initialize(AnalysisContext context) {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.EnableConcurrentExecution();
         context.RegisterCompilationStartAction(Start);
     }
 
-    private static void Start(CompilationStartAnalysisContext context)
-    {
+    private static void Start(CompilationStartAnalysisContext context) {
         var compilation = context.Compilation;
         bool IsCore(IAssemblySymbol assembly) => assembly.Name == CarrierAssembly;
         var result = Definition(compilation, "Rezultat.Result`2", IsCore);
         var validation = Definition(compilation, "Rezultat.Validation`2", IsCore);
-        if (result is null && validation is null)
-        {
+        if (result is null && validation is null) {
             return;
         }
 
@@ -59,8 +55,7 @@ public sealed class DiscardedOutcomeAnalyzer : DiagnosticAnalyzer
 
     // Not GetTypeByMetadataName: it prefers a same-named type declared in the consumer and returns null when
     // several references define one. A missing or ambiguous definition disables only that type.
-    private static INamedTypeSymbol? Definition(Compilation compilation, string metadataName, Func<IAssemblySymbol, bool> owner)
-    {
+    private static INamedTypeSymbol? Definition(Compilation compilation, string metadataName, Func<IAssemblySymbol, bool> owner) {
         var candidates = compilation.GetTypesByMetadataName(metadataName)
             .Where(type => type.ContainingAssembly is { } assembly && owner(assembly))
             .ToArray();
@@ -71,30 +66,24 @@ public sealed class DiscardedOutcomeAnalyzer : DiagnosticAnalyzer
         INamedTypeSymbol? result,
         INamedTypeSymbol? validation,
         INamedTypeSymbol? task,
-        INamedTypeSymbol? valueTask)
-    {
-        public void AnalyzeStatement(OperationAnalysisContext context)
-        {
+        INamedTypeSymbol? valueTask) {
+        public void AnalyzeStatement(OperationAnalysisContext context) {
             var expression = ((IExpressionStatementOperation)context.Operation).Operation;
-            if (expression is not (IInvocationOperation or IObjectCreationOperation or IAwaitOperation or IConditionalAccessOperation))
-            {
+            if (expression is not (IInvocationOperation or IObjectCreationOperation or IAwaitOperation or IConditionalAccessOperation)) {
                 return;
             }
 
             var value = expression;
-            while (value is IConditionalAccessOperation conditional)
-            {
+            while (value is IConditionalAccessOperation conditional) {
                 value = conditional.WhenNotNull;
             }
 
             var type = value.Type as INamedTypeSymbol;
-            if (value is not IAwaitOperation && type is not null && (Is(type, task) || Is(type, valueTask)))
-            {
+            if (value is not IAwaitOperation && type is not null && (Is(type, task) || Is(type, valueTask))) {
                 type = type.TypeArguments[0] as INamedTypeSymbol;
             }
 
-            if (type is not null && (Is(type, result) || Is(type, validation)))
-            {
+            if (type is not null && (Is(type, result) || Is(type, validation))) {
                 context.ReportDiagnostic(Diagnostic.Create(
                     _rule,
                     expression.Syntax.GetLocation(),

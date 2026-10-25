@@ -1,110 +1,100 @@
 namespace Rezultat.Tests;
 
-public sealed class MaybeStateTests
-{
+public sealed class MaybeStateTests {
     [Fact]
-    public void None_default_and_new_are_the_same_absence()
-    {
+    public void None_default_and_new_are_the_same_absence() {
         Maybe<string>[] absent = [Maybe<string>.None, default, new()];
 
-        Assert.All(absent, maybe =>
-        {
-            Assert.False(maybe.IsSome);
-            Assert.False(maybe.TryGetValue(out var value));
-            Assert.Null(value);
-            Assert.Equal(Maybe<string>.None, maybe);
-        });
+        foreach (var maybe in absent) {
+            maybe.IsSome.ShouldBeFalse();
+            maybe.TryGetValue(out var value).ShouldBeFalse();
+            value.ShouldBeNull();
+            maybe.ShouldBe(Maybe<string>.None);
+        }
     }
 
     [Fact]
-    public void Unfilled_array_elements_are_none()
-    {
+    public void Unfilled_array_elements_are_none() {
         var slots = new Maybe<int>[3];
 
-        Assert.All(slots, slot => Assert.False(slot.IsSome));
+        foreach (var slot in slots) {
+            slot.IsSome.ShouldBeFalse();
+        }
     }
 
     [Fact]
-    public void Inactive_value_type_output_is_default()
-    {
-        Assert.False(Maybe<int>.None.TryGetValue(out var number));
-        Assert.Equal(0, number);
-        Assert.False(default(Maybe<Unit>).TryGetValue(out var unit));
-        Assert.Equal(Unit.Value, unit);
+    public void Inactive_value_type_output_is_default() {
+        Maybe<int>.None.TryGetValue(out var number).ShouldBeFalse();
+        number.ShouldBe(0);
+        default(Maybe<Unit>).TryGetValue(out var unit).ShouldBeFalse();
+        unit.ShouldBe(Unit.Value);
     }
 
     [Fact]
-    public void Some_with_default_payload_is_present()
-    {
-        Assert.True(Maybe<int>.Some(0).TryGetValue(out var zero));
-        Assert.Equal(0, zero);
-        Assert.True(Maybe<bool>.Some(false).IsSome);
-        Assert.True(Maybe<string>.Some(string.Empty).IsSome);
-        Assert.True(Maybe<Unit>.Some(Unit.Value).IsSome);
-        Assert.NotEqual(Maybe<int>.None, Maybe<int>.Some(default));
+    public void Some_with_default_payload_is_present() {
+        Maybe<int>.Some(0).TryGetValue(out var zero).ShouldBeTrue();
+        zero.ShouldBe(0);
+        Maybe<bool>.Some(false).IsSome.ShouldBeTrue();
+        Maybe<string>.Some(string.Empty).IsSome.ShouldBeTrue();
+        Maybe<Unit>.Some(Unit.Value).IsSome.ShouldBeTrue();
+        Maybe<int>.Some(default).ShouldNotBe(Maybe<int>.None);
     }
 
     [Fact]
-    public void Some_null_reference_is_present_null()
-    {
+    public void Some_null_reference_is_present_null() {
         var maybe = Maybe<string?>.Some(null);
 
-        Assert.True(maybe.IsSome);
-        Assert.True(maybe.TryGetValue(out var value));
-        Assert.Null(value);
+        maybe.IsSome.ShouldBeTrue();
+        maybe.TryGetValue(out var value).ShouldBeTrue();
+        value.ShouldBeNull();
     }
 
     [Fact]
-    public void Some_empty_nullable_is_present_without_value()
-    {
+    public void Some_empty_nullable_is_present_without_value() {
         var maybe = Maybe<int?>.Some(null);
 
-        Assert.True(maybe.TryGetValue(out var value));
-        Assert.False(value.HasValue);
-        Assert.True(Maybe<int?>.Some(0).TryGetValue(out var zero) && zero == 0);
+        maybe.TryGetValue(out var value).ShouldBeTrue();
+        value.HasValue.ShouldBeFalse();
+        (Maybe<int?>.Some(0).TryGetValue(out var zero) && zero == 0).ShouldBeTrue();
     }
 
     [Fact]
-    public void Some_accepts_upcast_and_keeps_the_exact_reference()
-    {
+    public void Some_accepts_upcast_and_keeps_the_exact_reference() {
         var payload = new List<int>();
         var maybe = Maybe<IEnumerable<int>>.Some(payload);
 
-        Assert.True(maybe.TryGetValue(out var value));
-        Assert.Same(payload, value);
+        maybe.TryGetValue(out var value).ShouldBeTrue();
+        value.ShouldBeSameAs(payload);
     }
 
     [Fact]
-    public void Some_does_not_copy_mutable_payload()
-    {
+    public void Some_does_not_copy_mutable_payload() {
         var payload = new List<int> { 1 };
         var maybe = Maybe<List<int>>.Some(payload);
 
         payload.Add(2);
 
-        Assert.True(maybe.TryGetValue(out var value));
-        Assert.Equal([1, 2], value);
+        maybe.TryGetValue(out var value).ShouldBeTrue();
+        value.ShouldBe([1, 2]);
     }
 
     [Fact]
-    public void Nested_none_is_present_payload_of_outer_some()
-    {
+    public void Nested_none_is_present_payload_of_outer_some() {
         var outer = Maybe<Maybe<int>>.Some(Maybe<int>.None);
 
-        Assert.True(outer.IsSome);
-        Assert.True(outer.TryGetValue(out var inner));
-        Assert.False(inner.IsSome);
-        Assert.NotEqual(Maybe<Maybe<int>>.None, outer);
-        Assert.NotEqual(Maybe<Maybe<int>>.Some(Maybe<int>.Some(1)), outer);
+        outer.IsSome.ShouldBeTrue();
+        outer.TryGetValue(out var inner).ShouldBeTrue();
+        inner.IsSome.ShouldBeFalse();
+        outer.ShouldNotBe(Maybe<Maybe<int>>.None);
+        outer.ShouldNotBe(Maybe<Maybe<int>>.Some(Maybe<int>.Some(1)));
     }
 
     [Fact]
-    public void Uninitialized_result_payload_is_kept_without_validation()
-    {
+    public void Uninitialized_result_payload_is_kept_without_validation() {
         var maybe = Maybe<Result<int, string>>.Some(default);
 
-        Assert.True(maybe.TryGetValue(out var result));
-        Assert.False(result.IsInitialized);
-        Assert.Equal("Maybe.Some(Result.Uninitialized)", maybe.ToString());
+        maybe.TryGetValue(out var result).ShouldBeTrue();
+        result.IsInitialized.ShouldBeFalse();
+        maybe.ToString().ShouldBe("Maybe.Some(Result.Uninitialized)");
     }
 }

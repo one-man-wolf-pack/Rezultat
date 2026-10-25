@@ -7,8 +7,7 @@ namespace Rezultat.Testing.Xunit;
 /// A failed assertion throws <c>Xunit.Sdk.FailException</c> from the xunit.v3.assert assembly, including in xUnit v2
 /// tests, where it is not the v2 <c>Xunit.Sdk.XunitException</c>.
 /// </summary>
-public static class ResultAssertions
-{
+public static class ResultAssertions {
     /// <summary>
     /// Returns the exact success payload, which stays nullable when <typeparamref name="T"/> is. A matching branch
     /// formats nothing; Error and an uninitialized <c>default</c> fail without returning. The failure message shows the
@@ -25,15 +24,12 @@ public static class ResultAssertions
     /// failure message.
     /// </summary>
     [StackTraceHidden]
-    public static T ShouldBeOk<T, TError>(this Result<T, TError> result, bool includePayload)
-    {
-        if (!result.IsInitialized)
-        {
+    public static T ShouldBeOk<T, TError>(this Result<T, TError> result, bool includePayload) {
+        if (!result.IsInitialized) {
             throw FailException.ForFailure(FailureText.Branch("Result.Ok", "Result.Uninitialized"));
         }
 
-        if (result.TryGetValue(out var value, out var error))
-        {
+        if (result.TryGetValue(out var value, out var error)) {
             return value;
         }
 
@@ -58,15 +54,12 @@ public static class ResultAssertions
     /// payload; this limits only this failure message.
     /// </summary>
     [StackTraceHidden]
-    public static TError ShouldBeError<T, TError>(this Result<T, TError> result, bool includePayload)
-    {
-        if (!result.IsInitialized)
-        {
+    public static TError ShouldBeError<T, TError>(this Result<T, TError> result, bool includePayload) {
+        if (!result.IsInitialized) {
             throw FailException.ForFailure(FailureText.Branch("Result.Error", "Result.Uninitialized"));
         }
 
-        if (!result.TryGetValue(out var value, out var error))
-        {
+        if (!result.TryGetValue(out var value, out var error)) {
             return error;
         }
 

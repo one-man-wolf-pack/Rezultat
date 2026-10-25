@@ -4,8 +4,7 @@ using System.Collections.Immutable;
 
 namespace Rezultat.Collections;
 
-public static class ValidationCollectionExtensions
-{
+public static class ValidationCollectionExtensions {
     /// <summary>
     /// Enumerates <paramref name="source"/> once, in order, invoking <paramref name="selector"/> once per visited
     /// element; Invalid does not stop the traversal. With any Invalid returns all their issues in element order and
@@ -22,8 +21,7 @@ public static class ValidationCollectionExtensions
     /// </exception>
     public static Validation<TResult[], TIssue> Traverse<TSource, TResult, TIssue>(
         this IEnumerable<TSource> source,
-        Func<TSource, Validation<TResult, TIssue>> selector)
-    {
+        Func<TSource, Validation<TResult, TIssue>> selector) {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(selector);
         return TraverseCore(source, selector, ready: false);
@@ -39,8 +37,7 @@ public static class ValidationCollectionExtensions
     /// <exception cref="InvalidOperationException">
     /// A visited element is an uninitialized Validation, even after accumulated issues; the traversal stops there.
     /// </exception>
-    public static Validation<T[], TIssue> Sequence<T, TIssue>(this IEnumerable<Validation<T, TIssue>> source)
-    {
+    public static Validation<T[], TIssue> Sequence<T, TIssue>(this IEnumerable<Validation<T, TIssue>> source) {
         ArgumentNullException.ThrowIfNull(source);
         return TraverseCore(source, static item => item, ready: true);
     }
@@ -56,8 +53,7 @@ public static class ValidationCollectionExtensions
     /// <exception cref="InvalidOperationException">
     /// A visited element is an uninitialized Validation, even after accumulated issues; the traversal stops there.
     /// </exception>
-    public static Validation<Unit, TIssue> ValidateAll<T, TIssue>(this IEnumerable<Validation<T, TIssue>> source)
-    {
+    public static Validation<Unit, TIssue> ValidateAll<T, TIssue>(this IEnumerable<Validation<T, TIssue>> source) {
         ArgumentNullException.ThrowIfNull(source);
         return ValidateAllCore(source, static item => item, ready: true);
     }
@@ -78,8 +74,7 @@ public static class ValidationCollectionExtensions
     /// </exception>
     public static Validation<Unit, TIssue> ValidateAll<TSource, TValue, TIssue>(
         this IEnumerable<TSource> source,
-        Func<TSource, Validation<TValue, TIssue>> selector)
-    {
+        Func<TSource, Validation<TValue, TIssue>> selector) {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(selector);
         return ValidateAllCore(source, selector, ready: false);
@@ -88,27 +83,21 @@ public static class ValidationCollectionExtensions
     private static Validation<TResult[], TIssue> TraverseCore<TSource, TResult, TIssue>(
         IEnumerable<TSource> source,
         Func<TSource, Validation<TResult, TIssue>> selector,
-        bool ready)
-    {
+        bool ready) {
         List<TResult>? values = [];
         var firstIssues = default(ImmutableArray<TIssue>);
         ImmutableArray<TIssue>.Builder? accumulated = null;
-        foreach (var item in source)
-        {
+        foreach (var item in source) {
             var outcome = Observe(selector(item), ready);
-            if (outcome.TryGetValue(out var value, out var issues))
-            {
+            if (outcome.TryGetValue(out var value, out var issues)) {
                 values?.Add(value);
-            }
-            else
-            {
+            } else {
                 values = null;
                 Accumulate(ref firstIssues, ref accumulated, issues);
             }
         }
 
-        if (values is not null)
-        {
+        if (values is not null) {
             return Validation<TResult[], TIssue>.Valid(values.ToArray());
         }
 
@@ -118,32 +107,25 @@ public static class ValidationCollectionExtensions
     private static Validation<Unit, TIssue> ValidateAllCore<TSource, TValue, TIssue>(
         IEnumerable<TSource> source,
         Func<TSource, Validation<TValue, TIssue>> selector,
-        bool ready)
-    {
+        bool ready) {
         var firstIssues = default(ImmutableArray<TIssue>);
         ImmutableArray<TIssue>.Builder? accumulated = null;
-        foreach (var item in source)
-        {
-            if (!Observe(selector(item), ready).TryGetValue(out _, out var issues))
-            {
+        foreach (var item in source) {
+            if (!Observe(selector(item), ready).TryGetValue(out _, out var issues)) {
                 Accumulate(ref firstIssues, ref accumulated, issues);
             }
         }
 
-        if (firstIssues.IsDefault)
-        {
+        if (firstIssues.IsDefault) {
             return Validation<Unit, TIssue>.Valid(Unit.Value);
         }
 
         return Validation<Unit, TIssue>.InvalidMany(accumulated?.ToImmutable() ?? firstIssues);
     }
 
-    private static Validation<T, TIssue> Observe<T, TIssue>(Validation<T, TIssue> outcome, bool ready)
-    {
-        if (!outcome.IsInitialized)
-        {
-            if (ready)
-            {
+    private static Validation<T, TIssue> Observe<T, TIssue>(Validation<T, TIssue> outcome, bool ready) {
+        if (!outcome.IsInitialized) {
+            if (ready) {
                 ThrowHelper.ThrowUninitializedValidationElement();
             }
 
@@ -156,16 +138,13 @@ public static class ValidationCollectionExtensions
     private static void Accumulate<TIssue>(
         ref ImmutableArray<TIssue> firstIssues,
         ref ImmutableArray<TIssue>.Builder? accumulated,
-        ImmutableArray<TIssue> issues)
-    {
-        if (firstIssues.IsDefault)
-        {
+        ImmutableArray<TIssue> issues) {
+        if (firstIssues.IsDefault) {
             firstIssues = issues;
             return;
         }
 
-        if (accumulated is null)
-        {
+        if (accumulated is null) {
             accumulated = ImmutableArray.CreateBuilder<TIssue>(firstIssues.Length + issues.Length);
             accumulated.AddRange(firstIssues);
         }

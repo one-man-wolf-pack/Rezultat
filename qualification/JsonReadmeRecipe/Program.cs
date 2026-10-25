@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Rezultat;
+using Rezultat.Qualification;
 
 var checks = new Checks();
 var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
@@ -31,13 +32,10 @@ checks.That("round trip keeps Value, Value and Missing",
 var nullTrip = Read(Write(nulls));
 checks.That("round trip keeps Null", nullTrip.Nickname.IsNull && nullTrip.Age.IsNull && nullTrip.Newsletter.IsNull);
 
-try
-{
+try {
     Read("""{"age":"x"}""");
     checks.Fail("an invalid payload is rejected: no exception");
-}
-catch (JsonException exception)
-{
+} catch (JsonException exception) {
     checks.That("an invalid payload is rejected with the payload error inside", exception.InnerException is JsonException);
 }
 
@@ -53,10 +51,8 @@ return checks.Complete();
 [JsonConverter(typeof(NullTagConverter))]
 internal sealed record Tag(string Text);
 
-internal sealed class NullTagConverter : JsonConverter<Tag>
-{
-    public override Tag? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-    {
+internal sealed class NullTagConverter : JsonConverter<Tag> {
+    public override Tag? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) {
         reader.Skip();
         return null;
     }

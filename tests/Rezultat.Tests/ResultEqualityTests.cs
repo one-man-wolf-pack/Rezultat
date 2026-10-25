@@ -1,18 +1,16 @@
 namespace Rezultat.Tests;
 
-public sealed class ResultEqualityTests
-{
+public sealed class ResultEqualityTests {
     [Fact]
-    public void Two_uninitialized_results_are_equal_with_equal_hash()
-    {
+    public void Two_uninitialized_results_are_equal_with_equal_hash() {
         var left = default(Result<string, string>);
         var right = new Result<string, string>();
 
-        Assert.True(left.Equals(right));
-        Assert.True(left.Equals((object)right));
-        Assert.True(left == right);
-        Assert.False(left != right);
-        Assert.Equal(left.GetHashCode(), right.GetHashCode());
+        left.Equals(right).ShouldBeTrue();
+        left.Equals((object)right).ShouldBeTrue();
+        (left == right).ShouldBeTrue();
+        (left != right).ShouldBeFalse();
+        right.GetHashCode().ShouldBe(left.GetHashCode());
     }
 
     public static TheoryData<string, Result<string?, string?>> InitializedNullAndDefaultOutcomes => new()
@@ -24,175 +22,156 @@ public sealed class ResultEqualityTests
 
     [Theory]
     [MemberData(nameof(InitializedNullAndDefaultOutcomes))]
-    public void Uninitialized_differs_from_every_initialized_outcome(string name, Result<string?, string?> initialized)
-    {
+    public void Uninitialized_differs_from_every_initialized_outcome(string name, Result<string?, string?> initialized) {
         var uninitialized = default(Result<string?, string?>);
 
-        Assert.False(uninitialized.Equals(initialized), name);
-        Assert.False(initialized.Equals(uninitialized), name);
-        Assert.True(uninitialized != initialized, name);
+        uninitialized.Equals(initialized).ShouldBeFalse(name);
+        initialized.Equals(uninitialized).ShouldBeFalse(name);
+        (uninitialized != initialized).ShouldBeTrue(name);
     }
 
     [Fact]
-    public void Uninitialized_differs_from_value_type_default_payload_outcomes()
-    {
-        Assert.NotEqual(default, Result<int, bool>.Ok(0));
-        Assert.NotEqual(default, Result<int, bool>.Error(false));
-        Assert.NotEqual(default, Result<Unit, Unit>.Ok(Unit.Value));
-        Assert.NotEqual(default, Result<Unit, Unit>.Error(Unit.Value));
+    public void Uninitialized_differs_from_value_type_default_payload_outcomes() {
+        Result<int, bool>.Ok(0).ShouldNotBe(default);
+        Result<int, bool>.Error(false).ShouldNotBe(default);
+        Result<Unit, Unit>.Ok(Unit.Value).ShouldNotBe(default);
+        Result<Unit, Unit>.Error(Unit.Value).ShouldNotBe(default);
     }
 
     [Fact]
-    public void Different_branches_with_identical_payload_are_not_equal()
-    {
-        Assert.NotEqual(Result<int, int>.Ok(1), Result<int, int>.Error(1));
-        Assert.NotEqual(Result<string?, string?>.Ok(null), Result<string?, string?>.Error(null));
-        Assert.NotEqual(Result<Unit, Unit>.Ok(Unit.Value), Result<Unit, Unit>.Error(Unit.Value));
+    public void Different_branches_with_identical_payload_are_not_equal() {
+        Result<int, int>.Error(1).ShouldNotBe(Result<int, int>.Ok(1));
+        Result<string?, string?>.Error(null).ShouldNotBe(Result<string?, string?>.Ok(null));
+        Result<Unit, Unit>.Error(Unit.Value).ShouldNotBe(Result<Unit, Unit>.Ok(Unit.Value));
     }
 
     [Fact]
-    public void Same_branch_compares_active_payload_with_default_comparer()
-    {
-        Assert.Equal(Result<string, int>.Ok("a"), Result<string, int>.Ok(new string('a', 1)));
-        Assert.NotEqual(Result<string, int>.Ok("a"), Result<string, int>.Ok("A"));
-        Assert.Equal(Result<int, string?>.Error(null), Result<int, string?>.Error(null));
-        Assert.Equal(Result<Unit, string>.Ok(default), Result<Unit, string>.Ok(Unit.Value));
+    public void Same_branch_compares_active_payload_with_default_comparer() {
+        Result<string, int>.Ok(new string('a', 1)).ShouldBe(Result<string, int>.Ok("a"));
+        Result<string, int>.Ok("A").ShouldNotBe(Result<string, int>.Ok("a"));
+        Result<int, string?>.Error(null).ShouldBe(Result<int, string?>.Error(null));
+        Result<Unit, string>.Ok(Unit.Value).ShouldBe(Result<Unit, string>.Ok(default));
     }
 
     [Fact]
-    public void NaN_payloads_are_equal_through_default_comparer()
-    {
-        Assert.True(Result<double, int>.Ok(double.NaN) == Result<double, int>.Ok(double.NaN));
+    public void NaN_payloads_are_equal_through_default_comparer() {
+        (Result<double, int>.Ok(double.NaN) == Result<double, int>.Ok(double.NaN)).ShouldBeTrue();
     }
 
     [Fact]
-    public void Arrays_keep_reference_equality()
-    {
+    public void Arrays_keep_reference_equality() {
         int[] array = [1, 2];
 
-        Assert.Equal(Result<int[], int>.Ok(array), Result<int[], int>.Ok(array));
-        Assert.NotEqual(Result<int[], int>.Ok(array), Result<int[], int>.Ok([1, 2]));
+        Result<int[], int>.Ok(array).ShouldBe(Result<int[], int>.Ok(array));
+        Result<int[], int>.Ok([1, 2]).ShouldNotBe(Result<int[], int>.Ok(array));
     }
 
     [Fact]
-    public void Object_equality_rejects_null_raw_payload_and_other_closed_types()
-    {
+    public void Object_equality_rejects_null_raw_payload_and_other_closed_types() {
         var result = Result<int, string>.Ok(1);
 
-        Assert.False(result.Equals(null));
-        Assert.False(result.Equals((object)1));
-        Assert.False(result.Equals(Result<long, string>.Ok(1)));
-        Assert.False(result.Equals(Result<string, int>.Error(1)));
+        result.Equals(null).ShouldBeFalse();
+        result.Equals((object)1).ShouldBeFalse();
+        result.Equals(Result<long, string>.Ok(1)).ShouldBeFalse();
+        result.Equals(Result<string, int>.Error(1)).ShouldBeFalse();
     }
 
     [Fact]
-    public void Different_branches_do_not_invoke_payload_equality()
-    {
+    public void Different_branches_do_not_invoke_payload_equality() {
         var value = new ReferenceProbe(1);
         var error = new ReferenceProbe(1);
 
-        Assert.False(Result<ReferenceProbe, ReferenceProbe>.Ok(value) == Result<ReferenceProbe, ReferenceProbe>.Error(error));
-        Assert.Equal(0, value.EqualsCalls);
-        Assert.Equal(0, error.EqualsCalls);
+        (Result<ReferenceProbe, ReferenceProbe>.Ok(value) == Result<ReferenceProbe, ReferenceProbe>.Error(error)).ShouldBeFalse();
+        value.EqualsCalls.ShouldBe(0);
+        error.EqualsCalls.ShouldBe(0);
     }
 
     [Fact]
-    public void Comparison_with_uninitialized_does_not_invoke_payload_equality()
-    {
+    public void Comparison_with_uninitialized_does_not_invoke_payload_equality() {
         var probe = new ReferenceProbe(1);
 
-        Assert.False(Result<ReferenceProbe, int>.Ok(probe).Equals(default));
-        Assert.Equal(0, probe.EqualsCalls);
+        Result<ReferenceProbe, int>.Ok(probe).Equals(default).ShouldBeFalse();
+        probe.EqualsCalls.ShouldBe(0);
     }
 
     [Fact]
-    public void Inactive_value_type_slot_is_not_compared_or_hashed()
-    {
+    public void Inactive_value_type_slot_is_not_compared_or_hashed() {
         ValueProbe.Reset();
         var left = Result<ValueProbe, int>.Error(1);
         var right = Result<ValueProbe, int>.Error(1);
 
-        Assert.True(left == right);
+        (left == right).ShouldBeTrue();
         _ = left.GetHashCode();
-        Assert.Equal(0, ValueProbe.Touches);
+        ValueProbe.Touches.ShouldBe(0);
     }
 
     [Fact]
-    public void Uninitialized_equality_and_hash_do_not_touch_value_type_slots()
-    {
+    public void Uninitialized_equality_and_hash_do_not_touch_value_type_slots() {
         ValueProbe.Reset();
         var left = default(Result<ValueProbe, ValueProbe>);
         var right = default(Result<ValueProbe, ValueProbe>);
 
-        Assert.True(left == right);
-        Assert.False(left == Result<ValueProbe, ValueProbe>.Ok(default));
+        (left == right).ShouldBeTrue();
+        (left == Result<ValueProbe, ValueProbe>.Ok(default)).ShouldBeFalse();
         _ = left.GetHashCode();
-        Assert.Equal(0, ValueProbe.Touches);
+        ValueProbe.Touches.ShouldBe(0);
     }
 
     [Fact]
-    public void Active_value_type_payload_is_compared()
-    {
+    public void Active_value_type_payload_is_compared() {
         ValueProbe.Reset();
 
-        Assert.True(Result<ValueProbe, int>.Ok(new ValueProbe(2)) == Result<ValueProbe, int>.Ok(new ValueProbe(2)));
-        Assert.NotEqual(0, ValueProbe.Touches);
+        (Result<ValueProbe, int>.Ok(new ValueProbe(2)) == Result<ValueProbe, int>.Ok(new ValueProbe(2))).ShouldBeTrue();
+        ValueProbe.Touches.ShouldNotBe(0);
     }
 
     [Fact]
-    public void Payload_equality_exception_propagates_unchanged()
-    {
+    public void Payload_equality_exception_propagates_unchanged() {
         var left = Result<int, ReferenceProbe>.Error(new ReferenceProbe(1) { ThrowOnEquals = true });
         var right = Result<int, ReferenceProbe>.Error(new ReferenceProbe(1));
 
-        Assert.Throws<ProbeException>(() => left.Equals(right));
+        Should.Throw<ProbeException>(() => left.Equals(right));
     }
 
     [Fact]
-    public void Equal_results_have_equal_hashes_including_null_payload()
-    {
-        Assert.Equal(Result<string?, int>.Ok(null).GetHashCode(), Result<string?, int>.Ok(null).GetHashCode());
-        Assert.Equal(Result<int, string>.Error("x").GetHashCode(), Result<int, string>.Error(new string('x', 1)).GetHashCode());
-        Assert.Equal(Result<Unit, Unit>.Error(default).GetHashCode(), Result<Unit, Unit>.Error(Unit.Value).GetHashCode());
+    public void Equal_results_have_equal_hashes_including_null_payload() {
+        Result<string?, int>.Ok(null).GetHashCode().ShouldBe(Result<string?, int>.Ok(null).GetHashCode());
+        Result<int, string>.Error(new string('x', 1)).GetHashCode().ShouldBe(Result<int, string>.Error("x").GetHashCode());
+        Result<Unit, Unit>.Error(Unit.Value).GetHashCode().ShouldBe(Result<Unit, Unit>.Error(default).GetHashCode());
     }
 
     [Fact]
-    public void Hash_uses_active_payload_and_not_inactive_or_uninitialized()
-    {
+    public void Hash_uses_active_payload_and_not_inactive_or_uninitialized() {
         var probe = new ReferenceProbe(4);
 
         _ = Result<ReferenceProbe, int>.Ok(probe).GetHashCode();
         _ = default(Result<ReferenceProbe, ReferenceProbe>).GetHashCode();
 
-        Assert.Equal(1, probe.HashCalls);
+        probe.HashCalls.ShouldBe(1);
     }
 
     [Fact]
-    public void Payload_hash_exception_propagates_unchanged()
-    {
+    public void Payload_hash_exception_propagates_unchanged() {
         var result = Result<ReferenceProbe, int>.Ok(new ReferenceProbe(1) { ThrowOnHash = true });
 
-        Assert.Throws<ProbeException>(() => result.GetHashCode());
+        Should.Throw<ProbeException>(() => result.GetHashCode());
     }
 
     [Fact]
-    public void Results_work_as_dictionary_keys_with_branch_distinction()
-    {
-        var map = new Dictionary<Result<int, int>, string>
-        {
+    public void Results_work_as_dictionary_keys_with_branch_distinction() {
+        var map = new Dictionary<Result<int, int>, string> {
             [Result<int, int>.Ok(1)] = "ok",
             [Result<int, int>.Error(1)] = "error",
             [default] = "uninitialized",
         };
 
-        Assert.Equal("ok", map[Result<int, int>.Ok(1)]);
-        Assert.Equal("error", map[Result<int, int>.Error(1)]);
-        Assert.Equal("uninitialized", map[default]);
+        map[Result<int, int>.Ok(1)].ShouldBe("ok");
+        map[Result<int, int>.Error(1)].ShouldBe("error");
+        map[default].ShouldBe("uninitialized");
     }
 
     [Fact]
-    public void External_comparer_can_be_built_from_public_observation()
-    {
+    public void External_comparer_can_be_built_from_public_observation() {
         var comparer = new CaseInsensitiveErrorComparer();
         var set = new HashSet<Result<int, string>>(comparer)
         {
@@ -202,33 +181,27 @@ public sealed class ResultEqualityTests
             Result<int, string>.Ok(1),
         };
 
-        Assert.Equal(3, set.Count);
-        Assert.NotEqual(Result<int, string>.Error("Missing"), Result<int, string>.Error("MISSING"));
+        set.Count.ShouldBe(3);
+        Result<int, string>.Error("MISSING").ShouldNotBe(Result<int, string>.Error("Missing"));
     }
 
-    private sealed class CaseInsensitiveErrorComparer : IEqualityComparer<Result<int, string>>
-    {
-        public bool Equals(Result<int, string> x, Result<int, string> y)
-        {
-            if (!x.IsInitialized || !y.IsInitialized)
-            {
+    private sealed class CaseInsensitiveErrorComparer : IEqualityComparer<Result<int, string>> {
+        public bool Equals(Result<int, string> x, Result<int, string> y) {
+            if (!x.IsInitialized || !y.IsInitialized) {
                 return x.IsInitialized == y.IsInitialized;
             }
 
             var xSuccess = x.TryGetValue(out var xValue, out var xError);
             var ySuccess = y.TryGetValue(out var yValue, out var yError);
-            if (xSuccess != ySuccess)
-            {
+            if (xSuccess != ySuccess) {
                 return false;
             }
 
             return xSuccess ? xValue == yValue : StringComparer.OrdinalIgnoreCase.Equals(xError, yError);
         }
 
-        public int GetHashCode(Result<int, string> obj)
-        {
-            if (!obj.IsInitialized)
-            {
+        public int GetHashCode(Result<int, string> obj) {
+            if (!obj.IsInitialized) {
                 return 0;
             }
 

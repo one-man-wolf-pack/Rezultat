@@ -10,8 +10,7 @@ namespace Rezultat;
 /// detected. Presence does not choose a PATCH action or whether Null is acceptable for a field.
 /// </summary>
 public readonly struct Presence<T> : IEquatable<Presence<T>>
-    where T : notnull
-{
+    where T : notnull {
     private const byte MissingState = 0;
     private const byte NullState = 1;
     private const byte ValueState = 2;
@@ -19,8 +18,7 @@ public readonly struct Presence<T> : IEquatable<Presence<T>>
     private readonly T _value;
     private readonly byte _state;
 
-    private Presence(byte state, T value)
-    {
+    private Presence(byte state, T value) {
         _state = state;
         _value = value;
     }
@@ -37,10 +35,8 @@ public readonly struct Presence<T> : IEquatable<Presence<T>>
     /// <paramref name="value"/> is <see langword="null"/> or an empty <see cref="Nullable{T}"/>, even when
     /// nullable warnings were bypassed.
     /// </exception>
-    public static Presence<T> Value(T value)
-    {
-        if (value is null)
-        {
+    public static Presence<T> Value(T value) {
+        if (value is null) {
             ThrowHelper.ThrowArgumentNull(nameof(value));
         }
 
@@ -56,8 +52,7 @@ public readonly struct Presence<T> : IEquatable<Presence<T>>
     /// <summary>
     /// Returns <see langword="true"/> only for Value; <see langword="false"/> alone does not tell Missing from Null.
     /// </summary>
-    public bool TryGetValue([MaybeNullWhen(false), NotNullWhen(true)] out T value)
-    {
+    public bool TryGetValue([MaybeNullWhen(false), NotNullWhen(true)] out T value) {
         value = _value;
         return _state == ValueState;
     }
@@ -67,13 +62,11 @@ public readonly struct Presence<T> : IEquatable<Presence<T>>
     /// <paramref name="onNull"/> and <paramref name="onMissing"/> share a type, so swapping them still compiles.
     /// </summary>
     /// <exception cref="ArgumentNullException">Any handler is null, regardless of the state.</exception>
-    public TResult Match<TResult>(Func<T, TResult> onValue, Func<TResult> onNull, Func<TResult> onMissing)
-    {
+    public TResult Match<TResult>(Func<T, TResult> onValue, Func<TResult> onNull, Func<TResult> onMissing) {
         ArgumentNullException.ThrowIfNull(onValue);
         ArgumentNullException.ThrowIfNull(onNull);
         ArgumentNullException.ThrowIfNull(onMissing);
-        return _state switch
-        {
+        return _state switch {
             ValueState => onValue(_value),
             NullState => onNull(),
             _ => onMissing(),
@@ -89,15 +82,12 @@ public readonly struct Presence<T> : IEquatable<Presence<T>>
     /// The selector returned <see langword="null"/> or an empty <see cref="Nullable{T}"/>.
     /// </exception>
     public Presence<TResult> Map<TResult>(Func<T, TResult> selector)
-        where TResult : notnull
-    {
+        where TResult : notnull {
         ArgumentNullException.ThrowIfNull(selector);
-        switch (_state)
-        {
+        switch (_state) {
             case ValueState:
                 var result = selector(_value);
-                if (result is null)
-                {
+                if (result is null) {
                     ThrowHelper.ThrowNullPresenceMapResult();
                 }
 
@@ -115,11 +105,9 @@ public readonly struct Presence<T> : IEquatable<Presence<T>>
     /// </summary>
     /// <exception cref="ArgumentNullException"><paramref name="next"/> is null, even for Missing and Null.</exception>
     public Presence<TResult> AndThen<TResult>(Func<T, Presence<TResult>> next)
-        where TResult : notnull
-    {
+        where TResult : notnull {
         ArgumentNullException.ThrowIfNull(next);
-        return _state switch
-        {
+        return _state switch {
             ValueState => next(_value),
             NullState => Presence<TResult>.Null,
             _ => Presence<TResult>.Missing,
@@ -140,10 +128,8 @@ public readonly struct Presence<T> : IEquatable<Presence<T>>
     /// <exception cref="ArgumentNullException"><paramref name="predicate"/> is null, even for Missing and Null.</exception>
     public Presence<T> FilterToNull(Func<T, bool> predicate) => Filter(predicate, Null);
 
-    public bool Equals(Presence<T> other)
-    {
-        if (_state != other._state)
-        {
+    public bool Equals(Presence<T> other) {
+        if (_state != other._state) {
             return false;
         }
 
@@ -159,19 +145,16 @@ public readonly struct Presence<T> : IEquatable<Presence<T>>
 
     public static bool operator !=(Presence<T> left, Presence<T> right) => !left.Equals(right);
 
-    public override string ToString() => _state switch
-    {
+    public override string ToString() => _state switch {
         ValueState => string.Concat("Presence.Value(", _value.ToString() ?? string.Empty, ")"),
         NullState => "Presence.Null",
         _ => "Presence.Missing",
     };
 
-    private Presence<T> Filter(Func<T, bool> predicate, Presence<T> rejected)
-    {
+    private Presence<T> Filter(Func<T, bool> predicate, Presence<T> rejected) {
         ArgumentNullException.ThrowIfNull(predicate);
         var snapshot = this;
-        if (snapshot._state != ValueState)
-        {
+        if (snapshot._state != ValueState) {
             return snapshot;
         }
 

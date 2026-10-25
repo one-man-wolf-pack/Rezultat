@@ -3,6 +3,11 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using Rezultat;
 using Rezultat.Collections;
+using Rezultat.Qualification;
+
+// CA1861: each constant array is the input of a scenario that runs once; hoisting it into a field would only move
+// the scenario data away from its check.
+#pragma warning disable CA1861
 
 CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
 var checks = new Checks();
@@ -29,12 +34,9 @@ checks.Text("unit result text", "Result.Ok(())", Result<Unit, string>.Ok(Unit.Va
 checks.Text("early return success", "Result.Ok(5)", Sum("2", "3").ToString());
 checks.Text("early return failure", "Result.Error(not a number: x)", Sum("2", "x").ToString());
 
-if (Result<string, string>.Ok("value").TryGetValue(out var value, out var error))
-{
+if (Result<string, string>.Ok("value").TryGetValue(out var value, out var error)) {
     checks.Text("active value used without null check", "VALUE", value.ToUpperInvariant());
-}
-else
-{
+} else {
     checks.Fail($"unexpected error {error.Length}");
 }
 
@@ -58,8 +60,7 @@ var keys = new HashSet<Result<int, string>>(new IgnoreCaseErrorComparer())
 };
 checks.That("external comparer", keys.Count == 2);
 
-var lookup = new Dictionary<Result<Unit, Unit>, string>
-{
+var lookup = new Dictionary<Result<Unit, Unit>, string> {
     [Result<Unit, Unit>.Ok(Unit.Value)] = "ok",
     [Result<Unit, Unit>.Error(Unit.Value)] = "error",
 };
@@ -126,12 +127,9 @@ checks.That("default is none", !default(Maybe<int>).IsSome && default(Maybe<int>
 checks.That("none observation outputs default", !Maybe<int>.None.TryGetValue(out var inactive) && inactive == 0);
 checks.That("upcast some", Maybe<IEnumerable<char>>.Some("ab").ValueOr([]).Count() == 2);
 
-if (Maybe<string>.Some("value").TryGetValue(out var someValue))
-{
+if (Maybe<string>.Some("value").TryGetValue(out var someValue)) {
     checks.Text("active maybe value used without null check", "VALUE", someValue.ToUpperInvariant());
-}
-else
-{
+} else {
     checks.Fail("unexpected none");
 }
 
@@ -165,8 +163,7 @@ var maybeKeys = new HashSet<Maybe<string>>(new IgnoreCaseMaybeComparer())
     default,
 };
 checks.That("external maybe comparer", maybeKeys.Count == 2);
-var maybeLookup = new Dictionary<Maybe<string?>, string>
-{
+var maybeLookup = new Dictionary<Maybe<string?>, string> {
     [Maybe<string?>.None] = "none",
     [Maybe<string?>.Some(null)] = "null",
 };
@@ -224,12 +221,9 @@ checks.Text("get or none static IDictionary", "Maybe.Some(36)", mutableAges.GetO
 checks.Text("get or none static IReadOnlyDictionary", "Maybe.Some(36)", readOnlyAges.GetOrNone("Ada").ToString());
 checks.Text("get or none read-only priority", "Maybe.Some(read-only)", new DivergentDictionary().GetOrNone("key").ToString());
 checks.Text("get or none method group", "Maybe.Some(36)", Maybe<string>.Some("Ada").AndThen(ages.GetOrNone).ToString());
-if (new Dictionary<string, string> { ["k"] = "value" }.GetOrNone("k").TryGetValue(out var found))
-{
+if (new Dictionary<string, string> { ["k"] = "value" }.GetOrNone("k").TryGetValue(out var found)) {
     checks.Text("get or none non-null payload", "VALUE", found.ToUpperInvariant());
-}
-else
-{
+} else {
     checks.Fail("get or none non-null payload: unexpected none");
 }
 
@@ -270,12 +264,9 @@ checks.That("presence default is missing", default(Presence<string>) == missingN
 checks.That("presence one flag", Presence<int>.Null is { IsNull: true, IsMissing: false, IsValue: false });
 checks.That("presence zero is value", Presence<int>.Value(0).TryGetValue(out var zeroValue) && zeroValue == 0 && Presence<int>.Value(0) != default);
 checks.That("presence inactive out", !Presence<int>.Null.TryGetValue(out var inactiveNumber) && inactiveNumber == 0);
-if (Presence<string>.Value("ada").TryGetValue(out var presentName))
-{
+if (Presence<string>.Value("ada").TryGetValue(out var presentName)) {
     checks.Text("presence value used without null check", "ADA", presentName.ToUpperInvariant());
-}
-else
-{
+} else {
     checks.Fail("presence value: unexpected inactive state");
 }
 
@@ -423,23 +414,19 @@ static Result<int, string> ParseNumber(string text) =>
         ? Result<int, string>.Ok(number)
         : Result<int, string>.Error($"not a number: {text}");
 
-static Result<int, string> Sum(string left, string right)
-{
-    if (!ParseNumber(left).TryGetValue(out var a, out var leftError))
-    {
+static Result<int, string> Sum(string left, string right) {
+    if (!ParseNumber(left).TryGetValue(out var a, out var leftError)) {
         return Result<int, string>.Error(leftError);
     }
 
-    if (!ParseNumber(right).TryGetValue(out var b, out var rightError))
-    {
+    if (!ParseNumber(right).TryGetValue(out var b, out var rightError)) {
         return Result<int, string>.Error(rightError);
     }
 
     return Result<int, string>.Ok(a + b);
 }
 
-static async Task<Result<Unit, string>> SaveAsync(bool succeed)
-{
+static async Task<Result<Unit, string>> SaveAsync(bool succeed) {
     await Task.Yield();
     return succeed ? Result<Unit, string>.Ok(Unit.Value) : Result<Unit, string>.Error("rejected");
 }
@@ -453,18 +440,13 @@ static Result<int, Failure> Validate(int number) =>
 
 static Result<int, Failure> Fallback(string error) => Result<int, Failure>.Error(new Failure(error.Length));
 
-static IEnumerable<string> TrackedNumbers(DisposalTracker tracker)
-{
-    try
-    {
-        foreach (var text in new[] { "1", "x", "3" })
-        {
+static IEnumerable<string> TrackedNumbers(DisposalTracker tracker) {
+    try {
+        foreach (var text in new[] { "1", "x", "3" }) {
             tracker.Produced++;
             yield return text;
         }
-    }
-    finally
-    {
+    } finally {
         tracker.Disposed = true;
     }
 }
@@ -477,20 +459,17 @@ static Validation<int, string> CheckNumber(string text) =>
 static Validation<int, string> CheckSmall(int number) =>
     number < 5 ? Validation<int, string>.Valid(number) : Validation<int, string>.Invalid($"too large: {number}");
 
-static async Task<Validation<int, string>> CheckNumberAsync(string text)
-{
+static async Task<Validation<int, string>> CheckNumberAsync(string text) {
     await Task.Yield();
     return CheckNumber(text);
 }
 
-static async Task<Presence<string>> LoadNicknameAsync(bool found)
-{
+static async Task<Presence<string>> LoadNicknameAsync(bool found) {
     await Task.Yield();
     return found ? Presence<string>.Value("ace") : Presence<string>.Null;
 }
 
-static Validation<Draft, string> Patch(Draft current, Presence<string> name, Presence<int> count, Presence<string> nickname, Action? onDraft = null)
-{
+static Validation<Draft, string> Patch(Draft current, Presence<string> name, Presence<int> count, Presence<string> nickname, Action? onDraft = null) {
     var checkedName = name.Match(
         static value => value.Length > 0 ? Validation<string, string>.Valid(value) : Validation<string, string>.Invalid("name: empty"),
         static () => Validation<string, string>.Invalid("name: required"),
@@ -500,8 +479,7 @@ static Validation<Draft, string> Patch(Draft current, Presence<string> name, Pre
         static () => Validation<int, string>.Invalid("count: required"),
         () => Validation<int, string>.Valid(current.Count));
     var nextNickname = nickname.Match<string?>(static value => value, static () => null, () => current.Nickname);
-    return checkedName.Zip(checkedCount, (validName, validCount) =>
-    {
+    return checkedName.Zip(checkedCount, (validName, validCount) => {
         onDraft?.Invoke();
         return new Draft(validName, validCount, nextNickname);
     });
@@ -527,8 +505,7 @@ static string Anonymous() => "anonymous";
 
 static string GreetingName(Maybe<string> name, string guest) => name.TryGetValue(out var value) ? value : guest;
 
-static async Task<Maybe<string>> LoadAsync(bool found)
-{
+static async Task<Maybe<string>> LoadAsync(bool found) {
     await Task.Yield();
     return found ? Maybe<string>.Some("loaded") : Maybe<string>.None;
 }
@@ -539,23 +516,18 @@ internal sealed record Failure(int Code);
 
 internal sealed record Draft(string Name, int Count, string? Nickname);
 
-internal sealed record Reply(int Status, string Body)
-{
+internal sealed record Reply(int Status, string Body) {
     public override string ToString() => $"{Status} {Body}";
 }
 
-internal static class PresenceConsumerExtensions
-{
+internal static class PresenceConsumerExtensions {
     public static Presence<string> ThenNonBlank(this Presence<string> presence) =>
         presence.TryGetValue(out var value) && string.IsNullOrWhiteSpace(value) ? Presence<string>.Missing : presence;
 }
 
-internal sealed class IgnoreCaseIssuesComparer : IEqualityComparer<Validation<int, string>>
-{
-    public bool Equals(Validation<int, string> x, Validation<int, string> y)
-    {
-        if (!x.IsInitialized || !y.IsInitialized)
-        {
+internal sealed class IgnoreCaseIssuesComparer : IEqualityComparer<Validation<int, string>> {
+    public bool Equals(Validation<int, string> x, Validation<int, string> y) {
+        if (!x.IsInitialized || !y.IsInitialized) {
             return x.IsInitialized == y.IsInitialized;
         }
 
@@ -569,21 +541,18 @@ internal sealed class IgnoreCaseIssuesComparer : IEqualityComparer<Validation<in
         !obj.IsInitialized ? 0 : obj.TryGetValue(out var value, out var issues) ? value : issues.Length;
 }
 
-internal sealed class DisposalTracker
-{
+internal sealed class DisposalTracker {
     public int Produced { get; set; }
 
     public bool Disposed { get; set; }
 }
 
-internal static class ConsumerExtensions
-{
+internal static class ConsumerExtensions {
     public static Result<int, TError> Twice<TError>(this Result<int, TError> result) =>
         result.Match(value => Result<int, TError>.Ok(value * 2), Result<int, TError>.Error);
 }
 
-internal static class MaybeConsumerExtensions
-{
+internal static class MaybeConsumerExtensions {
     public static Maybe<int> Squared(this Maybe<int> maybe) =>
         maybe.TryGetValue(out var value) ? Maybe<int>.Some(value * value) : Maybe<int>.None;
 
@@ -591,21 +560,17 @@ internal static class MaybeConsumerExtensions
         maybe.TryGetValue(out var value) ? value : throw new InvalidOperationException("none");
 }
 
-internal sealed class DivergentDictionary : Dictionary<string, string>, IReadOnlyDictionary<string, string>
-{
+internal sealed class DivergentDictionary : Dictionary<string, string>, IReadOnlyDictionary<string, string> {
     public DivergentDictionary() => this["key"] = "dictionary";
 
-    bool IReadOnlyDictionary<string, string>.TryGetValue(string key, [System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)] out string value)
-    {
+    bool IReadOnlyDictionary<string, string>.TryGetValue(string key, [System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)] out string value) {
         value = "read-only";
         return true;
     }
 }
 
-internal sealed class IgnoreCaseMaybeComparer : IEqualityComparer<Maybe<string>>
-{
-    public bool Equals(Maybe<string> x, Maybe<string> y)
-    {
+internal sealed class IgnoreCaseMaybeComparer : IEqualityComparer<Maybe<string>> {
+    public bool Equals(Maybe<string> x, Maybe<string> y) {
         var xSome = x.TryGetValue(out var xValue);
         var ySome = y.TryGetValue(out var yValue);
         return xSome == ySome && (!xSome || StringComparer.OrdinalIgnoreCase.Equals(xValue, yValue));
@@ -615,12 +580,9 @@ internal sealed class IgnoreCaseMaybeComparer : IEqualityComparer<Maybe<string>>
         obj.TryGetValue(out var value) ? StringComparer.OrdinalIgnoreCase.GetHashCode(value) : 0;
 }
 
-internal sealed class IgnoreCaseErrorComparer : IEqualityComparer<Result<int, string>>
-{
-    public bool Equals(Result<int, string> x, Result<int, string> y)
-    {
-        if (!x.IsInitialized || !y.IsInitialized)
-        {
+internal sealed class IgnoreCaseErrorComparer : IEqualityComparer<Result<int, string>> {
+    public bool Equals(Result<int, string> x, Result<int, string> y) {
+        if (!x.IsInitialized || !y.IsInitialized) {
             return x.IsInitialized == y.IsInitialized;
         }
 
@@ -630,10 +592,8 @@ internal sealed class IgnoreCaseErrorComparer : IEqualityComparer<Result<int, st
             && (xSuccess ? xValue == yValue : StringComparer.OrdinalIgnoreCase.Equals(xError, yError));
     }
 
-    public int GetHashCode(Result<int, string> obj)
-    {
-        if (!obj.IsInitialized)
-        {
+    public int GetHashCode(Result<int, string> obj) {
+        if (!obj.IsInitialized) {
             return 0;
         }
 

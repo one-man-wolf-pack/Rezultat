@@ -7,6 +7,11 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using Rezultat.Qualification;
+
+// S6966/S3903: a synchronous top-level program; nothing awaits here, and its file-local helper types share the
+// global namespace of the generated Program class.
+#pragma warning disable S6966, S3903
 
 const string PackageId = "Rezultat.Analyzers";
 const string AnalyzerPath = "analyzers/dotnet/cs/Rezultat.Analyzers.dll";
@@ -14,8 +19,7 @@ const string ReadmePath = "README.md";
 
 var direct = Array.IndexOf(args, "--direct");
 var absent = Array.IndexOf(args, "--absent");
-if (args.Length < 5 || direct != 5 || absent < direct)
-{
+if (args.Length < 5 || direct != 5 || absent < direct) {
     Console.Error.WriteLine("usage: AnalyzerInspector <repo-root> <version> <nupkg> <packages-folder> <library-nupkg> "
         + "--direct <project.assets.json>... --absent <project.assets.json>...");
     return 2;
@@ -58,30 +62,35 @@ checks.That($"nuspec has no dependencies, framework/assembly references, content
     present.Length == 0);
 
 var readme = package.GetEntry(ReadmePath);
-if (readme is null)
-{
+if (readme is null) {
     checks.Fail("nupkg contains root README.md");
-}
-else
-{
+} else {
     var packaged = ReadAll(readme);
     checks.That("packaged README.md is the authored consumer readme",
         packaged.AsSpan().SequenceEqual(File.ReadAllBytes(Path.Combine(repoRoot, "src", PackageId, ReadmePath))));
     var text = Encoding.UTF8.GetString(packaged);
-    var localLinks = Regex.Matches(text, @"\]\((?!https://)[^)]*\)").Select(match => match.Value).ToArray();
+    var localLinks = Patterns.LocalLink().Matches(text).Select(match => match.Value).ToArray();
     checks.That($"README.md links only to absolute https targets: [{string.Join(", ", localLinks)}]", localLinks.Length == 0);
     string[] checkoutMarkers = ["../", "scripts/", "qualify.sh", "rezultat-specification", "src/", "artifacts/"];
     var checkoutOnly = checkoutMarkers.Where(marker => text.Contains(marker, StringComparison.Ordinal)).ToArray();
     checks.That($"README.md has no checkout-only paths or tooling: [{string.Join(", ", checkoutOnly)}]", checkoutOnly.Length == 0);
-    var recipe = $"<PackageReference Include=\"{PackageId}\" Version=\"{version}\" PrivateAssets=\"all\" IncludeAssets=\"analyzers\" />";
-    checks.That($"README.md shows the private connection recipe for {version}", text.Contains(recipe, StringComparison.Ordinal));
+    // The installation example may name an available issued version rather than this candidate; the candidate's
+    // own version is checked in the nuspec, restore assets and analyzer execution.
+    var recipes = Patterns.PackageReference().Matches(text).Select(match => ParseReference(match.Value))
+        .Where(reference => reference?.Attribute("Include")?.Value == PackageId).ToArray();
+    var recipe = recipes.Length == 1 ? recipes[0] : null;
+    var recipeVersion = recipe?.Attribute("Version")?.Value ?? "";
+    checks.That($"README.md shows exactly one {PackageId} PackageReference: found {recipes.Length}", recipes.Length == 1);
+    checks.That($"README.md recipe names an explicit version: '{recipeVersion}'", Patterns.ExplicitVersion().IsMatch(recipeVersion));
+    checks.That("README.md recipe is private and analyzers-only",
+        recipe?.Attribute("PrivateAssets")?.Value == "all" && recipe.Attribute("IncludeAssets")?.Value == "analyzers"
+        && recipe.Attributes().Count() == 4);
     checks.That("README.md names RZT0001 and its severity key", text.Contains("dotnet_diagnostic.RZT0001.severity", StringComparison.Ordinal));
 }
 
 var dll = ReadAll(package.GetEntry(AnalyzerPath)!);
 Info("analyzer dll sha256", Sha256(dll));
-using (var peReader = new PEReader(ImmutableArray.Create(dll)))
-{
+using (var peReader = new PEReader(ImmutableArray.Create(dll))) {
     var reader = peReader.GetMetadataReader();
     var references = reader.AssemblyReferences
         .Select(handle => reader.GetAssemblyReference(handle))
@@ -121,8 +130,7 @@ Info("packed library dependencies", string.Join(", ", libraryDependencies));
 checks.That("packed library with the private reference depends on Rezultat but not on Rezultat.Analyzers",
     libraryDependencies.Contains("Rezultat") && !libraryDependencies.Contains(PackageId));
 
-foreach (var assetsPath in args[(direct + 1)..absent])
-{
+foreach (var assetsPath in args[(direct + 1)..absent]) {
     using var assets = JsonDocument.Parse(File.ReadAllBytes(assetsPath));
     var root = assets.RootElement;
     var project = Path.GetFileNameWithoutExtension(assetsPath);
@@ -132,15 +140,13 @@ foreach (var assetsPath in args[(direct + 1)..absent])
         libraryEntry.Length == 1 && libraryEntry[0].Value.GetProperty("type").GetString() == "package"
         && libraryEntry[0].Value.GetProperty("files").EnumerateArray().Any(file => file.GetString() == AnalyzerPath));
 
-    foreach (var framework in root.GetProperty("project").GetProperty("frameworks").EnumerateObject())
-    {
+    foreach (var framework in root.GetProperty("project").GetProperty("frameworks").EnumerateObject()) {
         var reference = framework.Value.GetProperty("dependencies").GetProperty(PackageId);
         checks.That($"{project} [{framework.Name}]: reference keeps only analyzers and suppresses all assets for dependents",
             reference.GetProperty("include").GetString() == "Analyzers" && reference.GetProperty("suppressParent").GetString() == "All");
     }
 
-    foreach (var target in root.GetProperty("targets").EnumerateObject())
-    {
+    foreach (var target in root.GetProperty("targets").EnumerateObject()) {
         var entry = target.Value.GetProperty(key);
         var sections = entry.EnumerateObject().Select(item => item.Name).Where(name => name != "type").ToArray();
         checks.That($"{project} [{target.Name}]: analyzer package brings no compile/runtime/build/dependency assets: [{string.Join(", ", sections)}]",
@@ -158,8 +164,7 @@ foreach (var assetsPath in args[(direct + 1)..absent])
     checks.That($"{project}: analyzer source is the package feed {source}", source == Path.GetDirectoryName(nupkgPath));
 }
 
-foreach (var assetsPath in args[(absent + 1)..])
-{
+foreach (var assetsPath in args[(absent + 1)..]) {
     using var assets = JsonDocument.Parse(File.ReadAllBytes(assetsPath));
     var project = Path.GetFileNameWithoutExtension(assetsPath);
     var libraries = assets.RootElement.GetProperty("libraries").EnumerateObject().Select(item => item.Name).ToArray();
@@ -170,19 +175,16 @@ foreach (var assetsPath in args[(absent + 1)..])
 
 return checks.Complete();
 
-static XElement Metadata(ZipArchive archive, string id)
-{
+static XElement Metadata(ZipArchive archive, string id) {
     var nuspec = XDocument.Load(archive.GetEntry($"{id}.nuspec")!.Open());
     return nuspec.Root!.Elements().Single(element => element.Name.LocalName == "metadata");
 }
 
-static (string Type, string? Value) Attribute(MetadataReader reader, CustomAttributeHandle handle)
-{
+static (string Type, string? Value) Attribute(MetadataReader reader, CustomAttributeHandle handle) {
     var attribute = reader.GetCustomAttribute(handle);
     var constructor = (MemberReferenceHandle)attribute.Constructor;
     var type = reader.GetString(reader.GetTypeReference((TypeReferenceHandle)reader.GetMemberReference(constructor).Parent).Name);
-    if (type is not ("TargetFrameworkAttribute" or "AssemblyInformationalVersionAttribute"))
-    {
+    if (type is not ("TargetFrameworkAttribute" or "AssemblyInformationalVersionAttribute")) {
         return (type, null);
     }
 
@@ -191,8 +193,7 @@ static (string Type, string? Value) Attribute(MetadataReader reader, CustomAttri
     return (type, blob.ReadSerializedString());
 }
 
-static byte[] ReadAll(ZipArchiveEntry entry)
-{
+static byte[] ReadAll(ZipArchiveEntry entry) {
     using var stream = entry.Open();
     using var buffer = new MemoryStream();
     stream.CopyTo(buffer);
@@ -202,3 +203,25 @@ static byte[] ReadAll(ZipArchiveEntry entry)
 static string Sha256(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
 
 static void Info(string name, string value) => Console.WriteLine($"INFO {name}: {value}");
+
+// A malformed element is not a usable recipe; it counts as no reference at all.
+static XElement? ParseReference(string element) {
+    try {
+        return XElement.Parse(element);
+    } catch (System.Xml.XmlException) {
+        return null;
+    }
+}
+
+// The match timeout bounds a pathological README line (S6444); a timeout fails the check.
+internal static partial class Patterns {
+    [GeneratedRegex(@"\]\((?!https://)[^)]*\)", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
+    public static partial Regex LocalLink();
+
+    [GeneratedRegex(@"<PackageReference\b[^>]*>", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
+    public static partial Regex PackageReference();
+
+    // A literal NuGet version: no floating range, wildcard or MSBuild property.
+    [GeneratedRegex(@"^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
+    public static partial Regex ExplicitVersion();
+}

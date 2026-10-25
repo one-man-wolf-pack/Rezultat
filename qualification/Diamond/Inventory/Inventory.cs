@@ -3,10 +3,8 @@ using Rezultat.Collections;
 
 namespace Rezultat.Qualification.DiamondInventory;
 
-public static class Inventory
-{
-    public static Result<string?, string> FindNote(int sku) => sku switch
-    {
+public static class Inventory {
+    public static Result<string?, string> FindNote(int sku) => sku switch {
         1 => Result<string?, string>.Ok("fragile"),
         2 => Result<string?, string>.Ok(null),
         _ => Result<string?, string>.Error($"unknown sku {sku}"),

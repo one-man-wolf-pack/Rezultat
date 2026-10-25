@@ -2,8 +2,7 @@ using System;
 
 namespace Rezultat.Linq;
 
-public static class MaybeQueryExtensions
-{
+public static class MaybeQueryExtensions {
     /// <summary>Query <c>select</c> and <c>let</c> form of <see cref="Maybe{T}.Map{TResult}"/> with its exact contract.</summary>
     /// <exception cref="ArgumentNullException"><paramref name="selector"/> is null, even for None.</exception>
     public static Maybe<TResult> Select<T, TResult>(this Maybe<T> source, Func<T, TResult> selector) =>
@@ -21,12 +20,10 @@ public static class MaybeQueryExtensions
     public static Maybe<TResult> SelectMany<T, TNext, TResult>(
         this Maybe<T> source,
         Func<T, Maybe<TNext>> next,
-        Func<T, TNext, TResult> project)
-    {
+        Func<T, TNext, TResult> project) {
         ArgumentNullException.ThrowIfNull(next);
         ArgumentNullException.ThrowIfNull(project);
-        if (!source.TryGetValue(out var value))
-        {
+        if (!source.TryGetValue(out var value)) {
             return Maybe<TResult>.None;
         }
 

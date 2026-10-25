@@ -2,11 +2,23 @@
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
+
+  <!-- Single owner of versions that qualification projects also use; they keep explicit Version attributes
+       outside central package management and import these properties. -->
+  <PropertyGroup>
+    <ShouldlyVersion>4.3.0</ShouldlyVersion>
+    <RoslynatorAnalyzersVersion>5.0.1</RoslynatorAnalyzersVersion>
+    <SonarAnalyzerCSharpVersion>10.35.0.4138</SonarAnalyzerCSharpVersion>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageVersion Include="FsCheck.Xunit.v3" Version="3.5.0" />
     <PackageVersion Include="FSharp.Core" Version="10.1.402" />
     <PackageVersion Include="Microsoft.CodeAnalysis.Common" Version="4.14.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
+    <PackageVersion Include="Roslynator.Analyzers" Version="$(RoslynatorAnalyzersVersion)" />
+    <PackageVersion Include="Shouldly" Version="$(ShouldlyVersion)" />
+    <PackageVersion Include="SonarAnalyzer.CSharp" Version="$(SonarAnalyzerCSharpVersion)" />
     <PackageVersion Include="xunit.v3.assert" Version="4.0.1" />
     <PackageVersion Include="xunit.v3.mtp-v2" Version="4.0.2" />
   </ItemGroup>

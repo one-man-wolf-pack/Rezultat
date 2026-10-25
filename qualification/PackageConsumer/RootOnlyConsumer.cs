@@ -1,9 +1,8 @@
 using Rezultat;
+using Rezultat.Qualification;
 
-internal static class RootOnlyConsumer
-{
-    public static void Run(Checks checks)
-    {
+internal static class RootOnlyConsumer {
+    public static void Run(Checks checks) {
         checks.Text("root only result", "Result.Ok(42)", Parse("40").Zip(Parse("2"), static (a, b) => a + b).ToString());
         checks.Text("root only unit", "Result.Ok(())", Result<Unit, string>.Ok(Unit.Value).ToString());
         checks.Text("root only presence", "Presence.Value(x)", Presence<string>.Value("x").ToString());

@@ -3,36 +3,148 @@ root = true
 [*]
 charset = utf-8
 end_of_line = lf
-insert_final_newline = true
-trim_trailing_whitespace = true
 indent_style = space
 indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
 
-[*.{json,props,targets,csproj,slnx,xml,yml,yaml}]
+[*.{csproj,props,targets,xml,json,yml,yaml,slnx}]
 indent_size = 2
 
+[*.md]
+trim_trailing_whitespace = false
+
 [*.cs]
+csharp_new_line_before_open_brace = none
+csharp_new_line_before_else = false
+csharp_new_line_before_catch = false
+csharp_new_line_before_finally = false
+csharp_new_line_before_members_in_object_initializers = true
+csharp_new_line_before_members_in_anonymous_types = true
+csharp_new_line_between_query_expression_clauses = true
+csharp_indent_case_contents = true
+csharp_indent_switch_labels = true
+csharp_indent_block_contents = true
+csharp_indent_braces = false
+csharp_space_after_cast = false
+csharp_space_after_keywords_in_control_flow_statements = true
+csharp_space_between_method_declaration_parameter_list_parentheses = false
+csharp_space_between_method_call_parameter_list_parentheses = false
+csharp_preserve_single_line_statements = false
+csharp_preserve_single_line_blocks = true
+csharp_prefer_braces = true:warning
 csharp_style_namespace_declarations = file_scoped:warning
 csharp_using_directive_placement = outside_namespace:warning
 dotnet_sort_system_directives_first = true
-csharp_style_var_for_built_in_types = true:silent
-csharp_style_var_when_type_is_apparent = true:silent
-csharp_style_var_elsewhere = true:silent
-csharp_new_line_before_open_brace = all
-dotnet_style_qualification_for_field = false:warning
-dotnet_style_qualification_for_property = false:warning
-dotnet_style_qualification_for_method = false:warning
-dotnet_naming_rule.private_fields_underscore.symbols = private_fields
-dotnet_naming_rule.private_fields_underscore.style = underscore_camel
-dotnet_naming_rule.private_fields_underscore.severity = warning
+dotnet_separate_import_directive_groups = false
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = true:suggestion
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+csharp_style_expression_bodied_constructors = false:suggestion
+csharp_style_expression_bodied_properties = when_on_single_line:suggestion
+csharp_style_expression_bodied_accessors = when_on_single_line:suggestion
+csharp_style_expression_bodied_lambdas = when_on_single_line:suggestion
+csharp_style_pattern_matching_over_is_with_cast_check = true:suggestion
+csharp_style_pattern_matching_over_as_with_null_check = true:suggestion
+csharp_style_prefer_switch_expression = true:suggestion
+csharp_style_prefer_not_pattern = true:suggestion
+dotnet_style_prefer_collection_expression = when_types_exactly_match:suggestion
+dotnet_style_qualification_for_field = false:suggestion
+dotnet_style_qualification_for_property = false:suggestion
+dotnet_style_qualification_for_method = false:suggestion
+dotnet_style_qualification_for_event = false:suggestion
+dotnet_style_predefined_type_for_locals_parameters_members = true:suggestion
+dotnet_style_predefined_type_for_member_access = true:suggestion
+dotnet_style_require_accessibility_modifiers = for_non_interface_members:warning
+dotnet_style_coalesce_expression = true:suggestion
+dotnet_style_null_propagation = true:suggestion
+dotnet_style_prefer_is_null_check_over_reference_equality_method = true:suggestion
+dotnet_style_parentheses_in_arithmetic_binary_operators = always_for_clarity:suggestion
+dotnet_style_parentheses_in_relational_binary_operators = always_for_clarity:suggestion
+dotnet_style_parentheses_in_other_binary_operators = always_for_clarity:suggestion
+dotnet_style_parentheses_in_other_operators = never_if_unnecessary:suggestion
+
+# Naming is also enforced by the build through IDE1006.
+dotnet_naming_rule.private_fields.symbols = private_fields
+dotnet_naming_rule.private_fields.style = underscore_camel
+dotnet_naming_rule.private_fields.severity = warning
 dotnet_naming_symbols.private_fields.applicable_kinds = field
-dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private, private_protected
 dotnet_naming_style.underscore_camel.required_prefix = _
 dotnet_naming_style.underscore_camel.capitalization = camel_case
-dotnet_naming_rule.constants_pascal.symbols = constants
-dotnet_naming_rule.constants_pascal.style = pascal_case
-dotnet_naming_rule.constants_pascal.severity = warning
+dotnet_naming_rule.constants.symbols = constants
+dotnet_naming_rule.constants.style = pascal
+dotnet_naming_rule.constants.severity = warning
 dotnet_naming_symbols.constants.applicable_kinds = field
-dotnet_naming_symbols.constants.applicable_accessibilities = *
 dotnet_naming_symbols.constants.required_modifiers = const
-dotnet_naming_style.pascal_case.capitalization = pascal_case
+dotnet_naming_style.pascal.capitalization = pascal_case
+dotnet_naming_rule.interfaces.symbols = interfaces
+dotnet_naming_rule.interfaces.style = interface_pascal
+dotnet_naming_rule.interfaces.severity = warning
+dotnet_naming_symbols.interfaces.applicable_kinds = interface
+dotnet_naming_style.interface_pascal.required_prefix = I
+dotnet_naming_style.interface_pascal.capitalization = pascal_case
+dotnet_naming_rule.types.symbols = types
+dotnet_naming_rule.types.style = pascal
+dotnet_naming_rule.types.severity = warning
+dotnet_naming_symbols.types.applicable_kinds = class, struct, interface, enum, delegate
+dotnet_naming_rule.members.symbols = members
+dotnet_naming_rule.members.style = pascal
+dotnet_naming_rule.members.severity = warning
+dotnet_naming_symbols.members.applicable_kinds = method, property, event
+
+# Selected build/verification gates; suggestion-level preferences remain advisory.
+dotnet_diagnostic.IDE0005.severity = warning
+dotnet_diagnostic.IDE0011.severity = warning
+dotnet_diagnostic.IDE0040.severity = warning
+dotnet_diagnostic.IDE0044.severity = warning
+dotnet_diagnostic.IDE0051.severity = warning
+dotnet_diagnostic.IDE0052.severity = warning
+dotnet_diagnostic.IDE0055.severity = warning
+dotnet_diagnostic.IDE0059.severity = warning
+dotnet_diagnostic.IDE0065.severity = warning
+dotnet_diagnostic.IDE0161.severity = warning
+dotnet_diagnostic.IDE1006.severity = warning
+# Suppression cleanup is IDE-only, not a build gate.
+dotnet_diagnostic.IDE0079.severity = suggestion
+
+# Correctness beyond SDK recommended defaults; no inherited platform/ValueTask exemptions.
+dotnet_diagnostic.CA2000.severity = warning
+dotnet_diagnostic.CA2200.severity = warning
+dotnet_diagnostic.SYSLIB1045.severity = warning
+
+# Context-sensitive API/performance recommendations must not dictate architecture.
+dotnet_diagnostic.CA1000.severity = suggestion
+dotnet_diagnostic.CA1062.severity = suggestion
+dotnet_diagnostic.CA1309.severity = suggestion
+dotnet_diagnostic.CA1848.severity = suggestion
+dotnet_diagnostic.CA1859.severity = suggestion
+dotnet_diagnostic.CA2007.severity = suggestion
+
+# Roslynator offers refactoring suggestions; selected correctness rules are gates.
+dotnet_analyzer_diagnostic.category-Roslynator.severity = suggestion
+dotnet_diagnostic.RCS1210.severity = warning
+
+# Sonar default bug/security rules remain active; complexity and design heuristics are advisory.
+dotnet_diagnostic.S104.severity = suggestion
+dotnet_diagnostic.S107.severity = suggestion
+dotnet_diagnostic.S134.severity = suggestion
+dotnet_diagnostic.S138.severity = suggestion
+dotnet_diagnostic.S1067.severity = suggestion
+dotnet_diagnostic.S1192.severity = suggestion
+dotnet_diagnostic.S1200.severity = suggestion
+dotnet_diagnostic.S3776.severity = suggestion
+dotnet_diagnostic.S3267.severity = suggestion
+
+[tests/**/*.cs]
+# Test identities and fixtures are not public production API design.
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1861.severity = suggestion
+dotnet_diagnostic.S2925.severity = warning
+
+[*.g.cs]
+generated_code = true
+
+[*.generated.cs]
+generated_code = true

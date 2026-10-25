@@ -1,15 +1,14 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
-internal static class CostMeasurement
-{
+namespace Rezultat.Qualification.AllocationControls;
+
+internal static class CostMeasurement {
     private const int Iterations = 20_000;
     private const int WarmupRounds = 50;
 
-    public static (double Bytes, double Nanoseconds) Measure(Action<int> kernel)
-    {
-        for (var round = 0; round < WarmupRounds; round++)
-        {
+    public static (double Bytes, double Nanoseconds) Measure(Action<int> kernel) {
+        for (var round = 0; round < WarmupRounds; round++) {
             kernel(Iterations / 10);
         }
 
@@ -21,8 +20,7 @@ internal static class CostMeasurement
         return (bytes, elapsed.TotalNanoseconds / Iterations);
     }
 
-    public static Large CreateLarge(long first)
-    {
+    public static Large CreateLarge(long first) {
         var large = default(Large);
         large[0] = first;
         return large;
@@ -30,7 +28,9 @@ internal static class CostMeasurement
 }
 
 [InlineArray(64)]
-internal struct Large
-{
+internal struct Large {
+    // S1144: the InlineArray element field defines the 64-long payload and is accessed through indexing.
+#pragma warning disable S1144
     private long _element;
+#pragma warning restore S1144
 }

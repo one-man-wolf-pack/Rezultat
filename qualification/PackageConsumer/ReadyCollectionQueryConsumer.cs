@@ -1,15 +1,18 @@
 using Rezultat;
 using Rezultat.Collections;
 using Rezultat.Linq;
+using Rezultat.Qualification;
 
-internal static class ReadyCollectionQueryConsumer
-{
-    public static void Run(Checks checks)
-    {
+// CA1861: each constant array is the input of a scenario that runs once; hoisting it into a field would only move
+// the scenario data away from its check.
+#pragma warning disable CA1861
+
+internal static class ReadyCollectionQueryConsumer {
+    public static void Run(Checks checks) {
         checks.Text("result sequence", "Result.Ok(3)", new[] { Parse("1"), Parse("2") }.Sequence().Map(static values => values.Sum()).ToString());
         checks.Text("result sequence first error", "Result.Error(x)", new[] { Parse("1"), Parse("x"), Parse("y") }.Sequence().ToString());
         checks.Throws<InvalidOperationException>("result sequence visited default", () => new[] { default(Result<int, string>) }.Sequence());
-        checks.That("result sequence empty", new Result<string?, string>[0].Sequence().TryGetValue(out var empty, out _) && empty.Length == 0);
+        checks.That("result sequence empty", Array.Empty<Result<string?, string>>().Sequence().TryGetValue(out var empty, out _) && empty.Length == 0);
         checks.Text("maybe sequence", "Maybe.Some(2)", new[] { Maybe<string?>.Some(null), Maybe<string?>.Some("a") }.Sequence().Map(static values => values.Length).ToString());
         checks.Text("maybe sequence none", "Maybe.None", new[] { Maybe<int>.Some(1), default }.Sequence().ToString());
         checks.Text("validation sequence", "Validation.Invalid([a, b, c])",

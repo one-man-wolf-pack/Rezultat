@@ -5,6 +5,11 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Rezultat;
 using Rezultat.Collections;
+using Rezultat.Qualification.AllocationControls;
+
+// S6966/S3903: a synchronous top-level program; nothing awaits here, and its file-local helper types share the
+// global namespace of the generated Program class.
+#pragma warning disable S6966, S3903
 
 const int Iterations = 100_000;
 const int WarmupRounds = 50;
@@ -61,10 +66,8 @@ Console.WriteLine($"optimized consumer and Rezultat: {optimized}");
 ];
 
 var failures = optimized ? 0 : 1;
-foreach (var (name, kernel, allocates) in controls)
-{
-    for (var round = 0; round < WarmupRounds; round++)
-    {
+foreach (var (name, kernel, allocates) in controls) {
+    for (var round = 0; round < WarmupRounds; round++) {
         kernel(Iterations / 10);
     }
 
@@ -101,11 +104,9 @@ failures += CollectionQueryCosts.Run();
 Kernels.Consume();
 return failures == 0 ? 0 : 1;
 
-static double Measure(Action<int> kernel)
-{
+static double Measure(Action<int> kernel) {
     const int CostIterations = 2_000;
-    for (var round = 0; round < WarmupRounds; round++)
-    {
+    for (var round = 0; round < WarmupRounds; round++) {
         kernel(CostIterations / 10);
     }
 
@@ -114,8 +115,7 @@ static double Measure(Action<int> kernel)
     return (double)(GC.GetAllocatedBytesForCurrentThread() - before) / CostIterations;
 }
 
-static int Witness(string name, bool passed, string detail)
-{
+static int Witness(string name, bool passed, string detail) {
     Console.WriteLine($"{(passed ? "PASS" : "FAIL")} {name}: {detail}");
     return passed ? 0 : 1;
 }
@@ -123,20 +123,24 @@ static int Witness(string name, bool passed, string detail)
 static bool IsOptimized(Assembly assembly) =>
     assembly.GetCustomAttribute<DebuggableAttribute>() is not { IsJITOptimizerDisabled: true };
 
-internal static class Kernels
-{
+internal static class Kernels {
     private static readonly string _text = "payload";
     private static readonly int _number = 42;
     private static readonly Result<int, int> _okInt = Result<int, int>.Ok(1);
     private static readonly Result<int, int> _errorInt = Result<int, int>.Error(2);
     private static readonly Result<string, string> _okString = Result<string, string>.Ok("ok");
+    // CA1805: the explicit default carrier is the measured subject; without it CS0649/S3459 report an unassigned field.
+#pragma warning disable CA1805
     private static readonly Result<string, string> _uninitialized = default;
+#pragma warning restore CA1805
     private static readonly Result<string, string> _errorString = Result<string, string>.Error("error");
 
     private static readonly Maybe<int> _someInt = Maybe<int>.Some(3);
     private static readonly Maybe<int> _noneInt = Maybe<int>.None;
     private static readonly Maybe<string> _someString = Maybe<string>.Some("some");
+#pragma warning disable CA1805
     private static readonly Maybe<string> _noneString = default;
+#pragma warning restore CA1805
 
     private static readonly Presence<int> _presenceInt = Presence<int>.Value(5);
     private static readonly Presence<string> _presenceString = Presence<string>.Value("present");
@@ -170,406 +174,318 @@ internal static class Kernels
     private static long _counter;
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void Empty(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void Empty(int n) {
+        for (var i = 0; i < n; i++) {
             _counter += i;
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void Allocating(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void Allocating(int n) {
+        for (var i = 0; i < n; i++) {
             _objectSink = new object();
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void OkInt(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void OkInt(int n) {
+        for (var i = 0; i < n; i++) {
             _intSink = Result<int, int>.Ok(i);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void ErrorInt(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void ErrorInt(int n) {
+        for (var i = 0; i < n; i++) {
             _intSink = Result<int, int>.Error(_number + i);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void OkString(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void OkString(int n) {
+        for (var i = 0; i < n; i++) {
             _stringSink = Result<string, string>.Ok(_text);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void ErrorString(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void ErrorString(int n) {
+        for (var i = 0; i < n; i++) {
             _stringSink = Result<string, string>.Error(_text);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void OkUnit(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void OkUnit(int n) {
+        for (var i = 0; i < n; i++) {
             _unitSink = Result<Unit, string>.Ok(Unit.Value);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void StateInt(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void StateInt(int n) {
+        for (var i = 0; i < n; i++) {
             var result = (i & 1) == 0 ? _okInt : _errorInt;
             _counter += (result.IsInitialized ? 1 : 0) + (result.IsSuccess ? 2 : 0);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void StateString(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void StateString(int n) {
+        for (var i = 0; i < n; i++) {
             var result = (i & 1) == 0 ? _okString : _errorString;
             _counter += (result.IsInitialized ? 1 : 0) + (result.IsSuccess ? 2 : 0);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void StateUninitialized(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void StateUninitialized(int n) {
+        for (var i = 0; i < n; i++) {
             _counter += _uninitialized.IsInitialized ? 1 : 0;
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void TryGetOkInt(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void TryGetOkInt(int n) {
+        for (var i = 0; i < n; i++) {
             _counter += _okInt.TryGetValue(out var value, out var error) ? value : error;
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void TryGetErrorInt(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void TryGetErrorInt(int n) {
+        for (var i = 0; i < n; i++) {
             _counter += _errorInt.TryGetValue(out var value, out var error) ? value : error;
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void TryGetOkString(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void TryGetOkString(int n) {
+        for (var i = 0; i < n; i++) {
             _counter += _okString.TryGetValue(out var value, out var error) ? value.Length : error.Length;
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void TryGetErrorString(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void TryGetErrorString(int n) {
+        for (var i = 0; i < n; i++) {
             _counter += _errorString.TryGetValue(out var value, out var error) ? value.Length : error.Length;
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void SomeInt(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void SomeInt(int n) {
+        for (var i = 0; i < n; i++) {
             _maybeIntSink = Maybe<int>.Some(i);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void SomeString(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void SomeString(int n) {
+        for (var i = 0; i < n; i++) {
             _maybeStringSink = Maybe<string>.Some(_text);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void SomeUnit(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void SomeUnit(int n) {
+        for (var i = 0; i < n; i++) {
             _maybeUnitSink = Maybe<Unit>.Some(Unit.Value);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void NoneInt(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void NoneInt(int n) {
+        for (var i = 0; i < n; i++) {
             _maybeIntSink = (i & 1) == 0 ? Maybe<int>.None : default;
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void NoneString(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void NoneString(int n) {
+        for (var i = 0; i < n; i++) {
             _maybeStringSink = (i & 1) == 0 ? Maybe<string>.None : default;
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void IsSomeInt(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void IsSomeInt(int n) {
+        for (var i = 0; i < n; i++) {
             var maybe = (i & 1) == 0 ? _someInt : _noneInt;
             _counter += maybe.IsSome ? 1 : 0;
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void IsSomeString(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void IsSomeString(int n) {
+        for (var i = 0; i < n; i++) {
             var maybe = (i & 1) == 0 ? _someString : _noneString;
             _counter += maybe.IsSome ? 1 : 0;
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void TryGetSomeInt(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void TryGetSomeInt(int n) {
+        for (var i = 0; i < n; i++) {
             _counter += _someInt.TryGetValue(out var value) ? value : -1;
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void TryGetNoneInt(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void TryGetNoneInt(int n) {
+        for (var i = 0; i < n; i++) {
             _counter += _noneInt.TryGetValue(out var value) ? value : -1;
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void TryGetSomeString(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void TryGetSomeString(int n) {
+        for (var i = 0; i < n; i++) {
             _counter += _someString.TryGetValue(out var value) ? value.Length : -1;
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void TryGetNoneString(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void TryGetNoneString(int n) {
+        for (var i = 0; i < n; i++) {
             _counter += _noneString.TryGetValue(out var value) ? value.Length : -1;
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void PresenceValueInt(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void PresenceValueInt(int n) {
+        for (var i = 0; i < n; i++) {
             _presenceIntSink = Presence<int>.Value(i);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void PresenceValueString(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void PresenceValueString(int n) {
+        for (var i = 0; i < n; i++) {
             _presenceStringSink = Presence<string>.Value(_text);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void PresenceValueUnit(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void PresenceValueUnit(int n) {
+        for (var i = 0; i < n; i++) {
             _presenceUnitSink = Presence<Unit>.Value(Unit.Value);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void PresenceEmptyInt(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void PresenceEmptyInt(int n) {
+        for (var i = 0; i < n; i++) {
             _presenceIntSink = (i & 1) == 0 ? Presence<int>.Missing : Presence<int>.Null;
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void PresenceEmptyString(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void PresenceEmptyString(int n) {
+        for (var i = 0; i < n; i++) {
             _presenceStringSink = (i & 1) == 0 ? Presence<string>.Missing : Presence<string>.Null;
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void PresenceFlagsInt(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void PresenceFlagsInt(int n) {
+        for (var i = 0; i < n; i++) {
             var presence = _presenceInts[i % 3];
             _counter += (presence.IsMissing ? 1 : 0) + (presence.IsNull ? 2 : 0) + (presence.IsValue ? 4 : 0);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void PresenceFlagsString(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void PresenceFlagsString(int n) {
+        for (var i = 0; i < n; i++) {
             var presence = _presenceStrings[i % 3];
             _counter += (presence.IsMissing ? 1 : 0) + (presence.IsNull ? 2 : 0) + (presence.IsValue ? 4 : 0);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void PresenceTryGetInt(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void PresenceTryGetInt(int n) {
+        for (var i = 0; i < n; i++) {
             _counter += _presenceInts[i % 3].TryGetValue(out var value) ? value : -1;
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void PresenceTryGetString(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void PresenceTryGetString(int n) {
+        for (var i = 0; i < n; i++) {
             _counter += _presenceStrings[i % 3].TryGetValue(out var value) ? value.Length : -1;
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void ValidationValidInt(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void ValidationValidInt(int n) {
+        for (var i = 0; i < n; i++) {
             _validationIntSink = Validation<int, string>.Valid(i);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void ValidationValidString(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void ValidationValidString(int n) {
+        for (var i = 0; i < n; i++) {
             _validationStringSink = Validation<string, string>.Valid(_text);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void ValidationInvalidMany(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void ValidationInvalidMany(int n) {
+        for (var i = 0; i < n; i++) {
             _validationStringSink = Validation<string, string>.InvalidMany(_issues);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void ValidationState(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void ValidationState(int n) {
+        for (var i = 0; i < n; i++) {
             var validation = (i & 1) == 0 ? _validInt : _invalidInt;
             _counter += (validation.IsInitialized ? 1 : 0) + (validation.IsValid ? 2 : 0);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void ValidationTryGetInt(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void ValidationTryGetInt(int n) {
+        for (var i = 0; i < n; i++) {
             var validation = (i & 1) == 0 ? _validInt : _invalidInt;
             _counter += validation.TryGetValue(out var value, out var issues) ? value : issues.Length;
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void ValidationTryGetString(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void ValidationTryGetString(int n) {
+        for (var i = 0; i < n; i++) {
             var validation = (i & 1) == 0 ? _validString : _invalidString;
             _counter += validation.TryGetValue(out var value, out var issues) ? value.Length : issues.Length;
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void ZipThreeInvalid(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void ZipThreeInvalid(int n) {
+        for (var i = 0; i < n; i++) {
             _validationIntSink = _invalidInt.Zip(_invalidInt, _invalidInt, static (a, b, c) => a + b + c);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void ChainedZipThreeInvalid(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void ChainedZipThreeInvalid(int n) {
+        for (var i = 0; i < n; i++) {
             _validationIntSink = _invalidInt.Zip(_invalidInt, static (a, b) => a + b).Zip(_invalidInt, static (ab, c) => ab + c);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void ZipFourInvalid(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void ZipFourInvalid(int n) {
+        for (var i = 0; i < n; i++) {
             _validationIntSink = _invalidInt.Zip(_invalidInt, _invalidInt, _invalidInt, static (a, b, c, d) => a + b + c + d);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void ChainedZipFourInvalid(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void ChainedZipFourInvalid(int n) {
+        for (var i = 0; i < n; i++) {
             _validationIntSink = _invalidInt.Zip(_invalidInt, static (a, b) => a + b)
                 .Zip(_invalidInt, static (ab, c) => ab + c)
                 .Zip(_invalidInt, static (abc, d) => abc + d);
@@ -577,72 +493,56 @@ internal static class Kernels
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void Traverse64Invalid(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void Traverse64Invalid(int n) {
+        for (var i = 0; i < n; i++) {
             _validationArraySink = _invalidOutcomes64.Traverse(static outcome => outcome);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void Traverse256Invalid(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void Traverse256Invalid(int n) {
+        for (var i = 0; i < n; i++) {
             _validationArraySink = _invalidOutcomes256.Traverse(static outcome => outcome);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void ValidateAll64Valid(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void ValidateAll64Valid(int n) {
+        for (var i = 0; i < n; i++) {
             _validationUnitSink = _validOutcomes64.ValidateAll();
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void ValidateAll256Valid(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void ValidateAll256Valid(int n) {
+        for (var i = 0; i < n; i++) {
             _validationUnitSink = _validOutcomes256.ValidateAll();
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void ValidateAll64Invalid(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void ValidateAll64Invalid(int n) {
+        for (var i = 0; i < n; i++) {
             _validationUnitSink = _invalidOutcomes64.ValidateAll();
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void ValidateAll256Invalid(int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
+    public static void ValidateAll256Invalid(int n) {
+        for (var i = 0; i < n; i++) {
             _validationUnitSink = _invalidOutcomes256.ValidateAll();
         }
     }
 
-    public static bool TraverseReleasesSuccessPrefix(out int attempts)
-    {
+    public static bool TraverseReleasesSuccessPrefix(out int attempts) {
         const int MaxAttempts = 30;
         object[] warmup = ["a", "b"];
-        for (attempts = 1; attempts <= MaxAttempts; attempts++)
-        {
-            for (var call = 0; call < 100; call++)
-            {
+        for (attempts = 1; attempts <= MaxAttempts; attempts++) {
+            for (var call = 0; call < 100; call++) {
                 _objectSink = warmup.Traverse(static item => Validation<object, string>.Valid(item));
             }
 
-            if (!ProbeRetainedPrefix())
-            {
+            if (!ProbeRetainedPrefix()) {
                 return true;
             }
 
@@ -653,22 +553,22 @@ internal static class Kernels
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static bool ProbeRetainedPrefix()
-    {
+    private static bool ProbeRetainedPrefix() {
         var prefix = new WeakReference[1];
         var retained = true;
-        _objectSink = Enumerable.Range(0, 3).Select(static index => (object)index).Traverse(item =>
-        {
-            switch ((int)item)
-            {
+        _objectSink = Enumerable.Range(0, 3).Select(static index => (object)index).Traverse(item => {
+            switch ((int)item) {
                 case 0:
                     return Validation<object, string>.Valid(CreateTracked(prefix));
                 case 1:
                     return Validation<object, string>.Invalid("stop");
                 default:
+                    // S1215: forcing a collection is how this control observes that earlier payloads were released.
+#pragma warning disable S1215
                     GC.Collect();
                     GC.WaitForPendingFinalizers();
                     GC.Collect();
+#pragma warning restore S1215
                     retained = prefix[0].IsAlive;
                     return Validation<object, string>.Valid(item);
             }
@@ -677,8 +577,7 @@ internal static class Kernels
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static object CreateTracked(WeakReference[] prefix)
-    {
+    private static object CreateTracked(WeakReference[] prefix) {
         var payload = new object();
         prefix[0] = new WeakReference(payload);
         return payload;
