@@ -6,7 +6,9 @@
   <PropertyGroup Condition="'$(RezultatConsumerInput)' == 'true'">
     <RezultatDevelopmentAnalyzers>false</RezultatDevelopmentAnalyzers>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <MSBuildTreatWarningsAsErrors>false</MSBuildTreatWarningsAsErrors>
     <AnalysisLevel></AnalysisLevel>
+    <AnalysisModeStyle></AnalysisModeStyle>
     <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <!-- The consumer value without the profile's documentation suppressions: what the SDK props give an empty

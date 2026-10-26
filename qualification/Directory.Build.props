@@ -1,13 +1,9 @@
 <Project>
-  <!-- Repository policy first: support tools and consumers inherit the development profile explicitly. -->
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
 
   <PropertyGroup>
-    <RepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..'))</RepositoryRoot>
-    <ArtifactsPath>$(RepositoryRoot)/artifacts/qualification</ArtifactsPath>
-    <RestorePackagesPath>$(ArtifactsPath)/packages</RestorePackagesPath>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Candidate packages are restored only into this isolated cache, which the lanes reset per run. -->
+    <RestorePackagesPath>$(ArtifactsPath)/qualification/packages</RestorePackagesPath>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 </Project>

@@ -58,6 +58,6 @@ public static class ResultCollectionExtensions {
             values.Add(value);
         }
 
-        return Result<TResult[], TError>.Ok(values.ToArray());
+        return Result<TResult[], TError>.Ok([.. values]);
     }
 }

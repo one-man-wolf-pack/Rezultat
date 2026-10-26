@@ -15,11 +15,10 @@ internal static class AnalyzerHarness {
         new(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable);
 
     public static ImmutableArray<MetadataReference> Framework { get; } =
-        ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
+        [.. ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
             .Split(Path.PathSeparator)
             .Where(path => !Path.GetFileName(path).StartsWith("Rezultat", StringComparison.Ordinal))
-            .Select(path => (MetadataReference)MetadataReference.CreateFromFile(path))
-            .ToImmutableArray();
+            .Select(path => (MetadataReference)MetadataReference.CreateFromFile(path))];
 
     public static MetadataReference Core { get; } = MetadataReference.CreateFromFile(typeof(Unit).Assembly.Location);
 
@@ -37,8 +36,8 @@ internal static class AnalyzerHarness {
     public static Markup Parse(string markup) {
         var source = new System.Text.StringBuilder();
         var spans = ImmutableArray.CreateBuilder<TextSpan>();
-        var start = -1;
-        var index = 0;
+        int start = -1;
+        int index = 0;
         while (index < markup.Length) {
             if (string.CompareOrdinal(markup, index, "[|", 0, 2) == 0) {
                 start.ShouldBe(-1);

@@ -7,7 +7,7 @@ public sealed class MaybeStateTests {
 
         foreach (var maybe in absent) {
             maybe.IsSome.ShouldBeFalse();
-            maybe.TryGetValue(out var value).ShouldBeFalse();
+            maybe.TryGetValue(out string? value).ShouldBeFalse();
             value.ShouldBeNull();
             maybe.ShouldBe(Maybe<string>.None);
         }
@@ -24,7 +24,7 @@ public sealed class MaybeStateTests {
 
     [Fact]
     public void Inactive_value_type_output_is_default() {
-        Maybe<int>.None.TryGetValue(out var number).ShouldBeFalse();
+        Maybe<int>.None.TryGetValue(out int number).ShouldBeFalse();
         number.ShouldBe(0);
         default(Maybe<Unit>).TryGetValue(out var unit).ShouldBeFalse();
         unit.ShouldBe(Unit.Value);
@@ -32,7 +32,7 @@ public sealed class MaybeStateTests {
 
     [Fact]
     public void Some_with_default_payload_is_present() {
-        Maybe<int>.Some(0).TryGetValue(out var zero).ShouldBeTrue();
+        Maybe<int>.Some(0).TryGetValue(out int zero).ShouldBeTrue();
         zero.ShouldBe(0);
         Maybe<bool>.Some(false).IsSome.ShouldBeTrue();
         Maybe<string>.Some(string.Empty).IsSome.ShouldBeTrue();
@@ -45,7 +45,7 @@ public sealed class MaybeStateTests {
         var maybe = Maybe<string?>.Some(null);
 
         maybe.IsSome.ShouldBeTrue();
-        maybe.TryGetValue(out var value).ShouldBeTrue();
+        maybe.TryGetValue(out string? value).ShouldBeTrue();
         value.ShouldBeNull();
     }
 
@@ -53,9 +53,9 @@ public sealed class MaybeStateTests {
     public void Some_empty_nullable_is_present_without_value() {
         var maybe = Maybe<int?>.Some(null);
 
-        maybe.TryGetValue(out var value).ShouldBeTrue();
+        maybe.TryGetValue(out int? value).ShouldBeTrue();
         value.HasValue.ShouldBeFalse();
-        (Maybe<int?>.Some(0).TryGetValue(out var zero) && zero == 0).ShouldBeTrue();
+        (Maybe<int?>.Some(0).TryGetValue(out int? zero) && zero == 0).ShouldBeTrue();
     }
 
     [Fact]

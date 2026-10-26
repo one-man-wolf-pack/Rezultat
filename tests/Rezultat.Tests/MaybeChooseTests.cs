@@ -15,7 +15,7 @@ public sealed class MaybeChooseTests {
     [Fact]
     public void Call_neither_enumerates_source_nor_invokes_selector() {
         var source = new TrackedSequence<int>(1, 2);
-        var calls = 0;
+        int calls = 0;
 
         _ = source.Choose(value => { calls++; return Maybe<int>.Some(value); });
 
@@ -27,10 +27,10 @@ public sealed class MaybeChooseTests {
         var source = new TrackedSequence<int>(1, 2, 3, 4, 5);
         var visited = new List<int>();
 
-        var chosen = source.Choose(value => {
+        string[] chosen = [.. source.Choose(value => {
             visited.Add(value);
             return value % 2 == 1 ? Maybe<string>.Some($"v{value}") : default;
-        }).ToArray();
+        })];
 
         chosen.ShouldBe(["v1", "v3", "v5"]);
         visited.ShouldBe([1, 2, 3, 4, 5]);
@@ -83,7 +83,7 @@ public sealed class MaybeChooseTests {
     [Fact]
     public void Each_enumeration_accesses_source_and_selector_again_without_caching() {
         var source = new TrackedSequence<int>(1, 2);
-        var calls = 0;
+        int calls = 0;
         var chosen = source.Choose(value => { calls++; return Maybe<int>.Some(value + calls); });
 
         chosen.ToArray().ShouldBe([2, 4]);
@@ -104,12 +104,12 @@ public sealed class MaybeChooseTests {
         var yielded = new List<int>();
 
         Should.Throw<OperationCanceledException>(() => {
-            foreach (var value in source.Choose(value => value == 2 ? throw canceled : Maybe<int>.Some(value))) {
+            foreach (int value in source.Choose(value => value == 2 ? throw canceled : Maybe<int>.Some(value))) {
                 yielded.Add(value);
             }
         }).ShouldBeOfType<OperationCanceledException>().ShouldBeSameAs(canceled);
         Should.Throw<ProbeException>(() => {
-            foreach (var value in faulty.Choose(Maybe<int>.Some)) {
+            foreach (int value in faulty.Choose(Maybe<int>.Some)) {
                 yielded.Add(value);
             }
         });
@@ -139,12 +139,9 @@ public sealed class MaybeChooseTests {
         ready.Choose(static item => item).ShouldBe([1, 3]);
     }
 
-    // S2190/S1994: a deliberately unbounded source proves that only the needed prefix is enumerated.
-#pragma warning disable S2190, S1994
     private static IEnumerable<int> Naturals() {
-        for (var value = 0; ; value++) {
+        for (int value = 0; ; value++) {
             yield return value;
         }
     }
-#pragma warning restore S2190, S1994
 }

@@ -75,7 +75,7 @@ public sealed class ResultAssertionsTests {
 
     [Fact]
     public void FailureStopsTheCurrentLambda() {
-        var continued = false;
+        bool continued = false;
 
         Should.Throw<FailException>(() => {
             _ = Result<int, string>.Error("stop").ShouldBeOk();
@@ -130,7 +130,7 @@ public sealed class ResultAssertionsTests {
     [Fact]
     public void LaterUserAssertionFailureIsNotIntercepted() {
         var failure = Should.Throw<Exception>(() => {
-            var value = Result<int, string>.Ok(2).ShouldBeOk();
+            int value = Result<int, string>.Ok(2).ShouldBeOk();
             // Native xUnit assertion on purpose: its EqualException is the later user failure under test.
             Assert.Equal(1, value);
         });
@@ -142,7 +142,7 @@ public sealed class ResultAssertionsTests {
     public void FailureKeepsTheCallerAsTheTopFrame() {
         var failure = Should.Throw<FailException>(ExtractFromError).ShouldBeOfType<FailException>();
 
-        var stack = failure.StackTrace ?? string.Empty;
+        string stack = failure.StackTrace ?? string.Empty;
         stack.ShouldStartWith($"   at {typeof(ResultAssertionsTests).FullName}.{nameof(ExtractFromError)}()", Case.Sensitive);
         stack.ShouldNotContain($"{typeof(ResultAssertions).FullName}.", Case.Sensitive);
     }

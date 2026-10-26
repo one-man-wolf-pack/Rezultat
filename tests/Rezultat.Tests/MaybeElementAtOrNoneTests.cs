@@ -73,10 +73,7 @@ public sealed class MaybeElementAtOrNoneTests {
 
     [Fact]
     public void Source_indexer_and_dispose_exceptions_propagate() {
-        // S3928: "index" names the parameter of the faulting list indexer, not of this test.
-#pragma warning disable S3928
         var outOfRange = new ArgumentOutOfRangeException("index");
-#pragma warning restore S3928
         var disposeFault = new ProbeException("dispose");
         var faulty = new TrackedSequence<int>(1, 2) { PoisonFrom = 1 };
 
@@ -87,12 +84,9 @@ public sealed class MaybeElementAtOrNoneTests {
         Should.Throw<ProbeException>(() => new TrackedSequence<int>(1) { DisposeException = disposeFault }.ElementAtOrNone(5)).ShouldBeSameAs(disposeFault);
     }
 
-    // S2190/S1994: a deliberately unbounded source proves that only the needed prefix is enumerated.
-#pragma warning disable S2190, S1994
     private static IEnumerable<long> Longs() {
-        for (var value = 0L; ; value++) {
+        for (long value = 0L; ; value++) {
             yield return value;
         }
     }
-#pragma warning restore S2190, S1994
 }

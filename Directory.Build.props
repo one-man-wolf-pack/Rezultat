@@ -1,32 +1,32 @@
 <Project>
   <PropertyGroup>
-    <ArtifactsPath Condition="'$(ArtifactsPath)' == ''">$(MSBuildThisFileDirectory)artifacts</ArtifactsPath>
-    <NuGetAudit>true</NuGetAudit>
-    <NuGetAuditMode>all</NuGetAuditMode>
-    <NuGetAuditLevel>low</NuGetAuditLevel>
-    <WarningsAsErrors>$(WarningsAsErrors);NU1901;NU1902;NU1903;NU1904</WarningsAsErrors>
-  </PropertyGroup>
-
-  <!-- Development diagnostics profile: an ordinary build is strict without an external -warnaserror. -->
-  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <AnalysisLevel>10.0-recommended</AnalysisLevel>
+    <MSBuildTreatWarningsAsErrors>true</MSBuildTreatWarningsAsErrors>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>10.0-recommended</AnalysisLevel>
+    <AnalysisModeStyle>None</AnalysisModeStyle>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
-    <!-- XML output backs the compiler-based unused-using check (IDE0005); XML completeness is not required. -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591;CS1573;CS1712</NoWarn>
+    <UseArtifactsOutput>true</UseArtifactsOutput>
+    <ArtifactsPath>$(MSBuildThisFileDirectory)artifacts</ArtifactsPath>
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <!-- Consumer inputs under qualification/ compile without TreatWarningsAsErrors; advisories still fail their restore. -->
+    <WarningsAsErrors>$(WarningsAsErrors);NU1901;NU1902;NU1903;NU1904</WarningsAsErrors>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 
-  <!-- Private build-time analyzers: no compile/runtime asset and no dependency of a packed package. Versions are
-       owned by Directory.Packages.props; projects outside central package management take them from its
-       properties. -->
+  <!-- Private build-time analyzers: no compile/runtime asset and no dependency of a packed package. Projects outside
+       central package management take the version from the Directory.Packages.props property. -->
   <ItemGroup Condition="'$(RezultatDevelopmentAnalyzers)' != 'false'">
     <PackageReference Include="Roslynator.Analyzers" PrivateAssets="all" IncludeAssets="analyzers;build;buildtransitive">
       <Version Condition="'$(ManagePackageVersionsCentrally)' != 'true'">$(RoslynatorAnalyzersVersion)</Version>
-    </PackageReference>
-    <PackageReference Include="SonarAnalyzer.CSharp" PrivateAssets="all" IncludeAssets="analyzers;build;buildtransitive">
-      <Version Condition="'$(ManagePackageVersionsCentrally)' != 'true'">$(SonarAnalyzerCSharpVersion)</Version>
     </PackageReference>
   </ItemGroup>
 </Project>

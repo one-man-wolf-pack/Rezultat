@@ -9,7 +9,7 @@ public sealed class PresenceObservationTests {
         var presence = Create(state, "payload");
         var calls = new List<string>();
 
-        var result = presence.Match(
+        int result = presence.Match(
             value => { calls.Add($"value:{value}"); return 1; },
             () => { calls.Add("null"); return 2; },
             () => { calls.Add("missing"); return 3; });
@@ -23,7 +23,7 @@ public sealed class PresenceObservationTests {
     [MemberData(nameof(States))]
     public void Match_rejects_every_null_handler_regardless_of_state(string state) {
         var presence = Create(state, "payload");
-        var calls = 0;
+        int calls = 0;
         Func<string, int> onValue = _ => ++calls;
         Func<int> other = () => ++calls;
 
@@ -38,7 +38,7 @@ public sealed class PresenceObservationTests {
         var payload = new ReferenceProbe(1);
 
         var observed = Presence<ReferenceProbe>.Value(payload).Match<ReferenceProbe?>(static value => value, static () => null, static () => null);
-        var nullResult = Presence<int>.Missing.Match<string?>(static _ => "value", static () => "null", static () => null);
+        string? nullResult = Presence<int>.Missing.Match<string?>(static _ => "value", static () => "null", static () => null);
 
         observed.ShouldBeSameAs(payload);
         nullResult.ShouldBeNull();

@@ -61,7 +61,7 @@ public sealed class BranchMatrixTests {
         failure.Message.ShouldNotContain(Secret, Case.Sensitive);
         failure.Message.ShouldNotContain("ToString", Case.Sensitive);
         failure.Message.ShouldNotContain(character => char.IsDigit(character));
-        var carrier = assertion is Assertion.ShouldBeOk or Assertion.ShouldBeError ? "Result" : "Validation";
+        string carrier = assertion is Assertion.ShouldBeOk or Assertion.ShouldBeError ? "Result" : "Validation";
         failure.Message.ShouldContain($"{carrier}.{assertion.ToString()["ShouldBe".Length..]}", Case.Sensitive);
         failure.Message.ShouldContain(state == State.Uninitialized ? $"{carrier}.Uninitialized" : $"{carrier}.{ActualBranch(assertion)}", Case.Sensitive);
     }
@@ -101,7 +101,7 @@ public sealed class BranchMatrixTests {
         var failure = Should.Throw<FailException>(() => validation.ShouldBeValid()).ShouldBeOfType<FailException>();
 
         (extracted == issues).ShouldBeTrue();
-        var listed = string.Join(", ", issues.Select((issue, index) => $"{index}={issue ?? "null"}"));
+        string listed = string.Join(", ", issues.Select((issue, index) => $"{index}={issue ?? "null"}"));
         failure.Message.ShouldBe($"Expected Validation.Valid; actual Validation.Invalid; issues={issues.Length} [{listed}].");
     }
 

@@ -31,7 +31,7 @@ public sealed class ValidationValidateAllTests {
     public void Empty_source_gives_valid_unit() {
         var ready = new TrackedSequence<Validation<int, string>>();
         var mapped = new TrackedSequence<int>();
-        var calls = 0;
+        int calls = 0;
 
         ready.ValidateAll().ShouldBe(Validation<Unit, string>.Valid(Unit.Value));
         mapped.ValidateAll(value => { calls++; return Validation<int, string>.Valid(value); }).ShouldBe(Validation<Unit, string>.Valid(Unit.Value));
@@ -114,7 +114,7 @@ public sealed class ValidationValidateAllTests {
         var ready = new TrackedSequence<Validation<int, string>>(
             Validation<int, string>.Invalid("first"), default, Validation<int, string>.Invalid("later")) { PoisonFrom = 2 };
         var mapped = new TrackedSequence<int>(0, 1, 2) { PoisonFrom = 2 };
-        var calls = 0;
+        int calls = 0;
 
         Should.Throw<InvalidOperationException>(() => ready.ValidateAll()).ShouldBeOfType<InvalidOperationException>();
         Should.Throw<InvalidOperationException>(() => mapped.ValidateAll(value => {
@@ -176,7 +176,7 @@ public sealed class ValidationValidateAllTests {
     [InlineData("source exception")]
     public void Ready_form_dispose_exception_replaces_the_outcome_or_earlier_exception(string exit) {
         var disposeException = new ProbeException("dispose");
-        Validation<int, string> item = exit switch {
+        var item = exit switch {
             "valid" => Validation<int, string>.Valid(1),
             "invalid" or "source exception" => Validation<int, string>.Invalid("e"),
             _ => default,

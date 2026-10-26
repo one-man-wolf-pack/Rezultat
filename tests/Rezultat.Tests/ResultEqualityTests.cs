@@ -191,8 +191,8 @@ public sealed class ResultEqualityTests {
                 return x.IsInitialized == y.IsInitialized;
             }
 
-            var xSuccess = x.TryGetValue(out var xValue, out var xError);
-            var ySuccess = y.TryGetValue(out var yValue, out var yError);
+            bool xSuccess = x.TryGetValue(out int xValue, out string? xError);
+            bool ySuccess = y.TryGetValue(out int yValue, out string? yError);
             if (xSuccess != ySuccess) {
                 return false;
             }
@@ -205,7 +205,7 @@ public sealed class ResultEqualityTests {
                 return 0;
             }
 
-            return obj.TryGetValue(out var value, out var error)
+            return obj.TryGetValue(out int value, out string? error)
                 ? HashCode.Combine(1, value)
                 : HashCode.Combine(2, StringComparer.OrdinalIgnoreCase.GetHashCode(error));
         }

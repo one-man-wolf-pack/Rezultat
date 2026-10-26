@@ -1,10 +1,10 @@
 using System.Collections.Immutable;
 using Rezultat;
-using Rezultat.Testing.Xunit;
 using Rezultat.Qualification;
+using Rezultat.Testing.Xunit;
 
 var checks = new Checks();
-var reference = new object();
+object reference = new object();
 checks.That("ShouldBeOk returns the exact reference", ReferenceEquals(reference, Result<object, string>.Ok(reference).ShouldBeOk()));
 checks.That("ShouldBeOk keeps a null payload", Result<string, string>.Ok(null).ShouldBeOk() is null);
 checks.That("ShouldBeError keeps a null error", Result<int, string>.Error(null).ShouldBeError() is null);

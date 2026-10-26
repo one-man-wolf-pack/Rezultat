@@ -20,26 +20,20 @@ public static class MaybeValues {
 
 [Properties(Arbitrary = [typeof(MaybeValues)])]
 public sealed class MaybePropertyTests {
-    // S1940: the negated operator form is the subject of this equality law.
-#pragma warning disable S1940
     [Property]
     public bool Equality_is_reflexive(Maybe<string?> maybe) {
         var copy = maybe;
 
         return maybe.Equals(copy) && maybe == copy && !(maybe != copy) && maybe.GetHashCode() == copy.GetHashCode();
     }
-#pragma warning restore S1940
 
-    // S1940: the negated operator form is the subject of this equality law.
-#pragma warning disable S1940
     [Property]
     public bool Equality_forms_agree_and_are_symmetric(Maybe<string?> left, Maybe<string?> right) =>
         left.Equals(right) == (left == right)
-        && (left != right) == !(left == right)
+        && left != right == !(left == right)
         && left.Equals((object)right) == left.Equals(right)
         && EqualityComparer<Maybe<string?>>.Default.Equals(left, right) == left.Equals(right)
         && left.Equals(right) == right.Equals(left);
-#pragma warning restore S1940
 
     [Property]
     public bool Equal_values_have_equal_hashes(Maybe<int> left, Maybe<int> right) =>
@@ -47,8 +41,8 @@ public sealed class MaybePropertyTests {
 
     [Property]
     public bool Values_are_equal_exactly_for_same_alternative_and_payload(Maybe<int> left, Maybe<int> right) {
-        var leftSome = left.TryGetValue(out var leftValue);
-        var rightSome = right.TryGetValue(out var rightValue);
+        bool leftSome = left.TryGetValue(out int leftValue);
+        bool rightSome = right.TryGetValue(out int rightValue);
 
         return left.Equals(right) == (leftSome == rightSome && (!leftSome || leftValue == rightValue));
     }
@@ -58,14 +52,14 @@ public sealed class MaybePropertyTests {
         var maybe = Maybe<string?>.Some(value);
 
         return maybe.IsSome
-            && maybe.TryGetValue(out var observed) && observed == value
+            && maybe.TryGetValue(out string? observed) && observed == value
             && maybe.ValueOr("fallback") == value
             && maybe.Match(v => v == value, () => false);
     }
 
     [Property]
     public bool Observations_agree_on_alternative(Maybe<int> maybe, int fallback) {
-        var some = maybe.TryGetValue(out var value);
+        bool some = maybe.TryGetValue(out int value);
 
         return some == maybe.IsSome
             && maybe.ValueOr(fallback) == (some ? value : fallback)

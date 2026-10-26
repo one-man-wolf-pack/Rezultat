@@ -1,9 +1,9 @@
 using System.Reflection;
 using System.Runtime.Loader;
 using Rezultat;
+using Rezultat.Qualification;
 using Rezultat.Qualification.DiamondInventory;
 using Rezultat.Qualification.DiamondOrders;
-using Rezultat.Qualification;
 
 if (args.Length != 2 || !Version.TryParse(args[0], out var coreVersion) || !Version.TryParse(args[1], out var inventoryCoreVersion)) {
     Console.Error.WriteLine("usage: DiamondApp <resolved-core-assembly-version> <inventory-compile-core-assembly-version>");
@@ -17,10 +17,10 @@ checks.Text("Ok(null) note crosses both libraries", "no note", Orders.DescribeNo
 checks.Text("Error note crosses both libraries", "rejected: unknown sku 9", Orders.DescribeNote(Inventory.FindNote(9)));
 
 var nullNote = Inventory.FindNote(2);
-checks.That("Inventory Ok(null) is a successful null payload", nullNote.TryGetValue(out var noteText, out _) && noteText is null);
+checks.That("Inventory Ok(null) is a successful null payload", nullNote.TryGetValue(out string? noteText, out _) && noteText is null);
 
 var valid = Orders.TotalQuantity(Inventory.ParseQuantities(["2", "3"]), 10);
-checks.That("Valid quantities total 5", valid.TryGetValue(out var total, out _) && total == 5);
+checks.That("Valid quantities total 5", valid.TryGetValue(out int total, out _) && total == 5);
 
 var overLimit = Orders.TotalQuantity(Inventory.ParseQuantities(["2", "3"]), 4);
 checks.That("Orders adds its own issue to a Valid input",

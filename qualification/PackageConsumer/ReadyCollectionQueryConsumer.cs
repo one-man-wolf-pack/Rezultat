@@ -12,7 +12,7 @@ internal static class ReadyCollectionQueryConsumer {
         checks.Text("result sequence", "Result.Ok(3)", new[] { Parse("1"), Parse("2") }.Sequence().Map(static values => values.Sum()).ToString());
         checks.Text("result sequence first error", "Result.Error(x)", new[] { Parse("1"), Parse("x"), Parse("y") }.Sequence().ToString());
         checks.Throws<InvalidOperationException>("result sequence visited default", () => new[] { default(Result<int, string>) }.Sequence());
-        checks.That("result sequence empty", Array.Empty<Result<string?, string>>().Sequence().TryGetValue(out var empty, out _) && empty.Length == 0);
+        checks.That("result sequence empty", Array.Empty<Result<string?, string>>().Sequence().TryGetValue(out string?[]? empty, out _) && empty.Length == 0);
         checks.Text("maybe sequence", "Maybe.Some(2)", new[] { Maybe<string?>.Some(null), Maybe<string?>.Some("a") }.Sequence().Map(static values => values.Length).ToString());
         checks.Text("maybe sequence none", "Maybe.None", new[] { Maybe<int>.Some(1), default }.Sequence().ToString());
         checks.Text("validation sequence", "Validation.Invalid([a, b, c])",
@@ -28,7 +28,7 @@ internal static class ReadyCollectionQueryConsumer {
         checks.Throws<InvalidOperationException>("validate all visited default", () => new[] { Validation<int, string>.Invalid("a"), default }.ValidateAll());
         checks.Throws<ArgumentNullException>("validate all null selector", () => ValidationCollectionExtensions.ValidateAll<int, int, string>([], null!));
 
-        var factoryCalls = 0;
+        int factoryCalls = 0;
         checks.Text("at most one none", "Result.Ok(Maybe.None)", Array.Empty<string>().AtMostOne(() => { factoryCalls++; return "many"; }).ToString());
         checks.Text("at most one some", "Result.Ok(Maybe.Some(null))", new string?[] { null }.AtMostOne(() => { factoryCalls++; return "many"; }).ToString());
         checks.Text("at most one many", "Result.Error(many)", new[] { 1, 2, 3 }.AtMostOne(() => { factoryCalls++; return "many"; }).ToString());
@@ -56,10 +56,10 @@ internal static class ReadyCollectionQueryConsumer {
     }
 
     private static Result<int, string> Parse(string text) =>
-        int.TryParse(text, out var value) ? Result<int, string>.Ok(value) : Result<int, string>.Error(text);
+        int.TryParse(text, out int value) ? Result<int, string>.Ok(value) : Result<int, string>.Error(text);
 
     private static Validation<int, string> Check(string text) =>
-        int.TryParse(text, out var value) ? Validation<int, string>.Valid(value) : Validation<int, string>.Invalid(text);
+        int.TryParse(text, out int value) ? Validation<int, string>.Valid(value) : Validation<int, string>.Invalid(text);
 
     private static Maybe<int> Find(int value) => Maybe<int>.Some(value);
 }

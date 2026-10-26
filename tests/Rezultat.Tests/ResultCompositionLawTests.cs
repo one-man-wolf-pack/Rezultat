@@ -112,7 +112,7 @@ public sealed class ResultCompositionLawTests {
     [Property]
     public bool Traverse_returns_first_failure_in_source_order_or_all_values(int[] source, Func<int, Result<int, int>> step) {
         var expected = Result<int[], int>.Ok([.. source.Select(item => Value(step(item)))]);
-        foreach (var item in source) {
+        foreach (int item in source) {
             if (!step(item).IsSuccess) {
                 expected = Result<int[], int>.Error(Error(step(item)));
                 break;
@@ -131,7 +131,7 @@ public sealed class ResultCompositionLawTests {
         SameContent(new[] { item }.Traverse(step), step(item).Map(static value => new[] { value }));
 
     private static bool SameContent(Result<int[], int> actual, Result<int[], int> expected) =>
-        actual.TryGetValue(out var actualValues, out var actualError) == expected.TryGetValue(out var expectedValues, out var expectedError)
+        actual.TryGetValue(out int[]? actualValues, out int actualError) == expected.TryGetValue(out int[]? expectedValues, out int expectedError)
         && (actual.IsSuccess ? actualValues!.SequenceEqual(expectedValues!) : actualError == expectedError);
 
     private static int Value(Result<int, int> result) => result.Match(static value => value, static _ => 0);

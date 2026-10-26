@@ -29,7 +29,7 @@ public sealed class ResultInspectTests {
 
     [Fact]
     public void Inactive_branch_does_not_invoke_the_action() {
-        var calls = 0;
+        int calls = 0;
 
         var success = Result<int, string>.Ok(1).InspectError(_ => calls++);
         var failure = Result<int, string>.Error("e").Inspect(_ => calls++);

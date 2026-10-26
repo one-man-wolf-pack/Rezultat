@@ -23,7 +23,7 @@ public sealed class MaybeAtMostOneTests {
     [Fact]
     public void Empty_source_gives_ok_none_without_factory_call() {
         var source = new TrackedSequence<int>();
-        var calls = 0;
+        int calls = 0;
 
         var result = source.AtMostOne(() => { calls++; return "many"; });
 
@@ -35,7 +35,7 @@ public sealed class MaybeAtMostOneTests {
     public void Single_element_gives_ok_some_of_the_exact_element_without_factory_call() {
         var payload = new ReferenceProbe(1);
         var source = new TrackedSequence<ReferenceProbe>(payload);
-        var calls = 0;
+        int calls = 0;
 
         var result = source.AtMostOne(() => { calls++; return "many"; });
 
@@ -58,7 +58,7 @@ public sealed class MaybeAtMostOneTests {
     public void Second_element_gives_factory_error_without_reading_it_or_the_tail(int count) {
         var error = new ReferenceProbe(9);
         var source = new TrackedSequence<int>([.. Enumerable.Range(0, count)]) { PoisonFrom = 2 };
-        var calls = 0;
+        int calls = 0;
 
         var result = source.AtMostOne(() => { calls++; return error; });
 
@@ -71,7 +71,7 @@ public sealed class MaybeAtMostOneTests {
     public void Null_factory_error_is_kept() {
         var result = new[] { 1, 2 }.AtMostOne(static () => (string?)null);
 
-        result.TryGetValue(out _, out var error).ShouldBeFalse();
+        result.TryGetValue(out _, out string? error).ShouldBeFalse();
         error.ShouldBeNull();
     }
 
@@ -91,7 +91,7 @@ public sealed class MaybeAtMostOneTests {
     [InlineData(1)]
     public void Source_exception_is_not_an_outcome_and_disposes(int poisonFrom) {
         var source = new TrackedSequence<int>(1, 2) { PoisonFrom = poisonFrom };
-        var calls = 0;
+        int calls = 0;
 
         Should.Throw<ProbeException>(() => source.AtMostOne(() => { calls++; return "many"; }));
         (calls, source.Disposals).ShouldBe((0, 1));
@@ -110,7 +110,7 @@ public sealed class MaybeAtMostOneTests {
 
     [Fact]
     public void Caller_where_selects_matches_and_its_predicate_exception_is_not_an_outcome() {
-        var source = new[] { 1, 2, 3, 4 };
+        int[] source = [1, 2, 3, 4];
 
         source.Where(static value => value == 3).AtMostOne(static () => "many").ShouldBe(Result<Maybe<int>, string>.Ok(Maybe<int>.Some(3)));
         source.Where(static value => value > 2).AtMostOne(static () => "many").ShouldBe(Result<Maybe<int>, string>.Error("many"));

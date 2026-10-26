@@ -25,5 +25,5 @@ internal static class RootOnlyConsumer {
     }
 
     private static Result<int, string> Parse(string text) =>
-        int.TryParse(text, out var value) ? Result<int, string>.Ok(value) : Result<int, string>.Error(text);
+        int.TryParse(text, out int value) ? Result<int, string>.Ok(value) : Result<int, string>.Error(text);
 }

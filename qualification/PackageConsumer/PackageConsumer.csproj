@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
     <!-- The restored package graph of this consumer is inspected evidence: no private development analyzers. -->
     <RezultatDevelopmentAnalyzers>false</RezultatDevelopmentAnalyzers>
     <OutputType>Exe</OutputType>
@@ -15,7 +16,9 @@
     <PackageReference Include="Rezultat" Version="$(RezultatPackageVersion)" />
   </ItemGroup>
 
-  <ItemGroup>
+  <!-- Rooted publication analyzes the whole library surface; RezultatRootLibrary=false publishes the ordinary
+       consumer with normal reachability. Neither mode replaces the other. -->
+  <ItemGroup Condition="'$(RezultatRootLibrary)' != 'false'">
     <TrimmerRootAssembly Include="Rezultat" />
   </ItemGroup>
 

@@ -24,11 +24,11 @@ public sealed class ValidationTraverseTests {
     [Fact]
     public void Empty_source_gives_valid_empty_array() {
         var source = new TrackedSequence<int>();
-        var calls = 0;
+        int calls = 0;
 
         var result = source.Traverse(value => Validation<int, string>.Valid(++calls + value));
 
-        result.TryGetValue(out var values, out _).ShouldBeTrue();
+        result.TryGetValue(out int[]? values, out _).ShouldBeTrue();
         values.ShouldBeEmpty();
         (calls, source.Enumerations, source.Disposals).ShouldBe((0, 1, 1));
     }
@@ -40,7 +40,7 @@ public sealed class ValidationTraverseTests {
 
         var result = source.Traverse(value => { visited.Add(value); return Validation<string, int>.Valid($"v{value}"); });
 
-        result.TryGetValue(out var values, out _).ShouldBeTrue();
+        result.TryGetValue(out string[]? values, out _).ShouldBeTrue();
         values.ShouldBe(["v3", "v1", "v2"]);
         visited.ShouldBe([3, 1, 2]);
         (source.Enumerations, source.MoveNextCalls, source.CurrentReads, source.Disposals).ShouldBe((1, 4, 3, 1));
@@ -70,7 +70,7 @@ public sealed class ValidationTraverseTests {
         var result = new[] { 1, 2, 3 }.Traverse(static value =>
             value == 2 ? Validation<int, string>.Invalid("two") : Validation<int, string>.Valid(value));
 
-        result.TryGetValue(out var values, out var issues).ShouldBeFalse();
+        result.TryGetValue(out int[]? values, out var issues).ShouldBeFalse();
         values.ShouldBeNull();
         issues.ShouldBe(["two"]);
     }
@@ -79,7 +79,7 @@ public sealed class ValidationTraverseTests {
     public void Visited_uninitialized_outcome_throws_after_accumulated_issues_and_stops() {
         var source = new TrackedSequence<Validation<int, string>>(
             Validation<int, string>.Invalid("first"), default, Validation<int, string>.Invalid("later")) { PoisonFrom = 2 };
-        var calls = 0;
+        int calls = 0;
 
         Should.Throw<InvalidOperationException>(() => source.Traverse(outcome => { calls++; return outcome; })).ShouldBeOfType<InvalidOperationException>();
 
@@ -132,7 +132,7 @@ public sealed class ValidationTraverseTests {
         var nested = new[] { 1 }.Traverse(static _ => Validation<Validation<int, int>, int>.Valid(default));
         var tasks = new[] { 1 }.Traverse(static _ => Validation<Task<int>, int>.Valid(Task.FromException<int>(new ProbeException("task"))));
 
-        references.TryGetValue(out var referenceValues, out _).ShouldBeTrue();
+        references.TryGetValue(out string?[]? referenceValues, out _).ShouldBeTrue();
         referenceValues.ShouldBe(["a", null]);
         (nested.TryGetValue(out var inner, out _) && !inner.ShouldHaveSingleItem().IsInitialized).ShouldBeTrue();
         (tasks.TryGetValue(out var pending, out _) && pending.ShouldHaveSingleItem().IsFaulted).ShouldBeTrue();
@@ -145,7 +145,7 @@ public sealed class ValidationTraverseTests {
         var result = source.Traverse(static value => Validation<int, string>.Valid(value));
         source[0] = 10;
 
-        result.TryGetValue(out var values, out _).ShouldBeTrue();
+        result.TryGetValue(out int[]? values, out _).ShouldBeTrue();
         values.ShouldBe([1, 2]);
     }
 

@@ -7,20 +7,17 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
-// S6966/S3903: a synchronous top-level program; nothing awaits here, and its file-local helper types share the
-// global namespace of the generated Program class.
-#pragma warning disable S6966, S3903
 
 if (args.Length < 7 || args[0] is not (Inspection.CoreId or Inspection.AssertionsId)) {
     Console.Error.WriteLine("usage: PackageInspector <Rezultat|Rezultat.Testing.Xunit> <repo-root> <version> <nupkg> <snupkg> <packages-folder> <project.assets.json>...");
     return 2;
 }
 
-var repoRoot = Path.GetFullPath(args[1]);
+string repoRoot = Path.GetFullPath(args[1]);
 var inspection = new Inspection(args[0], args[2]);
-var nupkgDll = inspection.InspectPackage(args[3], repoRoot);
+byte[] nupkgDll = inspection.InspectPackage(args[3], repoRoot);
 inspection.InspectSymbols(args[4], nupkgDll, repoRoot);
-foreach (var assets in args[6..]) {
+foreach (string? assets in args[6..]) {
     inspection.InspectConsumer(assets, Path.GetFullPath(args[5]), Path.GetDirectoryName(Path.GetFullPath(args[3]))!, nupkgDll);
 }
 
@@ -45,7 +42,7 @@ internal sealed class Inspection(string packageId, string packageVersion) {
     public byte[] InspectPackage(string nupkgPath, string repoRoot) {
         Report("nupkg sha256", Sha256(File.ReadAllBytes(nupkgPath)));
         using var package = ZipFile.OpenRead(nupkgPath);
-        var entries = package.Entries.Select(entry => entry.FullName).Order(StringComparer.Ordinal).ToArray();
+        string[] entries = [.. package.Entries.Select(entry => entry.FullName).Order(StringComparer.Ordinal)];
         Report("nupkg entries", string.Join(", ", entries));
 
         string[] allowed =
@@ -53,9 +50,7 @@ internal sealed class Inspection(string packageId, string packageVersion) {
             "[Content_Types].xml", "_rels/.rels", "LICENSE", ReadmePath, $"{packageId}.nuspec",
             $"{LibPath}{packageId}.dll", $"{LibPath}{packageId}.xml",
         ];
-        var unexpected = entries
-            .Where(entry => !allowed.Contains(entry) && !entry.StartsWith("package/services/metadata/core-properties/", StringComparison.Ordinal))
-            .ToArray();
+        string[] unexpected = [.. entries.Where(entry => !allowed.Contains(entry) && !entry.StartsWith("package/services/metadata/core-properties/", StringComparison.Ordinal))];
         Check("nupkg has only lib/net10.0 assets, docs, license, readme and metadata", unexpected.Length == 0, string.Join(", ", unexpected));
         Check("nupkg has no build/analyzer/content/ref assets",
             !entries.Any(entry => entry.Split('/')[0] is "build" or "buildTransitive" or "buildMultiTargeting" or "analyzers" or "content" or "contentFiles" or "ref" or "tools"));
@@ -90,9 +85,9 @@ internal sealed class Inspection(string packageId, string packageVersion) {
         Check("nuspec carries no invented repository url/commit",
             repository is null || (repository.Attribute("url") is null && repository.Attribute("commit") is null));
 
-        var dll = ReadAll(package.GetEntry($"{LibPath}{packageId}.dll")!);
+        byte[] dll = ReadAll(package.GetEntry($"{LibPath}{packageId}.dll")!);
         Report("dll sha256", Sha256(dll));
-        var informationalVersion = ReadInformationalVersion(dll);
+        string? informationalVersion = ReadInformationalVersion(dll);
         Report("dll informational version", informationalVersion ?? "<none>");
         Check("dll informational version is the package version without unconfirmed source revision",
             informationalVersion == packageVersion, informationalVersion);
@@ -119,7 +114,7 @@ internal sealed class Inspection(string packageId, string packageVersion) {
     public void InspectSymbols(string snupkgPath, byte[] dll, string repoRoot) {
         Report("snupkg sha256", Sha256(File.ReadAllBytes(snupkgPath)));
         using var symbols = ZipFile.OpenRead(snupkgPath);
-        var entries = symbols.Entries.Select(entry => entry.FullName).Order(StringComparer.Ordinal).ToArray();
+        string[] entries = [.. symbols.Entries.Select(entry => entry.FullName).Order(StringComparer.Ordinal)];
         Report("snupkg entries", string.Join(", ", entries));
         var pdbEntry = symbols.GetEntry($"{LibPath}{packageId}.pdb");
         Check("snupkg contains lib/net10.0/Rezultat.pdb", pdbEntry is not null);
@@ -127,7 +122,7 @@ internal sealed class Inspection(string packageId, string packageVersion) {
             return;
         }
 
-        var pdb = ReadAll(pdbEntry);
+        byte[] pdb = ReadAll(pdbEntry);
         Report("pdb sha256", Sha256(pdb));
         using var peReader = new PEReader(ImmutableArray.Create(dll));
         var debugDirectory = peReader.ReadDebugDirectory();
@@ -139,29 +134,29 @@ internal sealed class Inspection(string packageId, string packageVersion) {
         var codeView = peReader.ReadCodeViewDebugDirectoryData(codeViewEntry);
         Report("dll codeview", $"{codeView.Guid} age {codeView.Age} path {codeView.Path}");
         Check("dll codeview path is logical", IsLogical(codeView.Path), codeView.Path);
-        var physicalRoots = PhysicalRoots(repoRoot);
-        var dllText = System.Text.Encoding.UTF8.GetString(dll);
-        var leakedRoot = physicalRoots.FirstOrDefault(physical => dllText.Contains(physical, StringComparison.Ordinal));
+        string[] physicalRoots = PhysicalRoots(repoRoot);
+        string dllText = System.Text.Encoding.UTF8.GetString(dll);
+        string? leakedRoot = physicalRoots.FirstOrDefault(physical => dllText.Contains(physical, StringComparison.Ordinal));
         Check("dll bytes carry no physical checkout/home root", leakedRoot is null, leakedRoot);
 
         using var pdbProvider = MetadataReaderProvider.FromPortablePdbImage(ImmutableArray.Create(pdb));
         var pdbReader = pdbProvider.GetMetadataReader();
         var header = pdbReader.DebugMetadataHeader!;
         var pdbGuid = new Guid(header.Id.AsSpan(0, 16));
-        var pdbStamp = BitConverter.ToUInt32(header.Id.AsSpan(16, 4));
+        uint pdbStamp = BitConverter.ToUInt32(header.Id.AsSpan(16, 4));
         Check("pdb id matches dll codeview guid and stamp", pdbGuid == codeView.Guid && pdbStamp == codeViewEntry.Stamp,
             $"pdb {pdbGuid}/{pdbStamp:x8}, dll {codeView.Guid}/{codeViewEntry.Stamp:x8}");
 
         var checksumEntry = debugDirectory.Single(entry => entry.Type == DebugDirectoryEntryType.PdbChecksum);
         var checksum = peReader.ReadPdbChecksumDebugDirectoryData(checksumEntry);
-        var zeroedId = pdb.ToArray();
+        byte[] zeroedId = [.. pdb];
         Array.Clear(zeroedId, header.IdStartOffset, header.Id.Length);
         Check("pdb checksum matches dll PdbChecksum entry",
             checksum.AlgorithmName == "SHA256" && SHA256.HashData(zeroedId).AsSpan().SequenceEqual(checksum.Checksum.AsSpan()),
             checksum.AlgorithmName);
 
-        var embedded = 0;
-        var sourceLink = 0;
+        int embedded = 0;
+        int sourceLink = 0;
         foreach (var handle in pdbReader.CustomDebugInformation) {
             var kind = pdbReader.GetGuid(pdbReader.GetCustomDebugInformation(handle).Kind);
             embedded += kind == _embeddedSourceKind ? 1 : 0;
@@ -171,32 +166,30 @@ internal sealed class Inspection(string packageId, string packageVersion) {
         Check("pdb has no embedded sources", embedded == 0, $"{embedded} embedded");
         Report("pdb source link mapping", sourceLink == 0 ? "absent (not generated in this bootstrap)" : "present");
 
-        var authoredSources = Directory.EnumerateFiles(Path.Combine(repoRoot, "src", packageId), "*.cs", SearchOption.AllDirectories)
+        string[] authoredSources = [.. Directory.EnumerateFiles(Path.Combine(repoRoot, "src", packageId), "*.cs", SearchOption.AllDirectories)
             .Select(path => LogicalRoot + Path.GetRelativePath(repoRoot, path).Replace('\\', '/'))
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-        var authoredDocuments = pdbReader.Documents
+            .Order(StringComparer.Ordinal)];
+        string[] authoredDocuments = [.. pdbReader.Documents
             .Select(handle => pdbReader.GetString(pdbReader.GetDocument(handle).Name))
             .Where(name => name.StartsWith($"{LogicalRoot}src/", StringComparison.Ordinal))
-            .Order(StringComparer.Ordinal)
-            .ToArray();
+            .Order(StringComparer.Ordinal)];
         Check("pdb documents cover every authored source", authoredDocuments.SequenceEqual(authoredSources),
             $"pdb [{string.Join(", ", authoredDocuments)}], sources [{string.Join(", ", authoredSources)}]");
 
         foreach (var handle in pdbReader.Documents) {
             var document = pdbReader.GetDocument(handle);
-            var name = pdbReader.GetString(document.Name);
+            string name = pdbReader.GetString(document.Name);
             var algorithm = pdbReader.GetGuid(document.HashAlgorithm);
-            var hash = pdbReader.GetBlobBytes(document.Hash);
+            byte[] hash = pdbReader.GetBlobBytes(document.Hash);
             if (!IsLogical(name) || physicalRoots.Any(physical => name.Contains(physical, StringComparison.Ordinal))) {
                 Check($"pdb document {name} has a logical path", false);
                 continue;
             }
 
-            var path = Path.Combine(repoRoot, name[LogicalRoot.Length..]);
-            var exists = File.Exists(path);
-            var matches = exists && algorithm == _sha256Algorithm && SHA256.HashData(File.ReadAllBytes(path)).AsSpan().SequenceEqual(hash);
-            var origin = name.StartsWith($"{LogicalRoot}src/", StringComparison.Ordinal) ? "authored" : "generated";
+            string path = Path.Combine(repoRoot, name[LogicalRoot.Length..]);
+            bool exists = File.Exists(path);
+            bool matches = exists && algorithm == _sha256Algorithm && SHA256.HashData(File.ReadAllBytes(path)).AsSpan().SequenceEqual(hash);
+            string origin = name.StartsWith($"{LogicalRoot}src/", StringComparison.Ordinal) ? "authored" : "generated";
             Check($"pdb document {name} ({origin}) checksum matches build input", matches, exists ? "hash mismatch" : $"missing {path}");
         }
     }
@@ -204,8 +197,8 @@ internal sealed class Inspection(string packageId, string packageVersion) {
     public void InspectConsumer(string assetsPath, string packagesFolder, string feedFolder, byte[] nupkgDll) {
         using var assets = JsonDocument.Parse(File.ReadAllBytes(assetsPath));
         var root = assets.RootElement;
-        var project = Path.GetFileName(Path.GetDirectoryName(assetsPath));
-        var key = $"{packageId}/{packageVersion}";
+        string? project = Path.GetFileName(Path.GetDirectoryName(assetsPath));
+        string key = $"{packageId}/{packageVersion}";
 
         var rezultatLibraries = root.GetProperty("libraries").EnumerateObject()
             .Where(library => library.Name.StartsWith($"{packageId}/", StringComparison.OrdinalIgnoreCase))
@@ -218,7 +211,7 @@ internal sealed class Inspection(string packageId, string packageVersion) {
         foreach (var target in root.GetProperty("targets").EnumerateObject()) {
             Report($"{project} [{target.Name}] libraries", string.Join(", ", target.Value.EnumerateObject().Select(library => library.Name)));
             var entry = target.Value.GetProperty(key);
-            string[] Keys(string section) => entry.TryGetProperty(section, out var value) ? value.EnumerateObject().Select(item => item.Name).ToArray() : [];
+            string[] Keys(string section) => entry.TryGetProperty(section, out var value) ? [.. value.EnumerateObject().Select(item => item.Name)] : [];
             Check($"{project} [{target.Name}] compile asset", Keys("compile").SequenceEqual([$"{LibPath}{packageId}.dll"]), string.Join(", ", Keys("compile")));
             Check($"{project} [{target.Name}] runtime asset", Keys("runtime").SequenceEqual([$"{LibPath}{packageId}.dll"]), string.Join(", ", Keys("runtime")));
             string[] expectedDependencies = packageId == CoreId ? [] : [CoreId, AssertId];
@@ -231,17 +224,17 @@ internal sealed class Inspection(string packageId, string packageVersion) {
             }
         }
 
-        var folders = root.GetProperty("packageFolders").EnumerateObject().Select(folder => Path.GetFullPath(folder.Name)).ToArray();
+        string[] folders = [.. root.GetProperty("packageFolders").EnumerateObject().Select(folder => Path.GetFullPath(folder.Name))];
         Check($"{project}: isolated package folder only",
             folders.Length == 1 && folders[0].TrimEnd('/') == packagesFolder.TrimEnd('/'), string.Join(", ", folders));
 
-        var installed = Path.Combine(packagesFolder, packageId.ToLowerInvariant(), packageVersion);
-        var installedDll = Path.Combine(installed, LibPath, $"{packageId}.dll");
+        string installed = Path.Combine(packagesFolder, packageId.ToLowerInvariant(), packageVersion);
+        string installedDll = Path.Combine(installed, LibPath, $"{packageId}.dll");
         Check($"{project}: installed dll is the inspected package dll",
             File.Exists(installedDll) && File.ReadAllBytes(installedDll).AsSpan().SequenceEqual(nupkgDll));
 
         using var restoreMetadata = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(installed, ".nupkg.metadata")));
-        var source = restoreMetadata.RootElement.GetProperty("source").GetString() ?? string.Empty;
+        string source = restoreMetadata.RootElement.GetProperty("source").GetString() ?? string.Empty;
         Check($"{project}: package source is the local feed", Path.GetFullPath(source).TrimEnd('/') == feedFolder.TrimEnd('/'), source);
     }
 
@@ -258,11 +251,11 @@ internal sealed class Inspection(string packageId, string packageVersion) {
             core is not null && !Flags(core).Intersect(["Compile", "Runtime"]).Any(), core?.ToString());
 
         var assert = dependencies.SingleOrDefault(dependency => Attribute(dependency, "id") == AssertId);
-        var minimum = assert is null ? null : Attribute(assert, "version");
+        string? minimum = assert is null ? null : Attribute(assert, "version");
         Report("nuspec xunit.v3.assert minimum", minimum ?? "<none>");
         Check("nuspec xunit.v3.assert dependency is a plain minimum without exact pin or upper bound",
             minimum is not null && Version.TryParse(minimum, out _), minimum);
-        var excluded = assert is null ? [] : Flags(assert);
+        string[] excluded = assert is null ? [] : Flags(assert);
         Check("nuspec xunit.v3.assert keeps runtime and excludes compile, build, buildTransitive and analyzers",
             assert is not null && !excluded.Contains("Runtime") && !excluded.Contains("All")
             && _excludedAssertAssets.All(excluded.Contains),
@@ -273,8 +266,8 @@ internal sealed class Inspection(string packageId, string packageVersion) {
     private void InspectAssertionGraph(JsonElement root, JsonProperty target, string? project) {
         var libraries = target.Value.EnumerateObject().ToDictionary(library => library.Name.Split('/')[0], library => library, StringComparer.OrdinalIgnoreCase);
         string[] Keys(JsonProperty library, string section) =>
-            library.Value.TryGetProperty(section, out var value) ? value.EnumerateObject().Select(item => item.Name).ToArray() : [];
-        var label = $"{project} [{target.Name}]";
+            library.Value.TryGetProperty(section, out var value) ? [.. value.EnumerateObject().Select(item => item.Name)] : [];
+        string label = $"{project} [{target.Name}]";
 
         Check($"{label}: Rezultat {packageVersion} resolved as a package",
             libraries.TryGetValue(CoreId, out var core) && core.Name == $"{CoreId}/{packageVersion}"
@@ -284,8 +277,8 @@ internal sealed class Inspection(string packageId, string packageVersion) {
             return;
         }
 
-        var assertVersion = assert.Name.Split('/')[1];
-        var ownsAssert = libraries.Keys.Any(name => name.StartsWith("xunit.v3.core", StringComparison.OrdinalIgnoreCase));
+        string assertVersion = assert.Name.Split('/')[1];
+        bool ownsAssert = libraries.Keys.Any(name => name.StartsWith("xunit.v3.core", StringComparison.OrdinalIgnoreCase));
         Report($"{label} xunit.v3.assert", $"{assertVersion} compile [{string.Join(", ", Keys(assert, "compile"))}] runtime [{string.Join(", ", Keys(assert, "runtime"))}]");
         Check($"{label}: xunit.v3.assert runtime assembly flows to the test consumer",
             Keys(assert, "runtime").Any(asset => asset.EndsWith("/xunit.v3.assert.dll", StringComparison.Ordinal)));
@@ -303,9 +296,7 @@ internal sealed class Inspection(string packageId, string packageVersion) {
         Check($"{label}: helper brings no other xUnit v3 package",
             libraries.Keys.All(name => !name.StartsWith("xunit.v3.", StringComparison.OrdinalIgnoreCase) || name.Equals(AssertId, StringComparison.OrdinalIgnoreCase)),
             string.Join(", ", libraries.Keys));
-        var direct = root.GetProperty("project").GetProperty("frameworks").EnumerateObject()
-            .SelectMany(framework => framework.Value.TryGetProperty("dependencies", out var value) ? value.EnumerateObject().Select(item => item.Name) : [])
-            .ToArray();
+        string[] direct = [.. root.GetProperty("project").GetProperty("frameworks").EnumerateObject().SelectMany(framework => framework.Value.TryGetProperty("dependencies", out var value) ? value.EnumerateObject().Select(item => item.Name) : [])];
         if (direct.SequenceEqual([AssertionsId], StringComparer.OrdinalIgnoreCase)) {
             Check($"{label}: the helper graph is exactly Rezultat, Rezultat.Testing.Xunit and xunit.v3.assert",
                 libraries.Keys.Order(StringComparer.OrdinalIgnoreCase).SequenceEqual([CoreId, AssertionsId, AssertId], StringComparer.OrdinalIgnoreCase),
@@ -329,31 +320,31 @@ internal sealed class Inspection(string packageId, string packageVersion) {
             return;
         }
 
-        var packaged = ReadAll(entry);
-        var authored = File.ReadAllBytes(Path.Combine(repoRoot, "src", packageId, ReadmePath));
+        byte[] packaged = ReadAll(entry);
+        byte[] authored = File.ReadAllBytes(Path.Combine(repoRoot, "src", packageId, ReadmePath));
         Check("packaged README.md is the authored consumer readme", packaged.AsSpan().SequenceEqual(authored));
 
-        var text = System.Text.Encoding.UTF8.GetString(packaged);
-        var localLinks = Patterns.LocalLink().Matches(text).Select(match => match.Value).ToArray();
+        string text = System.Text.Encoding.UTF8.GetString(packaged);
+        string[] localLinks = [.. Patterns.LocalLink().Matches(text).Select(match => match.Value)];
         Check("README.md links only to absolute https targets or its own sections", localLinks.Length == 0, string.Join(", ", localLinks));
         var sections = GitHubHeadingAnchors(text);
-        var anchors = Patterns.Anchor().Matches(text).Select(match => match.Groups[1].Value).ToArray();
-        var unknown = anchors.Where(anchor => !sections.Contains(anchor)).ToArray();
+        string[] anchors = [.. Patterns.Anchor().Matches(text).Select(match => match.Groups[1].Value)];
+        string[] unknown = [.. anchors.Where(anchor => !sections.Contains(anchor))];
         Report("README.md section links", anchors.Length.ToString(System.Globalization.CultureInfo.InvariantCulture));
         Check("README.md section links name its own headings", unknown.Length == 0, string.Join(", ", unknown));
         string[] checkoutMarkers = ["../", "scripts/", "qualify.sh", "rezultat-specification", "src/", "artifacts/"];
-        var checkoutOnly = checkoutMarkers.Where(marker => text.Contains(marker, StringComparison.Ordinal)).ToArray();
+        string[] checkoutOnly = [.. checkoutMarkers.Where(marker => text.Contains(marker, StringComparison.Ordinal))];
         Check("README.md has no checkout-only paths or tooling", checkoutOnly.Length == 0, string.Join(", ", checkoutOnly));
     }
 
     private static HashSet<string> GitHubHeadingAnchors(string markdown) {
         var anchors = new HashSet<string>(StringComparer.Ordinal);
-        var fenced = false;
-        foreach (var line in markdown.Split('\n')) {
+        bool fenced = false;
+        foreach (string line in markdown.Split('\n')) {
             fenced ^= line.StartsWith("```", StringComparison.Ordinal);
             var heading = fenced ? null : Patterns.Heading().Match(line);
             if (heading is { Success: true }) {
-                var title = heading.Groups[1].Value.Trim().ToLowerInvariant();
+                string title = heading.Groups[1].Value.Trim().ToLowerInvariant();
                 anchors.Add(Patterns.NonAnchorCharacter().Replace(title, string.Empty).Replace(' ', '-'));
             }
         }
@@ -369,10 +360,9 @@ internal sealed class Inspection(string packageId, string packageVersion) {
     private static bool IsLogical(string path) => path.StartsWith(LogicalRoot, StringComparison.Ordinal);
 
     private static string[] PhysicalRoots(string repoRoot) =>
-        new[] { repoRoot, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) }
+        [.. new[] { repoRoot, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) }
             .Where(root => root.Length > 1)
-            .Select(root => root.TrimEnd('/'))
-            .ToArray();
+            .Select(root => root.TrimEnd('/'))];
 
     private static string Sha256(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
 
@@ -381,11 +371,10 @@ internal sealed class Inspection(string packageId, string packageVersion) {
     private static (string Name, Version Version)[] ReadAssemblyReferences(byte[] dll) {
         using var peReader = new PEReader(ImmutableArray.Create(dll));
         var metadata = peReader.GetMetadataReader();
-        return metadata.AssemblyReferences
+        return [.. metadata.AssemblyReferences
             .Select(handle => metadata.GetAssemblyReference(handle))
             .Select(reference => (metadata.GetString(reference.Name), reference.Version))
-            .Order()
-            .ToArray();
+            .Order()];
     }
 
     private static string? ReadInformationalVersion(byte[] dll) {
@@ -419,7 +408,7 @@ internal sealed class Inspection(string packageId, string packageVersion) {
     }
 }
 
-// The match timeout bounds a pathological README line (S6444); a timeout fails the check.
+// The match timeout bounds a pathological README line; a timeout fails the check.
 internal static partial class Patterns {
     [GeneratedRegex(@"\]\((?!https://|#)[^)]*\)", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
     public static partial Regex LocalLink();

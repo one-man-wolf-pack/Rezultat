@@ -184,7 +184,7 @@ public sealed class DiscardedOutcomeTests {
 
         var diagnostic = (await AnalyzeAsync(Compilation(WithCore, (ConsumerPath, markup.Source)))).ShouldHaveSingleItem();
 
-        var message = diagnostic.GetMessage(CultureInfo.InvariantCulture);
+        string message = diagnostic.GetMessage(CultureInfo.InvariantCulture);
         diagnostic.Severity.ShouldBe(DiagnosticSeverity.Warning);
         message.ShouldContain("Validation<int, string>", Case.Sensitive);
         message.ShouldContain("_ =", Case.Sensitive);

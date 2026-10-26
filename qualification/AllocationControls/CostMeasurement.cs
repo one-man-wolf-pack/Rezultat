@@ -8,15 +8,15 @@ internal static class CostMeasurement {
     private const int WarmupRounds = 50;
 
     public static (double Bytes, double Nanoseconds) Measure(Action<int> kernel) {
-        for (var round = 0; round < WarmupRounds; round++) {
+        for (int round = 0; round < WarmupRounds; round++) {
             kernel(Iterations / 10);
         }
 
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        var started = Stopwatch.GetTimestamp();
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        long started = Stopwatch.GetTimestamp();
         kernel(Iterations);
         var elapsed = Stopwatch.GetElapsedTime(started);
-        var bytes = (double)(GC.GetAllocatedBytesForCurrentThread() - before) / Iterations;
+        double bytes = (double)(GC.GetAllocatedBytesForCurrentThread() - before) / Iterations;
         return (bytes, elapsed.TotalNanoseconds / Iterations);
     }
 
@@ -29,8 +29,5 @@ internal static class CostMeasurement {
 
 [InlineArray(64)]
 internal struct Large {
-    // S1144: the InlineArray element field defines the 64-long payload and is accessed through indexing.
-#pragma warning disable S1144
     private long _element;
-#pragma warning restore S1144
 }

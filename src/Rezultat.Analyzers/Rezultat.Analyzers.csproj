@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>14.0</LangVersion>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <!-- RS2008: RZT0001 and its release status are owned by the RFC-012 contract; analyzer release
          tracking files would be a second, unconsumed record of the same diagnostic.

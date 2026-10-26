@@ -22,10 +22,7 @@ internal sealed class ReferenceProbe(int id, string? text = null) {
     public override bool Equals(object? obj) {
         EqualsCalls++;
         if (ThrowOnEquals) {
-            // S3877: an opt-in poison payload; the test asserts this failure propagates or is never reached.
-#pragma warning disable S3877
             throw new ProbeException("equals");
-#pragma warning restore S3877
         }
 
         return obj is ReferenceProbe other && other.Id == Id;
@@ -34,10 +31,7 @@ internal sealed class ReferenceProbe(int id, string? text = null) {
     public override int GetHashCode() {
         HashCalls++;
         if (ThrowOnHash) {
-            // S3877: an opt-in poison payload; the test asserts this failure propagates or is never reached.
-#pragma warning disable S3877
             throw new ProbeException("hash");
-#pragma warning restore S3877
         }
 
         return Id;
@@ -46,10 +40,7 @@ internal sealed class ReferenceProbe(int id, string? text = null) {
     public override string? ToString() {
         ToStringCalls++;
         if (ThrowOnToString) {
-            // S3877: an opt-in poison payload; the test asserts this failure propagates or is never reached.
-#pragma warning disable S3877
             throw new ProbeException("format");
-#pragma warning restore S3877
         }
 
         return ReturnNullText ? null : text ?? $"probe{Id}";

@@ -14,7 +14,7 @@ public sealed class ValidationSequenceTests {
     public void Empty_source_gives_valid_empty_array() {
         var source = new TrackedSequence<Validation<int, string>>();
 
-        source.Sequence().TryGetValue(out var values, out _).ShouldBeTrue();
+        source.Sequence().TryGetValue(out int[]? values, out _).ShouldBeTrue();
         values.ShouldBeEmpty();
         (source.Enumerations, source.Disposals).ShouldBe((1, 1));
     }
@@ -23,7 +23,7 @@ public sealed class ValidationSequenceTests {
     public void All_valid_collects_values_including_null_in_one_pass() {
         var source = new TrackedSequence<Validation<string?, int>>(Validation<string?, int>.Valid("a"), Validation<string?, int>.Valid(null));
 
-        source.Sequence().TryGetValue(out var values, out _).ShouldBeTrue();
+        source.Sequence().TryGetValue(out string?[]? values, out _).ShouldBeTrue();
         values.ShouldBe(["a", null]);
         (source.Enumerations, source.MoveNextCalls, source.CurrentReads, source.Disposals).ShouldBe((1, 3, 2, 1));
     }
@@ -75,7 +75,7 @@ public sealed class ValidationSequenceTests {
     [InlineData("default")]
     public void Dispose_exception_replaces_the_outcome_or_earlier_exception(string exit) {
         var disposeException = new ProbeException("dispose");
-        Validation<int, string> item = exit switch {
+        var item = exit switch {
             "valid" => Validation<int, string>.Valid(1),
             "invalid" => Validation<int, string>.Invalid("e"),
             _ => default,
@@ -93,8 +93,8 @@ public sealed class ValidationSequenceTests {
         var second = source.Sequence();
         source[0] = Validation<int, string>.Valid(10);
 
-        first.TryGetValue(out var firstValues, out _).ShouldBeTrue();
-        second.TryGetValue(out var secondValues, out _).ShouldBeTrue();
+        first.TryGetValue(out int[]? firstValues, out _).ShouldBeTrue();
+        second.TryGetValue(out int[]? secondValues, out _).ShouldBeTrue();
         secondValues.ShouldNotBeSameAs(firstValues);
         firstValues.ShouldBe([1]);
     }

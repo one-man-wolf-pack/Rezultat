@@ -98,7 +98,7 @@ public static class ValidationCollectionExtensions {
         }
 
         if (values is not null) {
-            return Validation<TResult[], TIssue>.Valid(values.ToArray());
+            return Validation<TResult[], TIssue>.Valid([.. values]);
         }
 
         return Validation<TResult[], TIssue>.InvalidMany(accumulated?.ToImmutable() ?? firstIssues);

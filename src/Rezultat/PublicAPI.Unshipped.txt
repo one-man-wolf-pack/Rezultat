@@ -1,0 +1,139 @@
+#nullable enable
+override Rezultat.Maybe<T>.Equals(object? obj) -> bool
+override Rezultat.Maybe<T>.GetHashCode() -> int
+override Rezultat.Maybe<T>.ToString() -> string!
+override Rezultat.Presence<T>.Equals(object? obj) -> bool
+override Rezultat.Presence<T>.GetHashCode() -> int
+override Rezultat.Presence<T>.ToString() -> string!
+override Rezultat.Result<T, TError>.Equals(object? obj) -> bool
+override Rezultat.Result<T, TError>.GetHashCode() -> int
+override Rezultat.Result<T, TError>.ToString() -> string!
+override Rezultat.Unit.Equals(object? other) -> bool
+override Rezultat.Unit.GetHashCode() -> int
+override Rezultat.Unit.ToString() -> string!
+override Rezultat.Validation<T, TIssue>.Equals(object? obj) -> bool
+override Rezultat.Validation<T, TIssue>.GetHashCode() -> int
+override Rezultat.Validation<T, TIssue>.ToString() -> string!
+Rezultat.Collections.MaybeCollectionExtensions
+Rezultat.Collections.ResultCollectionExtensions
+Rezultat.Collections.ValidationCollectionExtensions
+Rezultat.Linq.MaybeQueryExtensions
+Rezultat.Linq.ResultQueryExtensions
+Rezultat.Maybe
+Rezultat.Maybe<T>
+Rezultat.Maybe<T>.AndThen<TResult>(System.Func<T, Rezultat.Maybe<TResult>>! next) -> Rezultat.Maybe<TResult>
+Rezultat.Maybe<T>.Equals(Rezultat.Maybe<T> other) -> bool
+Rezultat.Maybe<T>.Filter(System.Func<T, bool>! predicate) -> Rezultat.Maybe<T>
+Rezultat.Maybe<T>.IsSome.get -> bool
+Rezultat.Maybe<T>.Map<TResult>(System.Func<T, TResult>! selector) -> Rezultat.Maybe<TResult>
+Rezultat.Maybe<T>.Match<TResult>(System.Func<T, TResult>! onSome, System.Func<TResult>! onNone) -> TResult
+Rezultat.Maybe<T>.Maybe() -> void
+Rezultat.Maybe<T>.OrElse(System.Func<Rezultat.Maybe<T>>! fallback) -> Rezultat.Maybe<T>
+Rezultat.Maybe<T>.ToResult<TError>(TError error) -> Rezultat.Result<T, TError>
+Rezultat.Maybe<T>.ToResultElse<TError>(System.Func<TError>! errorFactory) -> Rezultat.Result<T, TError>
+Rezultat.Maybe<T>.TryGetValue(out T value) -> bool
+Rezultat.Maybe<T>.ValueOr(T fallback) -> T
+Rezultat.Maybe<T>.ValueOrElse(System.Func<T>! fallback) -> T
+Rezultat.Maybe<T>.Zip<TOther, TResult>(Rezultat.Maybe<TOther> other, System.Func<T, TOther, TResult>! selector) -> Rezultat.Maybe<TResult>
+Rezultat.MaybeExtensions
+Rezultat.Presence<T>
+Rezultat.Presence<T>.AndThen<TResult>(System.Func<T, Rezultat.Presence<TResult>>! next) -> Rezultat.Presence<TResult>
+Rezultat.Presence<T>.Equals(Rezultat.Presence<T> other) -> bool
+Rezultat.Presence<T>.FilterToMissing(System.Func<T, bool>! predicate) -> Rezultat.Presence<T>
+Rezultat.Presence<T>.FilterToNull(System.Func<T, bool>! predicate) -> Rezultat.Presence<T>
+Rezultat.Presence<T>.IsMissing.get -> bool
+Rezultat.Presence<T>.IsNull.get -> bool
+Rezultat.Presence<T>.IsValue.get -> bool
+Rezultat.Presence<T>.Map<TResult>(System.Func<T, TResult>! selector) -> Rezultat.Presence<TResult>
+Rezultat.Presence<T>.Match<TResult>(System.Func<T, TResult>! onValue, System.Func<TResult>! onNull, System.Func<TResult>! onMissing) -> TResult
+Rezultat.Presence<T>.Presence() -> void
+Rezultat.Presence<T>.TryGetValue(out T value) -> bool
+Rezultat.PresenceExtensions
+Rezultat.Result<T, TError>
+Rezultat.Result<T, TError>.AndThen<TResult>(System.Func<T, Rezultat.Result<TResult, TError>>! next) -> Rezultat.Result<TResult, TError>
+Rezultat.Result<T, TError>.Ensure(System.Func<T, bool>! predicate, System.Func<T, TError>! errorFactory) -> Rezultat.Result<T, TError>
+Rezultat.Result<T, TError>.Equals(Rezultat.Result<T, TError> other) -> bool
+Rezultat.Result<T, TError>.Inspect(System.Action<T>! action) -> Rezultat.Result<T, TError>
+Rezultat.Result<T, TError>.InspectError(System.Action<TError>! action) -> Rezultat.Result<T, TError>
+Rezultat.Result<T, TError>.IsInitialized.get -> bool
+Rezultat.Result<T, TError>.IsSuccess.get -> bool
+Rezultat.Result<T, TError>.Map<TResult>(System.Func<T, TResult>! selector) -> Rezultat.Result<TResult, TError>
+Rezultat.Result<T, TError>.MapError<TNewError, TState>(TState state, System.Func<TError, TState, TNewError>! selector) -> Rezultat.Result<T, TNewError>
+Rezultat.Result<T, TError>.MapError<TNewError>(System.Func<TError, TNewError>! selector) -> Rezultat.Result<T, TNewError>
+Rezultat.Result<T, TError>.Match<TResult>(System.Func<T, TResult>! onSuccess, System.Func<TError, TResult>! onError) -> TResult
+Rezultat.Result<T, TError>.OrElse<TNewError>(System.Func<TError, Rezultat.Result<T, TNewError>>! fallback) -> Rezultat.Result<T, TNewError>
+Rezultat.Result<T, TError>.Result() -> void
+Rezultat.Result<T, TError>.TryGetValue(out T value, out TError error) -> bool
+Rezultat.Result<T, TError>.Zip<TOther, TResult>(Rezultat.Result<TOther, TError> other, System.Func<T, TOther, TResult>! selector) -> Rezultat.Result<TResult, TError>
+Rezultat.ResultExtensions
+Rezultat.Unit
+Rezultat.Unit.Equals(Rezultat.Unit other) -> bool
+Rezultat.Unit.Unit() -> void
+Rezultat.Validation<T, TIssue>
+Rezultat.Validation<T, TIssue>.AndThen<TResult>(System.Func<T, Rezultat.Validation<TResult, TIssue>>! next) -> Rezultat.Validation<TResult, TIssue>
+Rezultat.Validation<T, TIssue>.Ensure(System.Func<T, bool>! predicate, System.Func<T, TIssue>! issueFactory) -> Rezultat.Validation<T, TIssue>
+Rezultat.Validation<T, TIssue>.Equals(Rezultat.Validation<T, TIssue> other) -> bool
+Rezultat.Validation<T, TIssue>.IsInitialized.get -> bool
+Rezultat.Validation<T, TIssue>.IsValid.get -> bool
+Rezultat.Validation<T, TIssue>.Map<TResult>(System.Func<T, TResult>! selector) -> Rezultat.Validation<TResult, TIssue>
+Rezultat.Validation<T, TIssue>.MapIssues<TNewIssue>(System.Func<TIssue, TNewIssue>! selector) -> Rezultat.Validation<T, TNewIssue>
+Rezultat.Validation<T, TIssue>.Match<TResult>(System.Func<T, TResult>! onValid, System.Func<System.Collections.Immutable.ImmutableArray<TIssue>, TResult>! onInvalid) -> TResult
+Rezultat.Validation<T, TIssue>.OrElse<TNewIssue>(System.Func<System.Collections.Immutable.ImmutableArray<TIssue>, Rezultat.Validation<T, TNewIssue>>! fallback) -> Rezultat.Validation<T, TNewIssue>
+Rezultat.Validation<T, TIssue>.TryGetValue(out T value, out System.Collections.Immutable.ImmutableArray<TIssue> issues) -> bool
+Rezultat.Validation<T, TIssue>.Validation() -> void
+Rezultat.Validation<T, TIssue>.Zip<TB, TC, TD, TResult>(Rezultat.Validation<TB, TIssue> b, Rezultat.Validation<TC, TIssue> c, Rezultat.Validation<TD, TIssue> d, System.Func<T, TB, TC, TD, TResult>! selector) -> Rezultat.Validation<TResult, TIssue>
+Rezultat.Validation<T, TIssue>.Zip<TB, TC, TResult>(Rezultat.Validation<TB, TIssue> b, Rezultat.Validation<TC, TIssue> c, System.Func<T, TB, TC, TResult>! selector) -> Rezultat.Validation<TResult, TIssue>
+Rezultat.Validation<T, TIssue>.Zip<TOther, TResult>(Rezultat.Validation<TOther, TIssue> other, System.Func<T, TOther, TResult>! selector) -> Rezultat.Validation<TResult, TIssue>
+Rezultat.ValidationExtensions
+static Rezultat.Collections.MaybeCollectionExtensions.AtMostOne<T, TError>(this System.Collections.Generic.IEnumerable<T>! source, System.Func<TError>! errorFactory) -> Rezultat.Result<Rezultat.Maybe<T>, TError>
+static Rezultat.Collections.MaybeCollectionExtensions.Choose<TSource, TResult>(this System.Collections.Generic.IEnumerable<TSource>! source, System.Func<TSource, Rezultat.Maybe<TResult>>! selector) -> System.Collections.Generic.IEnumerable<TResult>!
+static Rezultat.Collections.MaybeCollectionExtensions.ElementAtOrNone<T>(this System.Collections.Generic.IEnumerable<T>! source, int index) -> Rezultat.Maybe<T>
+static Rezultat.Collections.MaybeCollectionExtensions.FirstOrNone<T>(this System.Collections.Generic.IEnumerable<T>! source) -> Rezultat.Maybe<T>
+static Rezultat.Collections.MaybeCollectionExtensions.FirstOrNone<T>(this System.Collections.Generic.IEnumerable<T>! source, System.Func<T, bool>! predicate) -> Rezultat.Maybe<T>
+static Rezultat.Collections.MaybeCollectionExtensions.GetOrNone<TKey, TValue>(this System.Collections.Generic.IDictionary<TKey, TValue>! source, TKey key) -> Rezultat.Maybe<TValue>
+static Rezultat.Collections.MaybeCollectionExtensions.GetOrNone<TKey, TValue>(this System.Collections.Generic.IReadOnlyDictionary<TKey, TValue>! source, TKey key) -> Rezultat.Maybe<TValue>
+static Rezultat.Collections.MaybeCollectionExtensions.LastOrNone<T>(this System.Collections.Generic.IEnumerable<T>! source) -> Rezultat.Maybe<T>
+static Rezultat.Collections.MaybeCollectionExtensions.LastOrNone<T>(this System.Collections.Generic.IEnumerable<T>! source, System.Func<T, bool>! predicate) -> Rezultat.Maybe<T>
+static Rezultat.Collections.MaybeCollectionExtensions.Sequence<T>(this System.Collections.Generic.IEnumerable<Rezultat.Maybe<T>>! source) -> Rezultat.Maybe<T[]!>
+static Rezultat.Collections.MaybeCollectionExtensions.SingleOrNone<T>(this System.Collections.Generic.IEnumerable<T>! source) -> Rezultat.Maybe<T>
+static Rezultat.Collections.MaybeCollectionExtensions.SingleOrNone<T>(this System.Collections.Generic.IEnumerable<T>! source, System.Func<T, bool>! predicate) -> Rezultat.Maybe<T>
+static Rezultat.Collections.MaybeCollectionExtensions.Traverse<TSource, TResult>(this System.Collections.Generic.IEnumerable<TSource>! source, System.Func<TSource, Rezultat.Maybe<TResult>>! selector) -> Rezultat.Maybe<TResult[]!>
+static Rezultat.Collections.ResultCollectionExtensions.Sequence<T, TError>(this System.Collections.Generic.IEnumerable<Rezultat.Result<T, TError>>! source) -> Rezultat.Result<T[]!, TError>
+static Rezultat.Collections.ResultCollectionExtensions.Traverse<TSource, TResult, TError>(this System.Collections.Generic.IEnumerable<TSource>! source, System.Func<TSource, Rezultat.Result<TResult, TError>>! selector) -> Rezultat.Result<TResult[]!, TError>
+static Rezultat.Collections.ValidationCollectionExtensions.Sequence<T, TIssue>(this System.Collections.Generic.IEnumerable<Rezultat.Validation<T, TIssue>>! source) -> Rezultat.Validation<T[]!, TIssue>
+static Rezultat.Collections.ValidationCollectionExtensions.Traverse<TSource, TResult, TIssue>(this System.Collections.Generic.IEnumerable<TSource>! source, System.Func<TSource, Rezultat.Validation<TResult, TIssue>>! selector) -> Rezultat.Validation<TResult[]!, TIssue>
+static Rezultat.Collections.ValidationCollectionExtensions.ValidateAll<T, TIssue>(this System.Collections.Generic.IEnumerable<Rezultat.Validation<T, TIssue>>! source) -> Rezultat.Validation<Rezultat.Unit, TIssue>
+static Rezultat.Collections.ValidationCollectionExtensions.ValidateAll<TSource, TValue, TIssue>(this System.Collections.Generic.IEnumerable<TSource>! source, System.Func<TSource, Rezultat.Validation<TValue, TIssue>>! selector) -> Rezultat.Validation<Rezultat.Unit, TIssue>
+static Rezultat.Linq.MaybeQueryExtensions.Select<T, TResult>(this Rezultat.Maybe<T> source, System.Func<T, TResult>! selector) -> Rezultat.Maybe<TResult>
+static Rezultat.Linq.MaybeQueryExtensions.SelectMany<T, TNext, TResult>(this Rezultat.Maybe<T> source, System.Func<T, Rezultat.Maybe<TNext>>! next, System.Func<T, TNext, TResult>! project) -> Rezultat.Maybe<TResult>
+static Rezultat.Linq.MaybeQueryExtensions.Where<T>(this Rezultat.Maybe<T> source, System.Func<T, bool>! predicate) -> Rezultat.Maybe<T>
+static Rezultat.Linq.ResultQueryExtensions.Select<T, TResult, TError>(this Rezultat.Result<T, TError> source, System.Func<T, TResult>! selector) -> Rezultat.Result<TResult, TError>
+static Rezultat.Linq.ResultQueryExtensions.SelectMany<T, TNext, TResult, TError>(this Rezultat.Result<T, TError> source, System.Func<T, Rezultat.Result<TNext, TError>>! next, System.Func<T, TNext, TResult>! project) -> Rezultat.Result<TResult, TError>
+static Rezultat.Maybe.FromNullable<T>(T? value) -> Rezultat.Maybe<T!>
+static Rezultat.Maybe.FromNullable<T>(T? value) -> Rezultat.Maybe<T>
+static Rezultat.Maybe<T>.None.get -> Rezultat.Maybe<T>
+static Rezultat.Maybe<T>.operator !=(Rezultat.Maybe<T> left, Rezultat.Maybe<T> right) -> bool
+static Rezultat.Maybe<T>.operator ==(Rezultat.Maybe<T> left, Rezultat.Maybe<T> right) -> bool
+static Rezultat.Maybe<T>.Some(T value) -> Rezultat.Maybe<T>
+static Rezultat.MaybeExtensions.Traverse<T, TResult, TError>(this Rezultat.Maybe<T> source, System.Func<T, Rezultat.Result<TResult, TError>>! selector) -> Rezultat.Result<Rezultat.Maybe<TResult>, TError>
+static Rezultat.Presence<T>.Missing.get -> Rezultat.Presence<T>
+static Rezultat.Presence<T>.Null.get -> Rezultat.Presence<T>
+static Rezultat.Presence<T>.operator !=(Rezultat.Presence<T> left, Rezultat.Presence<T> right) -> bool
+static Rezultat.Presence<T>.operator ==(Rezultat.Presence<T> left, Rezultat.Presence<T> right) -> bool
+static Rezultat.Presence<T>.Value(T value) -> Rezultat.Presence<T>
+static Rezultat.PresenceExtensions.Traverse<T, TResult, TError>(this Rezultat.Presence<T> source, System.Func<T, Rezultat.Result<TResult, TError>>! selector) -> Rezultat.Result<Rezultat.Presence<TResult>, TError>
+static Rezultat.Result<T, TError>.Error(TError error) -> Rezultat.Result<T, TError>
+static Rezultat.Result<T, TError>.Ok(T value) -> Rezultat.Result<T, TError>
+static Rezultat.Result<T, TError>.operator !=(Rezultat.Result<T, TError> left, Rezultat.Result<T, TError> right) -> bool
+static Rezultat.Result<T, TError>.operator ==(Rezultat.Result<T, TError> left, Rezultat.Result<T, TError> right) -> bool
+static Rezultat.ResultExtensions.ToMaybe<T, TError>(this Rezultat.Result<T, TError> result) -> Rezultat.Maybe<T>
+static Rezultat.ResultExtensions.ToValidation<T, TError>(this Rezultat.Result<T, TError> source) -> Rezultat.Validation<T, TError>
+static Rezultat.Unit.operator !=(Rezultat.Unit left, Rezultat.Unit right) -> bool
+static Rezultat.Unit.operator ==(Rezultat.Unit left, Rezultat.Unit right) -> bool
+static Rezultat.Unit.Value.get -> Rezultat.Unit
+static Rezultat.Validation<T, TIssue>.Invalid(TIssue issue) -> Rezultat.Validation<T, TIssue>
+static Rezultat.Validation<T, TIssue>.InvalidMany(System.Collections.Immutable.ImmutableArray<TIssue> issues) -> Rezultat.Validation<T, TIssue>
+static Rezultat.Validation<T, TIssue>.operator !=(Rezultat.Validation<T, TIssue> left, Rezultat.Validation<T, TIssue> right) -> bool
+static Rezultat.Validation<T, TIssue>.operator ==(Rezultat.Validation<T, TIssue> left, Rezultat.Validation<T, TIssue> right) -> bool
+static Rezultat.Validation<T, TIssue>.Valid(T value) -> Rezultat.Validation<T, TIssue>
+static Rezultat.ValidationExtensions.ToResult<T, TIssue>(this Rezultat.Validation<T, TIssue> source) -> Rezultat.Result<T, System.Collections.Immutable.ImmutableArray<TIssue>>

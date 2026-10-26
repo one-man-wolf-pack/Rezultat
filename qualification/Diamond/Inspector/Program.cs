@@ -6,9 +6,6 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Xml.Linq;
 
-// S6966/S3903: a synchronous top-level program; nothing awaits here, and its file-local helper types share the
-// global namespace of the generated Program class.
-#pragma warning disable S6966, S3903
 
 if (args.Length != 11) {
     Console.Error.WriteLine("usage: DiamondInspector <case> <packages-folder> <library-feed> <app-bin> <assets-dir> "
@@ -19,10 +16,10 @@ if (args.Length != 11) {
 var inspection = new Inspection(args[0], Path.GetFullPath(args[1]), Path.GetFullPath(args[2]));
 var candidate = new Core(args[5], Path.GetFullPath(args[6]), args[7]);
 var inventoryCore = new Core(args[8], Path.GetFullPath(args[9]), args[10]);
-var assets = Path.GetFullPath(args[4]);
+string assets = Path.GetFullPath(args[4]);
 
-var inventoryDll = inspection.Library(Inspection.InventoryId, inventoryCore, Path.Combine(assets, "DiamondInventory.json"));
-var ordersDll = inspection.Library(Inspection.OrdersId, candidate, Path.Combine(assets, "DiamondOrders.json"));
+byte[] inventoryDll = inspection.Library(Inspection.InventoryId, inventoryCore, Path.Combine(assets, "DiamondInventory.json"));
+byte[] ordersDll = inspection.Library(Inspection.OrdersId, candidate, Path.Combine(assets, "DiamondOrders.json"));
 inspection.App(Path.Combine(assets, "DiamondApp.json"), Path.GetFullPath(args[3]), candidate, inventoryCore, inventoryDll, ordersDll);
 return inspection.Complete();
 
@@ -38,7 +35,7 @@ internal sealed class Inspection(string label, string packagesFolder, string lib
     private int _failures;
 
     public byte[] Library(string id, Core core, string assetsPath) {
-        var name = id.Split('.')[^1];
+        string name = id.Split('.')[^1];
         using var assets = JsonDocument.Parse(File.ReadAllBytes(assetsPath));
         var root = assets.RootElement;
         Check($"{name}: restore input is the minimum range of Rezultat {core.Version}",
@@ -46,7 +43,7 @@ internal sealed class Inspection(string label, string packagesFolder, string lib
         CheckResolvedCore(name, root, core);
         CheckNoRestoreLogs(name, root);
 
-        var nupkgPath = Path.Combine(libraryFeed, $"{id}.{LibraryVersion}.nupkg");
+        string nupkgPath = Path.Combine(libraryFeed, $"{id}.{LibraryVersion}.nupkg");
         Report($"{name} nupkg sha256", Sha256(File.ReadAllBytes(nupkgPath)));
         using var package = ZipFile.OpenRead(nupkgPath);
         var nuspec = XDocument.Load(package.GetEntry($"{id}.nuspec")!.Open());
@@ -57,7 +54,7 @@ internal sealed class Inspection(string label, string packagesFolder, string lib
             groups.Length == 1 && groups[0].Attribute("targetFramework")?.Value == Framework
             && dependencies.Length == 1 && dependencies[0].Attribute("id")?.Value == CoreId && dependencies[0].Attribute("version")?.Value == core.Version);
 
-        var dll = ReadAll(package.GetEntry($"lib/{Framework}/{id}.dll")!);
+        byte[] dll = ReadAll(package.GetEntry($"lib/{Framework}/{id}.dll")!);
         var reference = CoreReference(dll);
         Report($"{name} dll", $"sha256 {Sha256(dll)}, mvid {Mvid(dll)}, references Rezultat {reference}");
         Check($"{name}: dll was compiled against Rezultat {core.Version}", reference == AssemblyVersion(core.Version), reference?.ToString());
@@ -68,14 +65,13 @@ internal sealed class Inspection(string label, string packagesFolder, string lib
         using var assets = JsonDocument.Parse(File.ReadAllBytes(assetsPath));
         var root = assets.RootElement;
         Check($"App: exact Rezultat {candidate.Version} reference", DirectDependency(root, CoreId) == $"[{candidate.Version}, {candidate.Version}]", DirectDependency(root, CoreId));
-        foreach (var id in new[] { InventoryId, OrdersId }) {
+        foreach (string? id in new[] { InventoryId, OrdersId }) {
             Check($"App: exact {id} {LibraryVersion} reference", DirectDependency(root, id) == $"[{LibraryVersion}, {LibraryVersion}]", DirectDependency(root, id));
         }
 
-        var libraries = root.GetProperty("libraries").EnumerateObject()
+        string[] libraries = [.. root.GetProperty("libraries").EnumerateObject()
             .Select(library => $"{library.Name} ({library.Value.GetProperty("type").GetString()})")
-            .Order(StringComparer.Ordinal)
-            .ToArray();
+            .Order(StringComparer.Ordinal)];
         Report("App libraries", string.Join(", ", libraries));
         string[] expected =
         [
@@ -97,14 +93,14 @@ internal sealed class Inspection(string label, string packagesFolder, string lib
         Check($"App: Orders keeps its declared minimum {candidate.Version}", Declared(OrdersId) == candidate.Version, Declared(OrdersId));
 
         foreach (var (id, dll) in new[] { (InventoryId, inventoryDll), (OrdersId, ordersDll) }) {
-            var installed = Path.Combine(packagesFolder, id.ToLowerInvariant(), LibraryVersion);
+            string installed = Path.Combine(packagesFolder, id.ToLowerInvariant(), LibraryVersion);
             Check($"App: installed {id} dll is the packed binary", SameBytes(Path.Combine(installed, "lib", Framework, $"{id}.dll"), dll));
             Check($"App: {id} restored from the fixture feed", RestoreSource(installed) == libraryFeed, RestoreSource(installed));
             Check($"App: output {id}.dll is the packed binary", SameBytes(Path.Combine(appBin, $"{id}.dll"), dll));
         }
 
         using var corePackage = ZipFile.OpenRead(Path.Combine(candidate.Feed, $"{CoreId}.{candidate.Version}.nupkg"));
-        var coreDll = ReadAll(corePackage.GetEntry($"lib/{Framework}/{CoreId}.dll")!);
+        byte[] coreDll = ReadAll(corePackage.GetEntry($"lib/{Framework}/{CoreId}.dll")!);
         Check($"App: output Rezultat.dll is the {candidate.Version} package dll", SameBytes(Path.Combine(appBin, $"{CoreId}.dll"), coreDll));
     }
 
@@ -114,28 +110,27 @@ internal sealed class Inspection(string label, string packagesFolder, string lib
     }
 
     private void CheckResolvedCore(string name, JsonElement root, Core core) {
-        var resolved = root.GetProperty("libraries").EnumerateObject()
+        string[] resolved = [.. root.GetProperty("libraries").EnumerateObject()
             .Where(library => library.Name.Split('/')[0].Equals(CoreId, StringComparison.OrdinalIgnoreCase))
-            .Select(library => library.Name)
-            .ToArray();
+            .Select(library => library.Name)];
         Check($"{name}: resolves only Rezultat {core.Version}", resolved.SequenceEqual([$"{CoreId}/{core.Version}"]), string.Join(", ", resolved));
-        var compile = root.GetProperty("targets").GetProperty(Framework).TryGetProperty($"{CoreId}/{core.Version}", out var entry)
-            && entry.TryGetProperty("compile", out var value) ? value.EnumerateObject().Select(item => item.Name).ToArray() : [];
+        string[] compile = root.GetProperty("targets").GetProperty(Framework).TryGetProperty($"{CoreId}/{core.Version}", out var entry)
+            && entry.TryGetProperty("compile", out var value) ? [.. value.EnumerateObject().Select(item => item.Name)] : [];
         Check($"{name}: Rezultat compile asset is lib/{Framework}/Rezultat.dll", compile.SequenceEqual([$"lib/{Framework}/{CoreId}.dll"]), string.Join(", ", compile));
 
-        var folders = root.GetProperty("packageFolders").EnumerateObject().Select(folder => Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder.Name))).ToArray();
+        string[] folders = [.. root.GetProperty("packageFolders").EnumerateObject().Select(folder => Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder.Name)))];
         Check($"{name}: isolated case package folder only", folders.SequenceEqual([Path.TrimEndingDirectorySeparator(packagesFolder)]), string.Join(", ", folders));
 
-        var installed = Path.Combine(packagesFolder, CoreId.ToLowerInvariant(), core.Version);
-        var archive = Path.Combine(installed, $"{CoreId.ToLowerInvariant()}.{core.Version}.nupkg");
-        var hash = File.Exists(archive) ? Sha256(File.ReadAllBytes(archive)) : "<missing>";
+        string installed = Path.Combine(packagesFolder, CoreId.ToLowerInvariant(), core.Version);
+        string archive = Path.Combine(installed, $"{CoreId.ToLowerInvariant()}.{core.Version}.nupkg");
+        string hash = File.Exists(archive) ? Sha256(File.ReadAllBytes(archive)) : "<missing>";
         Report($"{name} installed Rezultat {core.Version}", $"sha256 {hash}, source {RestoreSource(installed)}");
         Check($"{name}: installed Rezultat {core.Version} is the chosen archive", hash == core.Sha256, hash);
         Check($"{name}: Rezultat {core.Version} restored from its chosen feed", RestoreSource(installed) == core.Feed, RestoreSource(installed));
     }
 
     private void CheckNoRestoreLogs(string name, JsonElement root) {
-        var logs = root.TryGetProperty("logs", out var value) ? value.EnumerateArray().Select(log => log.GetRawText()).ToArray() : [];
+        string[] logs = root.TryGetProperty("logs", out var value) ? [.. value.EnumerateArray().Select(log => log.GetRawText())] : [];
         Check($"{name}: restore reported no warnings (NU1605/NU1608 included)", logs.Length == 0, string.Join(", ", logs));
     }
 
@@ -144,7 +139,7 @@ internal sealed class Inspection(string label, string packagesFolder, string lib
             .TryGetProperty(id, out var dependency) ? dependency.GetProperty("version").GetString() : null;
 
     private static string? RestoreSource(string installed) {
-        var metadata = Path.Combine(installed, ".nupkg.metadata");
+        string metadata = Path.Combine(installed, ".nupkg.metadata");
         if (!File.Exists(metadata)) {
             return null;
         }

@@ -50,10 +50,7 @@ internal sealed class TrackedSequence<T>(params T[] items) : IEnumerable<T> {
         public void Dispose() {
             owner.Disposals++;
             if (owner.DisposeException is not null) {
-                // S3877: an opt-in Dispose fault whose propagation is under test.
-#pragma warning disable S3877
                 throw owner.DisposeException;
-#pragma warning restore S3877
             }
         }
     }

@@ -7,7 +7,7 @@ var checks = new Checks();
 
 var okNull = Result<string, string>.Ok(null);
 checks.That("null success is initialized", okNull.IsInitialized && okNull.IsSuccess);
-checks.That("null success outputs", okNull.TryGetValue(out var value, out var error) && value == null && error == null);
+checks.That("null success outputs", okNull.TryGetValue(out string value, out string error) && value == null && error == null);
 checks.Text("null success text", "Result.Ok(null)", okNull.ToString());
 
 var errorNull = Result<string, string>.Error(null);
@@ -23,11 +23,11 @@ checks.Throws<InvalidOperationException>("default Match with null handlers", () 
 checks.Throws<ArgumentNullException>("null success handler", () => okNull.Match(null, _ => 0));
 checks.Throws<ArgumentNullException>("null error handler", () => okNull.Match(_ => 0, null));
 
-checks.That("null payload map", okNull.Map(v => v == null ? "was null" : v) == Result<string, string>.Ok("was null"));
+checks.That("null payload map", okNull.Map(v => v ?? "was null") == Result<string, string>.Ok("was null"));
 checks.That("null error map error", errorNull.MapError(e => e == null) == Result<string, bool>.Error(true));
 checks.That("null payload zip", okNull.Zip(okNull, (a, b) => a == null && b == null) == Result<bool, string>.Ok(true));
 var traversed = new string[] { null, "a" }.Traverse(v => Result<string, string>.Ok(v));
-checks.That("null payload traverse", traversed.TryGetValue(out var items, out _) && items.Length == 2 && items[0] == null);
+checks.That("null payload traverse", traversed.TryGetValue(out string[] items, out _) && items.Length == 2 && items[0] == null);
 checks.That("null error from ensure factory", okNull.Ensure(v => v != null, v => null) == Result<string, string>.Error(null));
 checks.That("null error into or else", errorNull.OrElse(e => Result<string, int>.Ok(e)) == Result<string, int>.Ok(null));
 checks.Throws<InvalidOperationException>("default map with null selector", () => default(Result<string, string>).Map<int>(null));
@@ -36,7 +36,7 @@ checks.Throws<ArgumentNullException>("null traverse source", () => ((string[])nu
 
 var someNull = Maybe<string>.Some(null);
 checks.That("maybe some null is present", someNull.IsSome && someNull != Maybe<string>.None);
-checks.That("maybe some null output", someNull.TryGetValue(out var maybeValue) && maybeValue == null);
+checks.That("maybe some null output", someNull.TryGetValue(out string maybeValue) && maybeValue == null);
 checks.Text("maybe some null text", "Maybe.Some(null)", someNull.ToString());
 checks.That("maybe from null is none", !Maybe.FromNullable<string>(null).IsSome && Maybe.FromNullable((string)null) == default);
 checks.That("maybe from empty nullable is none", !Maybe.FromNullable((int?)null).IsSome);
@@ -48,7 +48,7 @@ checks.Throws<ArgumentNullException>("maybe null on some handler for none", () =
 checks.Throws<ArgumentNullException>("maybe null on none handler for some", () => someNull.Match(_ => 0, null));
 checks.Throws<ArgumentNullException>("maybe null fallback factory for some", () => someNull.ValueOrElse(null));
 
-checks.That("maybe map receives and keeps null", someNull.Map(v => v == null ? null : v) == Maybe<string>.Some(null));
+checks.That("maybe map receives and keeps null", someNull.Map(v => v ?? null) == Maybe<string>.Some(null));
 checks.That("maybe and then receives null", someNull.AndThen(v => Maybe<bool>.Some(v == null)) == Maybe<bool>.Some(true));
 checks.That("maybe or else keeps some null", someNull.OrElse(() => Maybe<string>.Some("x")) == someNull);
 checks.That("maybe filter keeps some null", someNull.Filter(v => v == null) == someNull);
@@ -63,7 +63,7 @@ checks.That("get or none null value", new Dictionary<string, string> { ["k"] = n
 checks.Throws<ArgumentNullException>("first or none null source", () => ((string[])null).FirstOrNone());
 checks.Throws<ArgumentNullException>("get or none null source", () => ((Dictionary<string, string>)null).GetOrNone("k"));
 var nullItems = new string[] { null, "a" }.Traverse(v => Maybe<string>.Some(v));
-checks.That("maybe traverse null payload", nullItems.TryGetValue(out var collectedItems) && collectedItems.Length == 2 && collectedItems[0] == null);
+checks.That("maybe traverse null payload", nullItems.TryGetValue(out string[] collectedItems) && collectedItems.Length == 2 && collectedItems[0] == null);
 checks.That("choose null payload", new string[] { null }.Choose(v => Maybe<string>.Some(v)).Single() == null);
 checks.Throws<ArgumentNullException>("choose null selector", () => Array.Empty<string>().Choose<string, string>(null));
 checks.That("to result null payload and error", someNull.ToResult<string>(null) == Result<string, string>.Ok(null)
@@ -78,17 +78,17 @@ checks.Throws<ArgumentNullException>("maybe traverse null selector", () => Maybe
 
 checks.Throws<ArgumentNullException>("presence value null", () => Presence<string>.Value(null));
 checks.Throws<ArgumentNullException>("presence value empty nullable", () => Presence<int?>.Value(null));
-checks.That("presence value non-empty nullable keeps type", Presence<int?>.Value(1).TryGetValue(out var nullableNumber) && nullableNumber.HasValue);
+checks.That("presence value non-empty nullable keeps type", Presence<int?>.Value(1).TryGetValue(out int? nullableNumber) && nullableNumber.HasValue);
 checks.Throws<InvalidOperationException>("presence map null result", () => Presence<int>.Value(1).Map(_ => (string)null));
 checks.Throws<InvalidOperationException>("presence map empty nullable result", () => Presence<int>.Value(1).Map(_ => (int?)null));
 checks.That("presence map skips selector on null", Presence<string>.Null.Map<string>(_ => null).IsNull);
 checks.Throws<ArgumentNullException>("presence map null selector", () => Presence<string>.Missing.Map<string>(null));
 checks.Throws<ArgumentNullException>("presence match null handler", () => Presence<string>.Missing.Match(null, () => 0, () => 1));
-checks.That("presence inactive output", !Presence<string>.Null.TryGetValue(out var inactivePresence) && inactivePresence == null);
+checks.That("presence inactive output", !Presence<string>.Null.TryGetValue(out string inactivePresence) && inactivePresence == null);
 checks.Text("presence null text", "Presence.Null", Presence<string>.Null.ToString());
 
 var validNull = Validation<string, string>.Valid(null);
-checks.That("validation valid null", validNull.IsValid && validNull.TryGetValue(out var validNullValue, out var validNullIssues) && validNullValue == null && validNullIssues.IsEmpty);
+checks.That("validation valid null", validNull.IsValid && validNull.TryGetValue(out string validNullValue, out var validNullIssues) && validNullValue == null && validNullIssues.IsEmpty);
 var invalidNull = Validation<string, string>.Invalid(null);
 checks.That("validation invalid null", !invalidNull.TryGetValue(out _, out var invalidNullIssues) && invalidNullIssues.Length == 1 && invalidNullIssues[0] == null);
 checks.Text("validation null texts", "Validation.Valid(null) Validation.Invalid([null])", validNull + " " + invalidNull);
@@ -116,7 +116,7 @@ checks.That("validation map null payload", validNull.Map(v => v == null) == Vali
 checks.That("validation ensure null issue", validNull.Ensure(v => v != null, _ => null) == Validation<string, string>.Invalid(null));
 
 var sequencedNulls = new[] { Result<string, string>.Ok(null), Result<string, string>.Ok("a") }.Sequence();
-checks.That("null payload sequence", sequencedNulls.TryGetValue(out var sequenced, out _) && sequenced.Length == 2 && sequenced[0] == null);
+checks.That("null payload sequence", sequencedNulls.TryGetValue(out string[] sequenced, out _) && sequenced.Length == 2 && sequenced[0] == null);
 checks.That("null error sequence", new[] { Result<string, string>.Error(null) }.Sequence() == Result<string[], string>.Error(null));
 checks.That("null payload maybe sequence", new[] { Maybe<string>.Some(null) }.Sequence().Map(v => v[0] == null) == Maybe<bool>.Some(true));
 checks.That("null issue validate all", new[] { Validation<string, string>.Valid(null), Validation<string, string>.Invalid(null) }.ValidateAll() == Validation<Unit, string>.Invalid(null));

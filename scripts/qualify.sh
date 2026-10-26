@@ -3,21 +3,15 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 artifacts="$root/artifacts"
-feed="$artifacts/package"
+feed="$artifacts/package/release"
 qualification="$artifacts/qualification"
 packages="$qualification/packages"
-linux_image="mcr.microsoft.com/dotnet/sdk:10.0.402-noble-aot"
 issued_feed="${REZULTAT_LOCAL_FEED:-$HOME/.local/share/nuget/rezultat}"
 # The mixed-version diamond must consume the archive that was actually issued as 0.8.0 (review/096). A repack or a
 # different file under the same version would compile the old library against other bytes and prove nothing.
 issued_core_version=0.8.0
 issued_core_sha256=4f2d6cdd7e84380515e559cdf42c2c14e8d9d357373b7d5e82e5c33389cc5469
 . "$root/scripts/release-record.sh"
-
-# Intentional consumer inputs under qualification/ keep their own layout: diagnostic corpus, compiler controls and
-# runner fixtures, whose sources and positions are the checked input (paths relative to qualification/).
-qualification_inputs=(CompilerControls AssertionCompilerControls AnalyzerConsumer AnalyzerLibrary AnalyzerDownstream
-    AnalyzerPackedConsumer AnalyzerCoreOnly AnalyzerWrapperHomonyms XunitV2Consumer XunitV3Consumer Shared/RunnerScenarios.cs)
 
 export DOTNET_NOLOGO=1 DOTNET_CLI_TELEMETRY_OPTOUT=1 TESTINGPLATFORM_TELEMETRY_OPTOUT=1
 
@@ -27,88 +21,29 @@ package_version() {
 
 usage() {
     cat <<'EOF'
-usage: scripts/qualify.sh <command> [args]
-  check                 non-mutating managed candidate check: format/style verification, strict Release build of the
-                        solution and every test module of the solution
-  test [project] [args...]
-                        run every test module of the solution, or one tests/<project> with its references; other
-                        arguments go to dotnet test (native filters such as --filter-class). Each module must run at
-                        least one test: an empty or all-skipped module fails
-  fmt                   apply whitespace formatting to the solution and owned qualification sources
-  fix [workspace] [dotnet-format-args...]
-                        apply code-style and analyzer fixes to the solution or the named project/solution, e.g.
-                        fix --diagnostics IDE0011
-  pack                  pack Rezultat, Rezultat.Testing.Xunit and Rezultat.Analyzers (Release) into artifacts/package
-  consumers             package consumers, compiler controls, root and packaged README examples, the packaged
-                        Shouldly, HTTP and Presence JSON recipes in isolated consumers, the reference diamond and
-                        package inspection
-  diamond               reference diamond: two separately packed fixture libraries exchange Result/Validation in an
-                        app, with both libraries on the candidate core and with one library compiled against the
-                        issued Rezultat 0.8.0 from the local feed (REZULTAT_LOCAL_FEED)
-  assertions            Rezultat.Testing.Xunit consumers, compiler controls, README examples, xUnit v2/v3 runner
-                        scenarios and package inspection
-  analyzers             Rezultat.Analyzers package: RZT0001 corpus in warning/error/none/warnings-as-errors modes,
-                        same-named Task/ValueTask wrappers, downstream, packed-library and core-only isolation,
-                        README examples and package inspection
-  alloc                 warmed Release allocation controls against the package
-  publish <rid>         rooted trimmed and Native AOT publication of the package consumer, then run both
-  all <rid>             check, pack, consumers, assertions, analyzers, alloc, publish
-  linux [command...]    run a command (default "all linux-arm64") in the native Linux ARM64/glibc container
-  release <commit> <package-id>...
-                        export the committed tree to artifacts/release/<full-commit>, pack it with its own
-                        "linux pack" and write the source record of each named package next to its archives
-  release-controls      release and publish controls in a disposable Git fixture (host Git and Docker)
+usage: scripts/qualify.sh <lane> [args]; normally reached through the root justfile (just --list)
+  pack | consumers | diamond | assertions | analyzers | alloc | publish <rid> | release <commit> <package-id>... |
+  release-controls
 EOF
 }
 
-# The build is strict through Directory.Build.props; --no-incremental keeps the check off outputs of an earlier build.
-check() {
-    dotnet format "$root/Rezultat.slnx" --verify-no-changes
-    dotnet format whitespace "$root/qualification" --folder --verify-no-changes --exclude "${qualification_inputs[@]}"
-    dotnet build "$root/Rezultat.slnx" -c Release --no-incremental
-    run_tests -c Release --no-build
-}
-
-# --minimum-expected-tests after the SDK "--" goes to every test module; before "--" it would be one global total
-# that also counts skipped tests.
-run_tests() {
-    local selection=(--solution "$root/Rezultat.slnx") separator=(--) arg
-    if [[ $# -gt 0 && -d "$root/tests/$1" ]]; then
-        selection=(--project "$root/tests/$1")
-        shift
-    fi
-    for arg in "$@"; do
-        [[ "$arg" == -- ]] && separator=()
-    done
-    dotnet test "${selection[@]}" "$@" ${separator[@]+"${separator[@]}"} --minimum-expected-tests 1
-}
-
-fmt() {
-    dotnet format whitespace "$root/Rezultat.slnx"
-    dotnet format whitespace "$root/qualification" --folder --exclude "${qualification_inputs[@]}"
-}
-
-fix() {
-    local workspace="$root/Rezultat.slnx"
-    if [[ $# -gt 0 && -e "$1" ]]; then
-        workspace="$1"
-        shift
-    fi
-    dotnet format style "$workspace" "$@"
-    dotnet format analyzers "$workspace" "$@"
-}
-
+# Restored in locked mode by the setup recipe; the archives land in the SDK package output.
 pack() {
     rm -rf "$feed"
-    dotnet pack "$root/src/Rezultat" -c Release -o "$feed" -warnaserror
-    dotnet pack "$root/src/Rezultat.Testing.Xunit" -c Release -o "$feed" -warnaserror
-    dotnet pack "$root/src/Rezultat.Analyzers" -c Release -o "$feed" -warnaserror
+    dotnet pack "$root/src/Rezultat" -c Release --no-restore
+    dotnet pack "$root/src/Rezultat.Testing.Xunit" -c Release --no-restore
+    dotnet pack "$root/src/Rezultat.Analyzers" -c Release --no-restore
 }
 
 reset_package_cache() {
     rm -rf "$packages/rezultat" "$packages/rezultat.testing.xunit" "$packages/rezultat.analyzers"
     RezultatPackageVersion="$(package_version)"
     export RezultatPackageVersion
+}
+
+# Support tools of the solution, restored in locked mode by the setup recipe.
+build_tool() {
+    dotnet build "$1" -c Release --no-restore
 }
 
 build_clean() {
@@ -202,15 +137,15 @@ consumers() {
     shouldly_recipe
     readme_recipe HttpReadmeRecipe httprecipe
     readme_recipe JsonReadmeRecipe jsonrecipe
-    build_clean "$root/qualification/PackageInspector"
+    build_tool "$root/qualification/PackageInspector"
     dotnet run --project "$root/qualification/PackageInspector" -c Release --no-build -- Rezultat \
         "$root" "$RezultatPackageVersion" "$feed/Rezultat.$RezultatPackageVersion.nupkg" \
         "$feed/Rezultat.$RezultatPackageVersion.snupkg" "$packages" \
-        "$qualification/obj/PackageConsumer/project.assets.json" \
-        "$qualification/obj/NullableDisabledConsumer/project.assets.json" \
-        "$qualification/obj/ShouldlyRecipeConsumer/project.assets.json" \
-        "$qualification/obj/HttpReadmeRecipe/project.assets.json" \
-        "$qualification/obj/JsonReadmeRecipe/project.assets.json"
+        "$artifacts/obj/PackageConsumer/project.assets.json" \
+        "$artifacts/obj/NullableDisabledConsumer/project.assets.json" \
+        "$artifacts/obj/ShouldlyRecipeConsumer/project.assets.json" \
+        "$artifacts/obj/HttpReadmeRecipe/project.assets.json" \
+        "$artifacts/obj/JsonReadmeRecipe/project.assets.json"
     diamond
 }
 
@@ -223,16 +158,16 @@ diamond_case() {
     restore=(-p:RestorePackagesPath="$out/packages")
     build_clean "$d/Inventory" "${restore[@]}" -p:RezultatPackageVersion="$inventory_core"
     dotnet_clean pack "$d/Inventory" --no-build -o "$library_feed" "${restore[@]}" -p:RezultatPackageVersion="$inventory_core"
-    cp "$qualification/obj/DiamondInventory/project.assets.json" "$out/assets/DiamondInventory.json"
+    cp "$artifacts/obj/DiamondInventory/project.assets.json" "$out/assets/DiamondInventory.json"
     build_clean "$d/Orders" "${restore[@]}"
     dotnet_clean pack "$d/Orders" --no-build -o "$library_feed" "${restore[@]}"
-    cp "$qualification/obj/DiamondOrders/project.assets.json" "$out/assets/DiamondOrders.json"
+    cp "$artifacts/obj/DiamondOrders/project.assets.json" "$out/assets/DiamondOrders.json"
     build_clean "$d/App" "${restore[@]}"
-    cp "$qualification/obj/DiamondApp/project.assets.json" "$out/assets/DiamondApp.json"
+    cp "$artifacts/obj/DiamondApp/project.assets.json" "$out/assets/DiamondApp.json"
     cp -R "$library_feed" "$out/feed"
     dotnet run --project "$d/App" -c Release --no-build -- "$RezultatPackageVersion.0" "$inventory_core.0"
     dotnet run --project "$d/Inspector" -c Release --no-build -- "$name" "$out/packages" "$library_feed" \
-        "$qualification/bin/DiamondApp/release" "$out/assets" \
+        "$artifacts/bin/DiamondApp/release" "$out/assets" \
         "$RezultatPackageVersion" "$feed" "$candidate_sha" "$inventory_core" "$inventory_feed" "$inventory_sha"
 }
 
@@ -246,7 +181,7 @@ diamond() {
     rm -rf "$issued"
     mkdir -p "$issued"
     cp "$archive" "$issued/"
-    build_clean "$root/qualification/Diamond/Inspector"
+    build_tool "$root/qualification/Diamond/Inspector"
     candidate_sha="$(sha256sum "$feed/Rezultat.$RezultatPackageVersion.nupkg" | cut -d' ' -f1)"
     diamond_case same-version "$candidate_sha" "$RezultatPackageVersion" "$feed" "$candidate_sha"
     diamond_case mixed-version "$candidate_sha" "$issued_core_version" "$issued" "$issued_core_sha256"
@@ -263,13 +198,13 @@ xunit_v3_pair() {
         --report-xunit-xml --report-xunit-xml-filename results.xml >"$report.log" 2>&1 || status=$?
     [[ $status -eq 2 ]] || { cat "$report.log"; echo "FAIL xunit.v3 $version: dotnet test exit $status, expected 2 (test failures)"; return 1; }
     status=0
-    "$qualification/bin/XunitV3Consumer/release/XunitV3Consumer" -reporter json -noAutoReporters -noColor \
+    "$artifacts/bin/XunitV3Consumer/release/XunitV3Consumer" -reporter json -noAutoReporters -noColor \
         >"$report/native.log" 2>&1 || status=$?
     [[ $status -eq 1 ]] || { cat "$report/native.log"; echo "FAIL xunit.v3 $version: native runner exit $status, expected 1"; return 1; }
     dotnet run --project "$root/qualification/RunnerReports" -c Release --no-build -- \
         v3 "$version" "$report/results.xml" "$report/native.log"
     mkdir -p "$qualification/assets/XunitV3Consumer-$version"
-    cp "$qualification/obj/XunitV3Consumer/project.assets.json" "$qualification/assets/XunitV3Consumer-$version/"
+    cp "$artifacts/obj/XunitV3Consumer/project.assets.json" "$qualification/assets/XunitV3Consumer-$version/"
 }
 
 xunit_v2_pair() {
@@ -286,7 +221,7 @@ xunit_v2_pair() {
     dotnet run --project "$root/qualification/RunnerReports" -c Release --no-build -- \
         v2 "xunit 2.9.3/VSTest" "$report/results.trx"
     mkdir -p "$qualification/assets/XunitV2Consumer"
-    cp "$qualification/obj/XunitV2Consumer/project.assets.json" "$qualification/assets/XunitV2Consumer/"
+    cp "$artifacts/obj/XunitV2Consumer/project.assets.json" "$qualification/assets/XunitV2Consumer/"
 }
 
 readme_facts() {
@@ -331,16 +266,16 @@ assertions() {
     dotnet run --project "$root/qualification/AssertionNullableDisabledConsumer" -c Release --no-build
     compiler_controls AssertionCompilerControls
     assertion_readme_examples
-    build_clean "$root/qualification/RunnerReports"
+    build_tool "$root/qualification/RunnerReports"
     xunit_v2_pair
     xunit_v3_pair 4.0.1
     xunit_v3_pair 4.0.2
-    build_clean "$root/qualification/PackageInspector"
+    build_tool "$root/qualification/PackageInspector"
     dotnet run --project "$root/qualification/PackageInspector" -c Release --no-build -- Rezultat.Testing.Xunit \
         "$root" "$RezultatPackageVersion" "$feed/Rezultat.Testing.Xunit.$RezultatPackageVersion.nupkg" \
         "$feed/Rezultat.Testing.Xunit.$RezultatPackageVersion.snupkg" "$packages" \
-        "$qualification/obj/AssertionConsumer/project.assets.json" \
-        "$qualification/obj/AssertionNullableDisabledConsumer/project.assets.json" \
+        "$artifacts/obj/AssertionConsumer/project.assets.json" \
+        "$artifacts/obj/AssertionNullableDisabledConsumer/project.assets.json" \
         "$qualification/assets/XunitV2Consumer/project.assets.json" \
         "$qualification/assets/XunitV3Consumer-4.0.1/project.assets.json" \
         "$qualification/assets/XunitV3Consumer-4.0.2/project.assets.json"
@@ -366,10 +301,10 @@ analyzers() {
     reset_package_cache
     rm -rf "$qualification/analyzer-logs" "$qualification/analyzer-assets" "$library_feed" "$packages/rezultat.qualification.analyzerlibrary"
     mkdir -p "$qualification/analyzer-logs" "$qualification/analyzer-assets"
-    build_clean "$q/AnalyzerReports"
+    build_tool "$q/AnalyzerReports"
     analyzer_build direct-warning warning "$q/AnalyzerConsumer" -- "${corpus[@]}"
-    cp "$qualification/obj/AnalyzerConsumer/project.assets.json" "$qualification/analyzer-assets/AnalyzerConsumer.json"
-    cp "$qualification/obj/AnalyzerLibrary/project.assets.json" "$qualification/analyzer-assets/AnalyzerLibrary.json"
+    cp "$artifacts/obj/AnalyzerConsumer/project.assets.json" "$qualification/analyzer-assets/AnalyzerConsumer.json"
+    cp "$artifacts/obj/AnalyzerLibrary/project.assets.json" "$qualification/analyzer-assets/AnalyzerLibrary.json"
     # Build only the consumer: -warnaserror and global properties would otherwise also apply to the referenced
     # library, whose own RZT0001 is not part of the consumer's severity configuration and would fail these checks.
     local consumer=("$q/AnalyzerConsumer" -p:BuildProjectReferences=false)
@@ -380,19 +315,19 @@ analyzers() {
     analyzer_build direct-rule-as-error error "${consumer[@]}" -p:WarningsAsErrors=RZT0001 -- "$q/AnalyzerConsumer"
     analyzer_build wrapper-homonyms warning "$q/AnalyzerWrapperHomonyms" -- "$q/AnalyzerLibrary" "$q/AnalyzerWrapperHomonyms"
     analyzer_build downstream-project warning "$q/AnalyzerDownstream" -- "$q/AnalyzerLibrary" "$q/AnalyzerDownstream"
-    cp "$qualification/obj/AnalyzerDownstream/project.assets.json" "$qualification/analyzer-assets/AnalyzerDownstream.json"
+    cp "$artifacts/obj/AnalyzerDownstream/project.assets.json" "$qualification/analyzer-assets/AnalyzerDownstream.json"
     dotnet pack "$q/AnalyzerLibrary" -c Release -o "$library_feed" >"$qualification/analyzer-logs/library-pack.log" 2>&1 \
         || { cat "$qualification/analyzer-logs/library-pack.log"; return 1; }
     analyzer_build packed-library-consumer warning "$q/AnalyzerPackedConsumer" -- "$q/AnalyzerPackedConsumer"
-    cp "$qualification/obj/AnalyzerPackedConsumer/project.assets.json" "$qualification/analyzer-assets/AnalyzerPackedConsumer.json"
+    cp "$artifacts/obj/AnalyzerPackedConsumer/project.assets.json" "$qualification/analyzer-assets/AnalyzerPackedConsumer.json"
     analyzer_build core-only warning "$q/AnalyzerCoreOnly" -- "$q/AnalyzerCoreOnly"
-    cp "$qualification/obj/AnalyzerCoreOnly/project.assets.json" "$qualification/analyzer-assets/AnalyzerCoreOnly.json"
+    cp "$artifacts/obj/AnalyzerCoreOnly/project.assets.json" "$qualification/analyzer-assets/AnalyzerCoreOnly.json"
     extract_readme_examples "$packages/rezultat.analyzers/$RezultatPackageVersion/README.md" "$snippets"
     mv "$snippets"/*.ini "$qualification/analyzer-readme.ini"
     analyzer_build readme-warning warning "$q/AnalyzerReadmeExamples" -p:SnippetDirectory="$snippets" -- "$snippets"
     cp "$qualification/analyzer-readme.ini" "$snippets/.editorconfig"
     analyzer_build readme-editorconfig-error error "$q/AnalyzerReadmeExamples" -p:SnippetDirectory="$snippets" -- "$snippets"
-    build_clean "$q/AnalyzerInspector"
+    build_tool "$q/AnalyzerInspector"
     dotnet run --project "$q/AnalyzerInspector" -c Release --no-build -- "$root" "$RezultatPackageVersion" \
         "$feed/Rezultat.Analyzers.$RezultatPackageVersion.nupkg" "$packages" \
         "$library_feed/Rezultat.Qualification.AnalyzerLibrary.1.0.0.nupkg" \
@@ -410,40 +345,21 @@ alloc() {
 publish() {
     local rid="${1:?runtime identifier required}"
     local project="$root/qualification/PackageConsumer"
-    local mode output binary
+    local rooting mode output
     reset_package_cache
-    for mode in trimmed aot; do
-        local properties=(-p:PublishTrimmed=true -p:TrimmerSingleWarn=false)
-        [[ "$mode" == aot ]] && properties=(-p:PublishAot=true -p:TrimmerSingleWarn=false)
-        output="$qualification/publish/$mode-$rid"
-        rm -rf "$output"
-        dotnet publish "$project" -c Release -r "$rid" --self-contained -warnaserror \
-            -p:ArtifactsPivots="release_${rid}_$mode" "${properties[@]}" -o "$output"
-        binary="$output/PackageConsumer"
-        "$binary"
+    for rooting in rooted unrooted; do
+        for mode in trimmed aot; do
+            local properties=(-p:PublishTrimmed=true -p:TrimmerSingleWarn=false)
+            [[ "$mode" == aot ]] && properties=(-p:PublishAot=true -p:TrimmerSingleWarn=false)
+            [[ "$rooting" == unrooted ]] && properties+=(-p:RezultatRootLibrary=false)
+            output="$qualification/publish/$rooting-$mode-$rid"
+            rm -rf "$output"
+            dotnet publish "$project" -c Release -r "$rid" --self-contained \
+                -p:ArtifactsPivots="release_${rid}_${rooting}_$mode" "${properties[@]}" -o "$output"
+            "$output/PackageConsumer"
+            echo "PASS $rooting $mode $rid publication"
+        done
     done
-}
-
-linux() {
-    local host_output="$artifacts/linux-arm64" engine command=("$@")
-    [[ $# -gt 0 ]] || command=(all linux-arm64)
-    engine="$(docker info --format '{{.OSType}}/{{.Architecture}}')"
-    if [[ "$engine" != linux/aarch64 && "$engine" != linux/arm64 ]]; then
-        echo "native linux/arm64 Docker engine required, found $engine" >&2
-        return 1
-    fi
-    mkdir -p "$host_output/home"
-    local mounts=()
-    [[ -d "$issued_feed" ]] && mounts=(-v "$(cd "$issued_feed" && pwd):/issued-feed:ro" -e REZULTAT_LOCAL_FEED=/issued-feed)
-    # UseSharedCompilation=false: a one-shot container compiles with the standalone compiler, not a reused
-    # Roslyn compiler server. MSBuild reads the variable as a property in every nested build.
-    docker run --rm --platform linux/arm64 \
-        --user "$(id -u):$(id -g)" ${mounts[@]+"${mounts[@]}"} -e UseSharedCompilation=false \
-        -e HOME=/work/artifacts/home -e DOTNET_CLI_HOME=/work/artifacts/home -e NUGET_PACKAGES=/work/artifacts/nuget \
-        -v "$root:/work:ro" -v "$host_output:/work/artifacts" -w /work \
-        "$linux_image" \
-        bash -c 'uname -m; ldd --version | head -1; . /etc/os-release; echo "$PRETTY_NAME"; dotnet --version; clang --version | head -1; scripts/qualify.sh "$@"' \
-        qualify "${command[@]}"
 }
 
 release() {
@@ -455,13 +371,13 @@ release() {
         release_known_id "$id" || { echo "Unknown package id: $id" >&2; return 1; }
     done
     snapshot="$artifacts/release/$revision"
-    packages="$snapshot/artifacts/linux-arm64/package"
+    packages="$snapshot/artifacts/linux-arm64/package/release"
     rm -rf "$snapshot"
     mkdir -p "$snapshot"
     # Build only the exported commit: the working tree may hold modified or untracked inputs, and attributing
     # them to the commit would make the source record false.
     git -C "$root" archive "$revision" | tar -x -C "$snapshot"
-    "$snapshot/scripts/qualify.sh" linux pack
+    just --justfile "$snapshot/justfile" linux pack
     for id in "$@"; do
         found=("$packages/$id".[0-9]*.nupkg)
         [[ ${#found[@]} -eq 1 && -f "${found[0]}" ]] || { echo "Expected one $id package in $packages" >&2; return 1; }
@@ -482,10 +398,6 @@ release() {
 command="${1:-}"
 [[ $# -gt 0 ]] && shift
 case "$command" in
-    check) check ;;
-    test) run_tests "$@" ;;
-    fmt) fmt ;;
-    fix) fix "$@" ;;
     pack) pack ;;
     consumers) consumers ;;
     diamond) diamond ;;
@@ -493,8 +405,6 @@ case "$command" in
     alloc) alloc ;;
     publish) publish "$@" ;;
     analyzers) analyzers ;;
-    all) check; pack; consumers; assertions; analyzers; alloc; publish "$@" ;;
-    linux) linux "$@" ;;
     release) release "$@" ;;
     release-controls) bash "$root/qualification/ReleaseControls/run.sh" "$root" ;;
     *) usage; exit 2 ;;

@@ -20,25 +20,19 @@ public static class InitializedResults {
 
 [Properties(Arbitrary = [typeof(InitializedResults)])]
 public sealed class ResultPropertyTests {
-    // S1940: the negated operator form is the subject of this equality law.
-#pragma warning disable S1940
     [Property]
     public bool Equality_is_reflexive(Result<int, string?> result) {
         var copy = result;
 
         return result.Equals(copy) && result == copy && !(result != copy) && result.GetHashCode() == copy.GetHashCode();
     }
-#pragma warning restore S1940
 
-    // S1940: the negated operator form is the subject of this equality law.
-#pragma warning disable S1940
     [Property]
     public bool Equality_operators_and_object_equals_agree(Result<int, string?> left, Result<int, string?> right) =>
         left.Equals(right) == (left == right)
-        && (left != right) == !(left == right)
+        && left != right == !(left == right)
         && left.Equals((object)right) == left.Equals(right)
         && left.Equals(right) == right.Equals(left);
-#pragma warning restore S1940
 
     [Property]
     public bool Equal_results_have_equal_hashes(Result<int, int> left, Result<int, int> right) =>
@@ -46,9 +40,9 @@ public sealed class ResultPropertyTests {
 
     [Property]
     public bool Same_type_results_are_equal_exactly_for_same_branch_and_payload(Result<int, int> left, Result<int, int> right) {
-        var leftSuccess = left.TryGetValue(out var leftValue, out var leftError);
-        var rightSuccess = right.TryGetValue(out var rightValue, out var rightError);
-        var expected = leftSuccess == rightSuccess && (leftSuccess ? leftValue == rightValue : leftError == rightError);
+        bool leftSuccess = left.TryGetValue(out int leftValue, out int leftError);
+        bool rightSuccess = right.TryGetValue(out int rightValue, out int rightError);
+        bool expected = leftSuccess == rightSuccess && (leftSuccess ? leftValue == rightValue : leftError == rightError);
 
         return left.Equals(right) == expected;
     }
@@ -59,7 +53,7 @@ public sealed class ResultPropertyTests {
 
         return result.IsInitialized
             && result.IsSuccess
-            && result.TryGetValue(out var observed, out var error)
+            && result.TryGetValue(out string? observed, out int error)
             && observed == value
             && error == 0
             && result.Match(v => v == value, _ => false);
@@ -71,7 +65,7 @@ public sealed class ResultPropertyTests {
 
         return result.IsInitialized
             && !result.IsSuccess
-            && !result.TryGetValue(out var value, out var observed)
+            && !result.TryGetValue(out int value, out string? observed)
             && observed == error
             && value == 0
             && result.Match(_ => false, e => e == error);

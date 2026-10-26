@@ -2,8 +2,8 @@ using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using Rezultat;
-using Rezultat.Testing.Xunit;
 using Rezultat.Qualification;
+using Rezultat.Testing.Xunit;
 
 var checks = new Checks();
 var assembly = typeof(ResultAssertions).Assembly;
@@ -14,7 +14,7 @@ checks.That("exported types are exactly ResultAssertions and ValidationAssertion
 CheckOwner(typeof(ResultAssertions), typeof(Result<,>), ("ShouldBeOk", 0), ("ShouldBeError", 1));
 CheckOwner(typeof(ValidationAssertions), typeof(Validation<,>), ("ShouldBeValid", 0), ("ShouldBeInvalid", -1));
 
-var reference = new object();
+object reference = new object();
 checks.That("ShouldBeOk returns the exact reference", ReferenceEquals(reference, Result<object, string>.Ok(reference).ShouldBeOk()));
 checks.That("ShouldBeError returns the exact reference", ReferenceEquals(reference, Result<int, object>.Error(reference).ShouldBeError()));
 checks.That("ShouldBeValid returns the exact reference", ReferenceEquals(reference, Validation<object, string>.Valid(reference).ShouldBeValid()));
@@ -74,7 +74,7 @@ void CheckOwner(Type owner, Type carrier, params (string Name, int Returned)[] e
 }
 
 void CheckSignature(Type owner, Type carrier, string shortName, int returned, MethodInfo method) {
-    var name = $"{shortName}({string.Join(", ", method.GetParameters().Select(item => item.ParameterType.Name))})";
+    string name = $"{shortName}({string.Join(", ", method.GetParameters().Select(item => item.ParameterType.Name))})";
     var arguments = method.GetGenericArguments();
     var parameter = method.GetParameters()[0].ParameterType;
     var returnType = returned < 0 ? typeof(ImmutableArray<>).MakeGenericType(arguments[1]) : arguments[returned];
@@ -97,7 +97,7 @@ static byte[] NullableFlags(ParameterInfo parameter, MethodInfo method) {
     var nullable = Find(parameter.GetCustomAttributesData(), "NullableAttribute");
     if (nullable is not null) {
         var value = nullable.ConstructorArguments[0];
-        return value.Value is byte flag ? [flag] : ((IEnumerable<CustomAttributeTypedArgument>)value.Value!).Select(item => (byte)item.Value!).ToArray();
+        return value.Value is byte flag ? [flag] : [.. ((IEnumerable<CustomAttributeTypedArgument>)value.Value!).Select(item => (byte)item.Value!)];
     }
 
     var context = Find(method.GetCustomAttributesData(), "NullableContextAttribute")

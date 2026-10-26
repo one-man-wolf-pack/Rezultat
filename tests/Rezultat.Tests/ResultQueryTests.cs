@@ -15,7 +15,7 @@ public sealed class ResultQueryTests {
     [Fact]
     public void Select_maps_ok_and_keeps_error_without_selector_call() {
         var error = new ReferenceProbe(1);
-        var calls = 0;
+        int calls = 0;
 
         Result<int, ReferenceProbe>.Ok(1).Select(_ => { calls++; return (string?)null; }).ShouldBe(Result<string?, ReferenceProbe>.Ok(null));
         Result<int, ReferenceProbe>.Error(error).Select(_ => { calls++; return 0; }).TryGetValue(out _, out var observed).ShouldBeFalse();
@@ -46,7 +46,7 @@ public sealed class ResultQueryTests {
     [Fact]
     public void SelectMany_keeps_source_error_without_callbacks() {
         var error = new ReferenceProbe(1);
-        var calls = 0;
+        int calls = 0;
 
         var result = Result<int, ReferenceProbe>.Error(error).SelectMany(
             value => { calls++; return Result<int, ReferenceProbe>.Ok(value); },
@@ -60,8 +60,8 @@ public sealed class ResultQueryTests {
     [Fact]
     public void SelectMany_keeps_next_error_without_project_call() {
         var error = new ReferenceProbe(2);
-        var nextCalls = 0;
-        var projectCalls = 0;
+        int nextCalls = 0;
+        int projectCalls = 0;
 
         var result = Result<int, ReferenceProbe>.Ok(1).SelectMany(
             value => { nextCalls++; return Result<string, ReferenceProbe>.Error(error); },
@@ -74,7 +74,7 @@ public sealed class ResultQueryTests {
 
     [Fact]
     public void SelectMany_rejects_uninitialized_next_result_before_project() {
-        var projectCalls = 0;
+        int projectCalls = 0;
 
         Should.Throw<InvalidOperationException>(() => Result<int, string>.Ok(1).SelectMany(
             static _ => default(Result<int, string>),
@@ -133,7 +133,7 @@ public sealed class ResultQueryTests {
     [Fact]
     public void Query_expressions_with_one_to_three_sources_and_let() {
         static Result<int, string> Parse(string text) =>
-            int.TryParse(text, out var value) ? Result<int, string>.Ok(value) : Result<int, string>.Error($"bad {text}");
+            int.TryParse(text, out int value) ? Result<int, string>.Ok(value) : Result<int, string>.Error($"bad {text}");
 
         var one = from x in Parse("1") select x + 1;
         var two = from x in Parse("1") from y in Parse("2") select x + y;

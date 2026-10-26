@@ -14,12 +14,9 @@ public sealed class ResultReadyAndQueryLawTests {
     public bool SelectMany_is_AndThen_of_mapped_next(Result<int, int> result, Func<int, Result<int, int>> next, Func<int, int, int> project) =>
         result.SelectMany(next, project) == result.AndThen(x => next(x).Map(y => project(x, y)));
 
-    // S2971: the law sequences a materialized collection of mapped outcomes, not a lazy projection.
-#pragma warning disable S2971
     [Property]
     public bool Sequence_of_mapped_source_is_traverse(int[] source, Func<int, Result<int, int>> step) =>
         Normalize(source.Select(step).ToArray().Sequence()) == Normalize(source.Traverse(step));
-#pragma warning restore S2971
 
     [Property]
     public bool AtMostOne_classifies_count(int[] source) =>
@@ -44,24 +41,18 @@ public sealed class MaybeReadyAndQueryLawTests {
     public bool SelectMany_is_AndThen_of_mapped_next(Maybe<int> maybe, Func<int, Maybe<int>> next, Func<int, int, int> project) =>
         maybe.SelectMany(next, project) == maybe.AndThen(x => next(x).Map(y => project(x, y)));
 
-    // S2971: the law sequences a materialized collection of mapped outcomes, not a lazy projection.
-#pragma warning disable S2971
     [Property]
     public bool Sequence_of_mapped_source_is_traverse(int[] source, Func<int, Maybe<int>> step) =>
         Normalize(source.Select(step).ToArray().Sequence()) == Normalize(source.Traverse(step));
-#pragma warning restore S2971
 
     private static Maybe<string> Normalize(Maybe<int[]> maybe) => maybe.Map(static values => string.Join(",", values));
 }
 
 [Properties(Arbitrary = [typeof(ValidationValues)])]
 public sealed class ValidationReadyLawTests {
-    // S2971: the law sequences a materialized collection of mapped outcomes, not a lazy projection.
-#pragma warning disable S2971
     [Property]
     public bool Sequence_of_mapped_source_is_traverse(int[] source, Func<int, Validation<int, int>> step) =>
         Normalize(source.Select(step).ToArray().Sequence()) == Normalize(source.Traverse(step));
-#pragma warning restore S2971
 
     [Property]
     public bool ValidateAll_has_the_branch_and_issues_of_traverse_mapped_to_unit(int[] source, Func<int, Validation<int, int>> step) =>

@@ -2,25 +2,22 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using Rezultat.Qualification;
 
-// S6966/S3903: a synchronous top-level program; nothing awaits here, and its file-local helper types share the
-// global namespace of the generated Program class.
-#pragma warning disable S6966, S3903
 
-if (args.Length < 5 || args[1] is not ("warning" or "error" or "none" or "wae") || !int.TryParse(args[2], out var exitCode)) {
+if (args.Length < 5 || args[1] is not ("warning" or "error" or "none" or "wae") || !int.TryParse(args[2], out int exitCode)) {
     Console.Error.WriteLine("usage: AnalyzerReports <label> <warning|error|none|wae> <build-exit-code> <build-log> <source-directory>...");
     return 2;
 }
 
 const string RuleId = "RZT0001";
-var label = args[0];
-var mode = args[1];
+string label = args[0];
+string mode = args[1];
 var checks = new Checks();
-var log = File.ReadAllLines(args[3]);
+string[] log = File.ReadAllLines(args[3]);
 
 var expected = new List<Expected>();
-foreach (var file in args[4..].SelectMany(SourceFiles)) {
-    var lines = File.ReadAllLines(file);
-    for (var index = 0; index < lines.Length; index++) {
+foreach (string? file in args[4..].SelectMany(SourceFiles)) {
+    string[] lines = File.ReadAllLines(file);
+    for (int index = 0; index < lines.Length; index++) {
         foreach (Match run in Patterns.MarkerRun().Matches(lines[index])) {
             var (line, column) = (index + 1, run.Index + run.Length + 1);
             if (lines[index].Trim() == run.Value && index + 1 < lines.Length) {
@@ -57,7 +54,7 @@ var anyDiagnostic = Patterns.AnyDiagnostic();
 var faults = Patterns.Faults();
 var actual = new List<Actual>();
 var unparsed = new List<string>();
-foreach (var line in log) {
+foreach (string line in log) {
     var match = diagnosticLine.Match(line);
     if (match.Success) {
         actual.Add(new Actual(
@@ -78,7 +75,7 @@ checks.That($"{label}: every diagnostic is reported once ({actual.Count} lines)"
 
 var unmatched = actual.Distinct().ToList();
 foreach (var (item, severity) in required) {
-    var found = unmatched.FindIndex(diagnostic =>
+    int found = unmatched.FindIndex(diagnostic =>
         diagnostic.Path == item.Path && diagnostic.Line == item.Line && diagnostic.Id == item.Id
         && (item.Column is null || diagnostic.Column == item.Column));
     if (found < 0) {
@@ -95,9 +92,9 @@ foreach (var diagnostic in unmatched) {
     checks.Fail($"{label}: unexpected {diagnostic.Severity} {diagnostic.Id} at {diagnostic.Path}({diagnostic.Line},{diagnostic.Column})");
 }
 
-var expectsError = required.Any(item => item.Severity == "error");
+bool expectsError = required.Any(item => item.Severity == "error");
 checks.That($"{label}: build exit code {exitCode} {(expectsError ? "reports failure" : "reports success")}", expectsError ? exitCode != 0 : exitCode == 0);
-var rules = required.Count(item => item.item.Id == RuleId);
+int rules = required.Count(item => item.item.Id == RuleId);
 Console.WriteLine($"INFO {label} ({mode}): {rules} {RuleId}, "
     + $"{required.Count - rules} other expected diagnostics, exit {exitCode}");
 return checks.Complete();
@@ -111,7 +108,7 @@ internal sealed record Expected(string Path, int Line, int? Column, string Id);
 
 internal sealed record Actual(string Path, int Line, int Column, string Severity, string Id);
 
-// The match timeout bounds a pathological log or source line (S6444); a timeout fails the check.
+// The match timeout bounds a pathological log or source line; a timeout fails the check.
 internal static partial class Patterns {
     [GeneratedRegex(@"(?:/\*[A-Z]+[0-9]+\*/)+", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
     public static partial Regex MarkerRun();

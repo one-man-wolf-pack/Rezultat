@@ -18,7 +18,7 @@ public sealed class PresenceMapTests {
 
     [Fact]
     public void Missing_and_null_are_kept_without_invoking_the_selector() {
-        var calls = 0;
+        int calls = 0;
 
         Presence<int>.Missing.Map(value => ++calls).IsMissing.ShouldBeTrue();
         default(Presence<int>).Map(value => ++calls).IsMissing.ShouldBeTrue();
@@ -55,7 +55,7 @@ public sealed class PresenceMapTests {
         Should.Throw<InvalidOperationException>(() => Presence<int>.Value(1).Map<int?>(static _ => null)).ShouldBeOfType<InvalidOperationException>();
 
         var kept = Presence<int>.Value(1).Map<int?>(static value => value + 1);
-        (kept.TryGetValue(out var value) && value.HasValue && value.Value == 2).ShouldBeTrue();
+        (kept.TryGetValue(out int? value) && value.HasValue && value.Value == 2).ShouldBeTrue();
     }
 #pragma warning restore CS8714
 
@@ -109,16 +109,13 @@ public static class PresenceValues {
 
 [Properties(Arbitrary = [typeof(PresenceValues)])]
 public sealed class PresencePropertyTests {
-    // S1940: the negated operator form is the subject of this equality law.
-#pragma warning disable S1940
     [Property]
     public bool Equality_forms_agree_and_are_symmetric(Presence<int> left, Presence<int> right) =>
         left.Equals(right) == (left == right)
-        && (left != right) == !(left == right)
+        && left != right == !(left == right)
         && left.Equals((object)right) == left.Equals(right)
         && left.Equals(right) == right.Equals(left)
         && (!left.Equals(right) || left.GetHashCode() == right.GetHashCode());
-#pragma warning restore S1940
 
     [Property]
     public bool Exactly_one_flag_is_set(Presence<int> presence) =>

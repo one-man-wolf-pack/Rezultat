@@ -15,7 +15,7 @@ public sealed class ResultCompositionGuardTests {
 
     public static TheoryData<string, bool, string> NullCallbackCases() {
         var data = new TheoryData<string, bool, string>();
-        foreach (var success in new[] { true, false }) {
+        foreach (bool success in new[] { true, false }) {
             data.Add("Map", success, "selector");
             data.Add("MapError", success, "selector");
             data.Add("MapError(state)", success, "selector");
@@ -50,7 +50,7 @@ public sealed class ResultCompositionGuardTests {
 
     [Fact]
     public void Uninitialized_receiver_is_rejected_before_any_callback_invocation() {
-        var calls = 0;
+        int calls = 0;
         var receiver = default(Result<int, string>);
 
         Should.Throw<InvalidOperationException>(() => receiver.Map(_ => ++calls)).ShouldBeOfType<InvalidOperationException>();
@@ -68,7 +68,7 @@ public sealed class ResultCompositionGuardTests {
     [InlineData(false)]
     public void Zip_rejects_uninitialized_other_before_error_selection_and_selector_validation(bool receiverSuccess) {
         var receiver = receiverSuccess ? Result<int, string>.Ok(1) : Result<int, string>.Error("left");
-        var calls = 0;
+        int calls = 0;
 
         Should.Throw<InvalidOperationException>(() => receiver.Zip(default(Result<int, string>), (_, _) => ++calls)).ShouldBeOfType<InvalidOperationException>();
         Should.Throw<InvalidOperationException>(() => receiver.Zip<int, int>(default, null!)).ShouldBeOfType<InvalidOperationException>();

@@ -23,11 +23,11 @@ public sealed class ResultTraverseTests {
     [Fact]
     public void Empty_source_gives_empty_success_without_selector_calls() {
         var source = new TrackedSequence<int>();
-        var calls = 0;
+        int calls = 0;
 
         var result = source.Traverse(value => Result<int, string>.Ok(++calls + value));
 
-        result.TryGetValue(out var values, out _).ShouldBeTrue();
+        result.TryGetValue(out int[]? values, out _).ShouldBeTrue();
         values.ShouldBeEmpty();
         calls.ShouldBe(0);
         (source.Enumerations, source.Disposals).ShouldBe((1, 1));
@@ -43,7 +43,7 @@ public sealed class ResultTraverseTests {
             return Result<string, int>.Ok($"v{value}");
         });
 
-        result.TryGetValue(out var values, out _).ShouldBeTrue();
+        result.TryGetValue(out string[]? values, out _).ShouldBeTrue();
         values.ShouldBe(["v3", "v1", "v2"]);
         visited.ShouldBe([3, 1, 2]);
         (source.Enumerations, source.MoveNextCalls, source.CurrentReads, source.Disposals).ShouldBe((1, 4, 3, 1));
@@ -91,7 +91,7 @@ public sealed class ResultTraverseTests {
     [Fact]
     public void Visited_uninitialized_outcome_throws_before_later_failure_and_disposes() {
         var source = new TrackedSequence<Result<int, string>>(default, Result<int, string>.Error("later")) { PoisonFrom = 1 };
-        var calls = 0;
+        int calls = 0;
 
         Should.Throw<InvalidOperationException>(() => source.Traverse(outcome => { calls++; return outcome; })).ShouldBeOfType<InvalidOperationException>();
 
@@ -103,9 +103,9 @@ public sealed class ResultTraverseTests {
         var references = new[] { "a", null }.Traverse(static value => Result<string?, int>.Ok(value));
         var values = new[] { 0, 5 }.Traverse(static value => Result<int, int>.Ok(value));
 
-        references.TryGetValue(out var referenceValues, out _).ShouldBeTrue();
+        references.TryGetValue(out string?[]? referenceValues, out _).ShouldBeTrue();
         referenceValues.ShouldBe(["a", null]);
-        values.TryGetValue(out var valueValues, out _).ShouldBeTrue();
+        values.TryGetValue(out int[]? valueValues, out _).ShouldBeTrue();
         valueValues.ShouldBe([0, 5]);
     }
 
@@ -123,13 +123,13 @@ public sealed class ResultTraverseTests {
     [Fact]
     public void Success_array_is_materialized_independently_of_the_source() {
         var source = new List<int> { 1, 2 };
-        var calls = 0;
+        int calls = 0;
 
         var result = source.Traverse(value => { calls++; return Result<int, string>.Ok(value); });
         source[0] = 10;
         source.Add(3);
 
-        result.TryGetValue(out var values, out _).ShouldBeTrue();
+        result.TryGetValue(out int[]? values, out _).ShouldBeTrue();
         values.ShouldBe([1, 2]);
         calls.ShouldBe(2);
     }
@@ -148,7 +148,7 @@ public sealed class ResultTraverseTests {
     [Fact]
     public void Source_exception_propagates_and_disposes_enumerator() {
         var source = new TrackedSequence<int>(1, 2) { PoisonFrom = 1 };
-        var calls = 0;
+        int calls = 0;
 
         Should.Throw<ProbeException>(() => source.Traverse(value => Result<int, string>.Ok(++calls + value)));
 
@@ -178,7 +178,7 @@ public sealed class ResultTraverseTests {
 
         var result = outcomes.Traverse(static outcome => outcome);
 
-        result.TryGetValue(out var values, out _).ShouldBeTrue();
+        result.TryGetValue(out int[]? values, out _).ShouldBeTrue();
         values.ShouldBe([1, 2]);
     }
 }

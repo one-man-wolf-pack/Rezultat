@@ -43,7 +43,7 @@ public sealed class MaybeLastOrNoneTests {
     public void List_with_predicate_and_no_match_reads_every_position_once() {
         var list = new TrackedList<int>(1, 2, 3);
         var empty = new TrackedList<int>();
-        var calls = 0;
+        int calls = 0;
 
         list.LastOrNone(_ => { calls++; return false; }).IsSome.ShouldBeFalse();
         empty.LastOrNone(_ => { calls++; return true; }).IsSome.ShouldBeFalse();
@@ -90,7 +90,7 @@ public sealed class MaybeLastOrNoneTests {
     [Fact]
     public void Stateful_predicate_observes_different_paths_on_list_and_sequence() {
         static Func<int, bool> FirstSeenOnly() {
-            var seen = false;
+            bool seen = false;
             return _ => {
                 if (seen) {
                     return false;
@@ -108,7 +108,7 @@ public sealed class MaybeLastOrNoneTests {
     [Fact]
     public void Empty_sequence_is_none_without_predicate_calls() {
         var source = new TrackedSequence<int>();
-        var calls = 0;
+        int calls = 0;
 
         source.LastOrNone().IsSome.ShouldBeFalse();
         source.LastOrNone(_ => ++calls > 0).IsSome.ShouldBeFalse();

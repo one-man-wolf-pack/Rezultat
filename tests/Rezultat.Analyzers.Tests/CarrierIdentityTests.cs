@@ -59,7 +59,7 @@ public sealed class CarrierIdentityTests {
                 }
             }
             """);
-        var local = """
+        string local = """
             namespace Local
             {
                 public readonly struct Result<T, TError>
@@ -76,7 +76,7 @@ public sealed class CarrierIdentityTests {
 
     [Fact]
     public async Task ReportsNothingWithoutTheCoreAssembly() {
-        var source = """
+        string source = """
             using System.Threading.Tasks;
 
             public static class Consumer
@@ -104,7 +104,7 @@ public sealed class CarrierIdentityTests {
                 public static Result<int, string> Submit() => Result<int, string>.Ok(1);
             }
             """, WithCore);
-        var source = """
+        string source = """
             public static class Consumer
             {
                 public static void M()
@@ -125,7 +125,7 @@ public sealed class CarrierIdentityTests {
 
     [Fact]
     public async Task KeepsTheOtherCarrierWhenOneCarrierIsAmbiguous() {
-        var localResult = """
+        string localResult = """
             namespace Rezultat
             {
                 public readonly struct Result<T, TError>
@@ -218,7 +218,7 @@ public sealed class CarrierIdentityTests {
                 public static void Authored() { [|Result<int, string>.Ok(1)|]; }
             }
             """);
-        var generated = header + """
+        string generated = header + """
             using Rezultat;
 
             public static partial class Consumer
@@ -234,7 +234,7 @@ public sealed class CarrierIdentityTests {
 
     [Fact]
     public async Task ExcludesCodeMarkedAsGenerated() {
-        var source = """
+        string source = """
             using Rezultat;
 
             [System.CodeDom.Compiler.GeneratedCode("tool", "1.0")]

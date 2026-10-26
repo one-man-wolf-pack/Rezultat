@@ -27,9 +27,9 @@ public sealed class ResultOrElseTests {
     [Fact]
     public void OrElse_on_success_skips_fallback_and_keeps_value_identity_in_target_type() {
         var value = new ReferenceProbe(2);
-        var calls = 0;
+        int calls = 0;
 
-        Result<ReferenceProbe, int> result = Result<ReferenceProbe, string>.Ok(value)
+        var result = Result<ReferenceProbe, string>.Ok(value)
             .OrElse(_ => Result<ReferenceProbe, int>.Error(++calls));
 
         result.TryGetValue(out var observed, out _).ShouldBeTrue();
@@ -57,7 +57,7 @@ public sealed class ResultOrElseTests {
 
     [Fact]
     public void OrElse_rejects_uninitialized_outcome_returned_by_fallback() {
-        var calls = 0;
+        int calls = 0;
 
         Should.Throw<InvalidOperationException>(() => Result<int, string>.Error("e").OrElse(_ => {
             calls++;

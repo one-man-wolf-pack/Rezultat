@@ -16,7 +16,7 @@ internal static class MigrationConsumer {
         checks.Throws<ArgumentNullException>("domain guard still rejects null after Valid(null)",
             () => Validation<string?, string>.Valid(null).Map(static name => new CustomerName(name)));
 
-        var constructed = 0;
+        int constructed = 0;
         var invalid = CheckName("").Zip(CheckAge(-1), (name, age) => {
             constructed++;
             return new Person(name, age);
@@ -41,14 +41,14 @@ internal static class MigrationConsumer {
             && combined.SequenceEqual(["dup", "dup", "age is negative"]));
 
         var payment = Result<int, PaymentError>.Error(new PaymentError("card-declined", "4111 1111 1111 1111"));
-        var state = !payment.IsInitialized ? "Uninitialized" : payment.IsSuccess ? "Ok" : "Error";
-        var code = payment.IsInitialized && !payment.TryGetValue(out _, out var error) ? error.Code : null;
+        string state = !payment.IsInitialized ? "Uninitialized" : payment.IsSuccess ? "Ok" : "Error";
+        string? code = payment.IsInitialized && !payment.TryGetValue(out _, out var error) ? error.Code : null;
         checks.That("selected facts omit the card number", $"{state} {code}" == "Error card-declined" && !$"{state} {code}".Contains("4111", StringComparison.Ordinal));
         checks.That("the carrier text itself shows the card number", payment.ToString().Contains("4111", StringComparison.Ordinal));
     }
 
     private static string Handle(Result<int, string> result) {
-        if (!result.TryGetValue(out var value, out var error)) {
+        if (!result.TryGetValue(out int value, out string? error)) {
             return $"rejected, {error}";
         }
 
@@ -56,7 +56,7 @@ internal static class MigrationConsumer {
     }
 
     private static Result<int, string> Parse(string text) =>
-        int.TryParse(text, out var value) ? Result<int, string>.Ok(value) : Result<int, string>.Error($"not a number: {text}");
+        int.TryParse(text, out int value) ? Result<int, string>.Ok(value) : Result<int, string>.Error($"not a number: {text}");
 
     private static Validation<string, string> CheckName(string name) =>
         name.Length > 0 ? Validation<string, string>.Valid(name) : Validation<string, string>.Invalid("name is empty");

@@ -17,7 +17,7 @@ public sealed class MaybeResultBridgeTests {
 
     [Fact]
     public void ToResult_keeps_a_delegate_error_as_payload_without_invoking_it() {
-        var calls = 0;
+        int calls = 0;
         Func<string> error = () => $"{++calls}";
 
         var result = Maybe<int>.None.ToResult(error);
@@ -29,7 +29,7 @@ public sealed class MaybeResultBridgeTests {
 
     [Fact]
     public void ToResult_error_argument_is_evaluated_even_for_some() {
-        var evaluations = 0;
+        int evaluations = 0;
 
         Maybe<int>.Some(1).ToResult(++evaluations).ShouldBe(Result<int, int>.Ok(1));
         evaluations.ShouldBe(1);
@@ -37,7 +37,7 @@ public sealed class MaybeResultBridgeTests {
 
     [Fact]
     public void ToResultElse_invokes_factory_once_only_for_none() {
-        var calls = 0;
+        int calls = 0;
 
         Maybe<int>.Some(1).ToResultElse(() => $"{++calls}").ShouldBe(Result<int, string>.Ok(1));
         calls.ShouldBe(0);
@@ -95,7 +95,7 @@ public sealed class MaybeResultBridgeTests {
 
     [Fact]
     public void Traverse_maps_none_to_ok_none_without_selector() {
-        var calls = 0;
+        int calls = 0;
 
         Maybe<int>.None.Traverse(_ => { calls++; return Result<int, string>.Ok(1); }).ShouldBe(Result<Maybe<int>, string>.Ok(Maybe<int>.None));
         default(Maybe<int>).Traverse(_ => { calls++; return default(Result<int, string>); }).ShouldBe(Result<Maybe<int>, string>.Ok(Maybe<int>.None));
@@ -104,7 +104,7 @@ public sealed class MaybeResultBridgeTests {
 
     [Fact]
     public void Traverse_maps_some_through_selector_once() {
-        var calls = 0;
+        int calls = 0;
         var error = new ReferenceProbe(1);
 
         Maybe<int>.Some(1).Traverse(value => { calls++; return Result<string, string>.Ok($"{value + 1}"); }).ShouldBe(Result<Maybe<string>, string>.Ok(Maybe<string>.Some("2")));

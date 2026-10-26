@@ -25,7 +25,7 @@ public sealed class MaybeFirstAndSingleOrNoneTests {
     [Fact]
     public void Empty_source_is_none_without_predicate_calls() {
         var source = new TrackedSequence<int>();
-        var calls = 0;
+        int calls = 0;
 
         source.FirstOrNone().IsSome.ShouldBeFalse();
         source.FirstOrNone(_ => ++calls > 0).IsSome.ShouldBeFalse();
@@ -58,7 +58,7 @@ public sealed class MaybeFirstAndSingleOrNoneTests {
     [Fact]
     public void FirstOrNone_with_predicate_and_no_match_visits_all_once() {
         var source = new TrackedSequence<int>(1, 3, 5);
-        var calls = 0;
+        int calls = 0;
 
         source.FirstOrNone(_ => { calls++; return false; }).IsSome.ShouldBeFalse();
         (calls, source.Enumerations, source.MoveNextCalls, source.CurrentReads, source.Disposals).ShouldBe((3, 1, 4, 3, 1));
@@ -109,7 +109,7 @@ public sealed class MaybeFirstAndSingleOrNoneTests {
     [Fact]
     public void SingleOrNone_with_predicate_confirms_uniqueness_after_the_source_ends() {
         var source = new TrackedSequence<int>(1, 2, 3);
-        var calls = 0;
+        int calls = 0;
 
         source.SingleOrNone(value => { calls++; return value == 2; }).ShouldBe(Maybe<int>.Some(2));
         source.SingleOrNone(static _ => false).IsSome.ShouldBeFalse();
@@ -170,12 +170,9 @@ public sealed class MaybeFirstAndSingleOrNoneTests {
         Should.Throw<InvalidOperationException>(() => Naturals().SingleOrNone()).ShouldBeOfType<InvalidOperationException>();
     }
 
-    // S2190/S1994: a deliberately unbounded source proves that only the needed prefix is enumerated.
-#pragma warning disable S2190, S1994
     private static IEnumerable<int> Naturals() {
-        for (var value = 0; ; value++) {
+        for (int value = 0; ; value++) {
             yield return value;
         }
     }
-#pragma warning restore S2190, S1994
 }

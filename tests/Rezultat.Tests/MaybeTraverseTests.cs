@@ -21,11 +21,11 @@ public sealed class MaybeTraverseTests {
     [Fact]
     public void Empty_source_gives_some_empty_array_without_selector_calls() {
         var source = new TrackedSequence<int>();
-        var calls = 0;
+        int calls = 0;
 
         var result = source.Traverse(value => Maybe<int>.Some(++calls + value));
 
-        result.TryGetValue(out var values).ShouldBeTrue();
+        result.TryGetValue(out int[]? values).ShouldBeTrue();
         values.ShouldBeEmpty();
         (calls, source.Enumerations, source.Disposals).ShouldBe((0, 1, 1));
     }
@@ -40,7 +40,7 @@ public sealed class MaybeTraverseTests {
             return Maybe<string>.Some($"v{value}");
         });
 
-        result.TryGetValue(out var values).ShouldBeTrue();
+        result.TryGetValue(out string[]? values).ShouldBeTrue();
         values.ShouldBe(["v3", "v1", "v2"]);
         visited.ShouldBe([3, 1, 2]);
         (source.Enumerations, source.MoveNextCalls, source.CurrentReads, source.Disposals).ShouldBe((1, 4, 3, 1));
@@ -72,9 +72,9 @@ public sealed class MaybeTraverseTests {
         var results = new[] { 1 }.Traverse(static _ => Maybe<Result<int, string>>.Some(default));
         var tasks = new[] { 1 }.Traverse(static _ => Maybe<Task<int>>.Some(Task.FromException<int>(new ProbeException("task"))));
 
-        references.TryGetValue(out var referenceValues).ShouldBeTrue();
+        references.TryGetValue(out string?[]? referenceValues).ShouldBeTrue();
         referenceValues.ShouldBe(["a", null, ""]);
-        nullables.TryGetValue(out var nullableValues).ShouldBeTrue();
+        nullables.TryGetValue(out int?[]? nullableValues).ShouldBeTrue();
         nullableValues.ShouldBe([null, 0]);
         (nested.TryGetValue(out var nestedValues) && !nestedValues.ShouldHaveSingleItem().IsSome).ShouldBeTrue();
         (results.TryGetValue(out var resultValues) && !resultValues.ShouldHaveSingleItem().IsInitialized).ShouldBeTrue();
@@ -85,7 +85,7 @@ public sealed class MaybeTraverseTests {
     public void Result_array_is_materialized_independently_of_the_source_and_keeps_identity() {
         var probe = new ReferenceProbe(1);
         var source = new List<ReferenceProbe> { probe };
-        var calls = 0;
+        int calls = 0;
 
         var result = source.Traverse(value => { calls++; return Maybe<ReferenceProbe>.Some(value); });
         source[0] = new ReferenceProbe(2);
@@ -99,10 +99,10 @@ public sealed class MaybeTraverseTests {
 
     [Fact]
     public void Each_call_returns_a_new_array() {
-        var source = new[] { 1, 2 };
+        int[] source = [1, 2];
 
-        source.Traverse(Maybe<int>.Some).TryGetValue(out var first).ShouldBeTrue();
-        source.Traverse(Maybe<int>.Some).TryGetValue(out var second).ShouldBeTrue();
+        source.Traverse(Maybe<int>.Some).TryGetValue(out int[]? first).ShouldBeTrue();
+        source.Traverse(Maybe<int>.Some).TryGetValue(out int[]? second).ShouldBeTrue();
         second.ShouldNotBeSameAs(first);
     }
 
@@ -111,7 +111,7 @@ public sealed class MaybeTraverseTests {
         var canceled = new OperationCanceledException();
         var source = new TrackedSequence<int>(1, 2) { PoisonFrom = 1 };
         var faulty = new TrackedSequence<int>(1, 2) { PoisonFrom = 1 };
-        var calls = 0;
+        int calls = 0;
 
         Should.Throw<OperationCanceledException>(() => source.Traverse<int, int>(_ => throw canceled)).ShouldBeOfType<OperationCanceledException>().ShouldBeSameAs(canceled);
         Should.Throw<ProbeException>(() => faulty.Traverse(value => Maybe<int>.Some(++calls + value)));
@@ -140,7 +140,7 @@ public sealed class MaybeTraverseTests {
         Maybe<int>[] ready = [Maybe<int>.Some(1), Maybe<int>.Some(2)];
         Maybe<int>[] incomplete = [Maybe<int>.Some(1), default];
 
-        ready.Traverse(static item => item).TryGetValue(out var values).ShouldBeTrue();
+        ready.Traverse(static item => item).TryGetValue(out int[]? values).ShouldBeTrue();
         values.ShouldBe([1, 2]);
         incomplete.Traverse(static item => item).IsSome.ShouldBeFalse();
     }

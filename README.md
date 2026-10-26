@@ -68,7 +68,7 @@ behavior in `rfc/`, technical mapping in `realization/`, engineering rules in `c
 - `0.y.z` versions promise no source, binary or behavioral compatibility. The reference diamond (two separately
   packed libraries exchanging carriers in one app) is checked for libraries built against the candidate version and
   for one built against the issued 0.8.0 and run with the candidate; other version pairs are not covered.
-- There is no general zero-allocation claim; `scripts/qualify.sh alloc` measures selected operations in warmed
+- There is no general zero-allocation claim; `just alloc` measures selected operations in warmed
   Release.
 
 ## Development
@@ -82,55 +82,68 @@ by `qualification/ShouldlyRecipeConsumer` (with Shouldly and xUnit v3, without `
 `qualification/JsonReadmeRecipe`. All packages share the version and packaging settings in
 `src/Directory.Build.props`.
 
-`.editorconfig` (K&R braces, file-scoped namespaces, naming) and `Directory.Build.props` make every ordinary build
-strict: warnings are errors, with the .NET 10 recommended analysis, enforced code style and the private
-Roslynator and SonarAnalyzer.CSharp analyzers. `Directory.Packages.props` owns the versions, including those used by
-`qualification/` projects outside central package management. Owned qualification support code inherits this profile;
-consumers whose restored package graph is inspected keep it without the private analyzers. Projects marked
-`RezultatConsumerInput` (diagnostic corpus, compiler controls, compiled README text and runner fixtures) compile with
-ordinary consumer settings and keep their source layout, so development diagnostics do not change what they check.
+`.editorconfig` and `Directory.Build.props` make every restore and build equally strict, focused or not: compiler
+and MSBuild warnings are errors, with the .NET 10 recommended analysis, the enabled code-style rules and the selected
+Roslynator rules. `Directory.Packages.props` owns the versions, including those used by `qualification/` projects
+outside central package management. The core and `Rezultat.Testing.Xunit` track their public API in
+`PublicAPI.Shipped.txt` and `PublicAPI.Unshipped.txt`; an unrecorded API change fails the build, and `just fix`
+records it for review. Owned qualification support code inherits the profile; consumers whose restored package graph
+is inspected keep it without the private analyzers. Projects marked `RezultatConsumerInput` (diagnostic corpus,
+compiler controls, compiled README text and runner fixtures) compile with ordinary consumer settings and keep their
+source layout, so development diagnostics do not change what they check.
+
+The solution's projects restore from committed `packages.lock.json` files in locked mode. After an intentional
+dependency change, run an ordinary `dotnet restore Rezultat.slnx` and review the lock diff. Qualification projects
+that consume the freshly packed candidates, or pin a varied xUnit version, do not use lock files: they resolve into the
+isolated `artifacts/qualification/packages`, which the lanes reset, and their resolved graphs are inspected.
 
 ## Prerequisites
 
 - .NET SDK pinned in `global.json`; tests use Microsoft.Testing.Platform mode of `dotnet test`. The xUnit v2
   consumer `qualification/XunitV2Consumer` has its own `global.json` with the same SDK and VSTest mode; keep the
   two SDK versions equal.
+- [Just](https://just.systems) for the commands below, plus Git and Bash.
 - Docker with a native `linux/arm64` engine for the Linux qualification contour.
 
 ## Commands
 
-All recurring operations go through `scripts/qualify.sh`; run it without arguments for the list.
+All recurring operations go through the root `justfile`; `just` lists them.
 
 ```sh
-scripts/qualify.sh check                 # format/style verification, strict Release build, every test module; changes no source
-scripts/qualify.sh test                  # every test module of the solution
-scripts/qualify.sh test Rezultat.Tests --filter-class Rezultat.Tests.ResultMapTests   # one test project and its references, filtered
-scripts/qualify.sh fmt                   # apply whitespace formatting (solution and owned qualification sources)
-scripts/qualify.sh fix --diagnostics IDE0011   # apply code-style/analyzer fixes to the solution, optionally scoped
-scripts/qualify.sh pack                  # artifacts/package/{Rezultat,Rezultat.Testing.Xunit}.<version>.nupkg/.snupkg, Rezultat.Analyzers.<version>.nupkg
-scripts/qualify.sh consumers             # package consumers, compiler controls, README examples and recipes, reference diamond, package inspection
-scripts/qualify.sh diamond               # only the reference diamond (needs the issued Rezultat 0.8.0, see below)
-scripts/qualify.sh assertions            # assertion package consumers, xUnit v2/v3 runner scenarios, package inspection
-scripts/qualify.sh analyzers             # RZT0001 corpus in all severity modes, downstream isolation, README, package inspection
-scripts/qualify.sh alloc                 # warmed Release allocation controls
-scripts/qualify.sh publish <host-rid>    # rooted trimmed and Native AOT consumer publication and run
-scripts/qualify.sh linux                 # everything above inside the Linux ARM64/glibc SDK container
-scripts/qualify.sh linux analyzers       # one command inside the same container
-scripts/qualify.sh release <commit> Rezultat   # commit-bound package build with its source record (see Local releases)
-scripts/qualify.sh release-controls      # release/publish controls in a disposable Git fixture (host Git and Docker)
+just check                  # Just/source formatting, strict Release build, every test module; changes no source
+just test                   # every test module of the solution; arguments use native MTP syntax
+just test-project tests/Rezultat.Tests/Rezultat.Tests.csproj --filter-class Rezultat.Tests.ResultMapTests
+just fmt                    # whitespace and Just formatting only
+just fix --diagnostics IDE0011   # supported style/analyzer repairs, optionally scoped; review the diff
+just pack                   # artifacts/package/release: Rezultat and Rezultat.Testing.Xunit .nupkg/.snupkg, Rezultat.Analyzers .nupkg
+just consumers              # package consumers, compiler controls, README examples and recipes, reference diamond, package inspection
+just diamond                # only the reference diamond (needs the issued Rezultat 0.8.0, see below)
+just assertions             # assertion package consumers, xUnit v2/v3 runner scenarios, package inspection
+just analyzers              # RZT0001 corpus in all severity modes, downstream isolation, README, package inspection
+just alloc                  # warmed Release allocation controls
+just publish <rid>          # rooted and unrooted trimmed and Native AOT consumer publication and run
+just qualify <rid>          # check, pack, every package lane and publish for the runtime
+just linux qualify linux-arm64   # the same recipes inside the Linux ARM64/glibc SDK container
+just linux pack analyzers   # any recipes inside the same container
+just release <commit> Rezultat   # commit-bound package build with its source record (see Local releases)
+just release-controls       # release/publish controls in a disposable Git fixture (host Git, Just and Docker)
+just gc                     # delete artifacts/ (not the local feed)
 ```
 
-`test` arguments after the optional project go to `dotnet test`; native filters such as `--filter-class` pass
-through to each selected test module. Each module receives `--minimum-expected-tests 1` after the SDK `--`
-separator (appended after an existing `--`), so a required module that runs no test, because it is empty or every
-selected test is skipped, fails even when other modules pass. A global `--minimum-expected-tests` before `--` would
-count one total including skips and does not replace it. `check` and `test` never format; `fmt` and `fix` are the
-only commands that change sources.
+Each test module receives `--minimum-expected-tests 1` after the SDK `--` separator, so a required module that runs
+no test, because it is empty or every selected test is skipped, fails even when other modules pass. `test-project`
+restores and builds only the selected project and its references. `check` and `test` never change sources; `fmt` and
+`fix` are the only commands that do. Qualification consumers outside the solution get the same
+profile through their lane builds; after a lane has restored one, repair it with
+`dotnet format qualification/<project> --no-restore --severity warn`. Restore refuses to run while a tracked lock file is deleted or its deletion is
+staged.
 
 `consumers`, `diamond`, `assertions`, `analyzers`, `alloc` and `publish` consume the packages from
-`artifacts/package` through `qualification/NuGet.Config` and an isolated package folder, so run `pack` first.
-Linux container outputs are kept separately in `artifacts/linux-arm64`; the container compiles with
-`UseSharedCompilation=false` (standalone compiler, no reused compiler server) and does not retry failed builds.
+`artifacts/package/release` through `qualification/NuGet.Config` and an isolated package folder, so run `pack` first.
+`just linux` runs the same recipe bodies on the host and sends each `dotnet` and lane command through
+`scripts/linux.sh` into the SDK container, with the source mounted read-only; container outputs are kept separately in
+`artifacts/linux-arm64`. The container compiles with `UseSharedCompilation=false` (standalone compiler, no reused
+compiler server) and does not retry failed builds. Paths passed to recipes are relative to the repository root.
 `assertions` runs expected-failure fixtures on purpose and checks the native reports kept in
 `artifacts/qualification/runner-reports`. `analyzers` compares every diagnostic of each build with the markers in the
 checked sources: `/*ID*/` expects the diagnostic at the following token (the next line's first token when the marker
@@ -154,15 +167,15 @@ Packages built from the working tree are candidates for review and are never iss
 package is built from a commit, and its private source record goes with it into the feed:
 
 ```sh
-scripts/qualify.sh release <commit> Rezultat                      # name each package to issue
-artifacts/release/<full-commit>/scripts/qualify.sh linux consumers   # qualify those exact archives
-scripts/publish-local.sh 0.8.2 artifacts/release/<full-commit>/artifacts/linux-arm64/package
+just release <commit> Rezultat                                    # name each package to issue
+just --justfile artifacts/release/<full-commit>/justfile linux consumers   # qualify those exact archives
+scripts/publish-local.sh 0.8.2 artifacts/release/<full-commit>/artifacts/linux-arm64/package/release
 # Other packages and explicit destination:
 scripts/publish-local.sh --package Rezultat.Analyzers <version> <package-directory> /absolute/path/to/rezultat-feed
 ```
 
 `release` exports the committed tree of `<commit>` with `git archive` into `artifacts/release/<full-commit>`,
-so modified and untracked working-tree files never enter the build, and runs that tree's own `linux pack`.
+so modified and untracked working-tree files never enter the build, and runs that tree's own `just linux pack`.
 For each named package it writes `<id>.<version>.record` next to the archives: package ID, version, full
 commit and SHA-256 of the `.nupkg` and, when shipped, `.snupkg`. Qualify a package with its own command
 in the exported tree (`consumers`, `assertions` or `analyzers`). Running `release` again rebuilds the snapshot
@@ -232,10 +245,12 @@ switch and qualification of their API, adapters and deployment profiles.
 | `src/Rezultat.Testing.Xunit` | The test-only assertions package and its consumer `README.md`. |
 | `src/Rezultat.Analyzers` | The `RZT0001` analyzer package and its consumer `README.md`. |
 | `tests/Rezultat.Tests`, `tests/Rezultat.Testing.Xunit.Tests`, `tests/Rezultat.Analyzers.Tests` | Own behavioral and property tests (xUnit v3 on Microsoft.Testing.Platform, Shouldly assertions, FsCheck) and in-process Roslyn analyzer tests. |
-| `qualification/` | Package consumers, compiler controls, README examples and recipe consumers, xUnit v2/v3 runner consumers and report checks, analyzer corpus/isolation consumers and diagnostic report checks, allocation controls and package inspectors; outside the solution and restored only from the built packages. |
+| `qualification/` | Package consumers, compiler controls, README examples and recipe consumers, xUnit v2/v3 runner consumers and report checks, analyzer corpus/isolation consumers and diagnostic report checks, allocation controls and package inspectors. The inspectors and report checks are in the solution; the consumers restore only from the built packages. |
 | `qualification/Diamond` | Reference diamond fixtures: two packable libraries, the consuming app and the graph inspector, with their own package sources. |
 | `qualification/ReleaseControls` | Release build and publication controls against a disposable Git fixture and temporary feeds. |
-| `scripts/qualify.sh` | Command adapter over native `dotnet`, Git and Docker. |
+| `justfile` | The command interface. |
+| `scripts/qualify.sh` | Package qualification and release lanes behind the `justfile`. |
+| `scripts/linux.sh` | Transport of one command into the Linux ARM64/glibc SDK container. |
 | `scripts/publish-local.sh`, `scripts/release-record.sh` | Local feed publication and the package source record. |
 
 ## License

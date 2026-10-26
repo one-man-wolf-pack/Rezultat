@@ -7,7 +7,7 @@ public sealed class PresenceStateTests {
 
         foreach (var presence in missing) {
             (presence.IsMissing, presence.IsNull, presence.IsValue).ShouldBe((true, false, false));
-            presence.TryGetValue(out var value).ShouldBeFalse();
+            presence.TryGetValue(out string? value).ShouldBeFalse();
             value.ShouldBeNull();
             presence.ShouldBe(Presence<string>.Missing);
         }
@@ -27,15 +27,15 @@ public sealed class PresenceStateTests {
         var presence = Presence<string>.Null;
 
         (presence.IsMissing, presence.IsNull, presence.IsValue).ShouldBe((false, true, false));
-        presence.TryGetValue(out var value).ShouldBeFalse();
+        presence.TryGetValue(out string? value).ShouldBeFalse();
         value.ShouldBeNull();
         presence.ShouldNotBe(Presence<string>.Missing);
     }
 
     [Fact]
     public void Inactive_value_type_output_is_default_and_does_not_tell_missing_from_null() {
-        Presence<int>.Missing.TryGetValue(out var missing).ShouldBeFalse();
-        Presence<int>.Null.TryGetValue(out var explicitNull).ShouldBeFalse();
+        Presence<int>.Missing.TryGetValue(out int missing).ShouldBeFalse();
+        Presence<int>.Null.TryGetValue(out int explicitNull).ShouldBeFalse();
         (missing, explicitNull).ShouldBe((0, 0));
         Presence<Unit>.Null.TryGetValue(out var unit).ShouldBeFalse();
         unit.ShouldBe(Unit.Value);
@@ -43,10 +43,10 @@ public sealed class PresenceStateTests {
 
     [Fact]
     public void Value_keeps_default_like_payloads_as_value() {
-        Presence<int>.Value(0).TryGetValue(out var zero).ShouldBeTrue();
+        Presence<int>.Value(0).TryGetValue(out int zero).ShouldBeTrue();
         zero.ShouldBe(0);
         Presence<bool>.Value(false).IsValue.ShouldBeTrue();
-        Presence<string>.Value(string.Empty).TryGetValue(out var empty).ShouldBeTrue();
+        Presence<string>.Value(string.Empty).TryGetValue(out string? empty).ShouldBeTrue();
         empty.ShouldBe(string.Empty);
         Presence<Unit>.Value(Unit.Value).IsValue.ShouldBeTrue();
         Presence<int>.Value(default).ShouldNotBe(Presence<int>.Missing);
@@ -72,7 +72,7 @@ public sealed class PresenceStateTests {
     public void Value_non_empty_nullable_keeps_the_declared_nullable_type() {
         var presence = Presence<int?>.Value(5);
 
-        presence.TryGetValue(out var value).ShouldBeTrue();
+        presence.TryGetValue(out int? value).ShouldBeTrue();
         value.HasValue.ShouldBeTrue();
         value.Value.ShouldBe(5);
         presence.ToString().ShouldBe("Presence.Value(5)");

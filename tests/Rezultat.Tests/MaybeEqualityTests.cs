@@ -51,7 +51,7 @@ public sealed class MaybeEqualityTests {
         Maybe<int[]>.Some([1, 2]).ShouldNotBe(Maybe<int[]>.Some(array));
         Maybe<List<int>>.Some([1, 2]).ShouldNotBe(Maybe<List<int>>.Some(list));
         Maybe<ImmutableArray<int>>.Some(immutable).ShouldBe(Maybe<ImmutableArray<int>>.Some(immutable));
-        Maybe<ImmutableArray<int>>.Some(ImmutableArray.Create(1, 2)).ShouldNotBe(Maybe<ImmutableArray<int>>.Some(immutable));
+        Maybe<ImmutableArray<int>>.Some([1, 2]).ShouldNotBe(Maybe<ImmutableArray<int>>.Some(immutable));
     }
 
     [Fact]
@@ -100,7 +100,7 @@ public sealed class MaybeEqualityTests {
         ValueProbe.Reset();
 
         (Maybe<ValueProbe>.Some(new ValueProbe(2)) == Maybe<ValueProbe>.Some(new ValueProbe(2))).ShouldBeTrue();
-        var touchesAfterEquality = ValueProbe.Touches;
+        int touchesAfterEquality = ValueProbe.Touches;
         _ = Maybe<ValueProbe>.Some(new ValueProbe(2)).GetHashCode();
 
         touchesAfterEquality.ShouldNotBe(0);

@@ -61,7 +61,7 @@ fixture_git commit -q -m later
 head="$(git -C "$repo" rev-parse HEAD)"
 
 snapshot="$repo/artifacts/release/$built"
-packages="$snapshot/artifacts/linux-arm64/package"
+packages="$snapshot/artifacts/linux-arm64/package/release"
 version="$(sed -n 's/^version=//p' "$packages"/Rezultat.[0-9]*.record)"
 core_record="$packages/Rezultat.$version.record"
 analyzer_record="$packages/Rezultat.Analyzers.$version.record"
@@ -164,7 +164,7 @@ rm "$repo/src/Rezultat/UntrackedInput.cs"
 fixture_git add -A
 fixture_git commit -q -m buildable
 buildable="$(git -C "$repo" rev-parse HEAD)"
-hashing_packages="$repo/artifacts/release/$buildable/artifacts/linux-arm64/package"
+hashing_packages="$repo/artifacts/release/$buildable/artifacts/linux-arm64/package/release"
 if PATH="$broken_bin:$PATH" "$repo/scripts/qualify.sh" release "$buildable" Rezultat >"$work/release-hashing.log" 2>&1; then
     fail "record generation when hashing fails: release succeeded"
 else

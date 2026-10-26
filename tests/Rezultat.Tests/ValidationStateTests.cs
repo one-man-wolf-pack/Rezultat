@@ -22,9 +22,9 @@ public sealed class ValidationStateTests {
         var nullable = Validation<int?, int>.Valid(null);
 
         (reference.IsInitialized && reference.IsValid).ShouldBeTrue();
-        (reference.TryGetValue(out var referenceValue, out _) && referenceValue is null).ShouldBeTrue();
-        (number.TryGetValue(out var numberValue, out _) && numberValue == 0).ShouldBeTrue();
-        (nullable.TryGetValue(out var nullableValue, out _) && !nullableValue.HasValue).ShouldBeTrue();
+        (reference.TryGetValue(out string? referenceValue, out _) && referenceValue is null).ShouldBeTrue();
+        (number.TryGetValue(out int numberValue, out _) && numberValue == 0).ShouldBeTrue();
+        (nullable.TryGetValue(out int? nullableValue, out _) && !nullableValue.HasValue).ShouldBeTrue();
         Validation<bool, int>.Valid(false).IsValid.ShouldBeTrue();
     }
 
@@ -61,7 +61,7 @@ public sealed class ValidationStateTests {
     public void InvalidMany_rejects_default_and_empty_sequences() {
         Should.Throw<ArgumentException>(() => Validation<int, string>.InvalidMany(default)).ShouldBeOfType<ArgumentException>().ParamName.ShouldBe("issues");
         Should.Throw<ArgumentException>(() => Validation<int, string>.InvalidMany([])).ShouldBeOfType<ArgumentException>().ParamName.ShouldBe("issues");
-        Should.Throw<ArgumentException>(() => Validation<int, string>.InvalidMany(ImmutableArray<string>.Empty)).ShouldBeOfType<ArgumentException>().ParamName.ShouldBe("issues");
+        Should.Throw<ArgumentException>(() => Validation<int, string>.InvalidMany([])).ShouldBeOfType<ArgumentException>().ParamName.ShouldBe("issues");
     }
 
     [Fact]
@@ -89,10 +89,10 @@ public sealed class ValidationStateTests {
 
     [Fact]
     public void TryGetValue_on_invalid_outputs_default_value_and_stored_issues() {
-        Validation<string, int>.Invalid(3).TryGetValue(out var value, out var issues).ShouldBeFalse();
+        Validation<string, int>.Invalid(3).TryGetValue(out string? value, out var issues).ShouldBeFalse();
         value.ShouldBeNull();
         issues.ShouldBe([3]);
-        Validation<int, int>.Invalid(3).TryGetValue(out var number, out _).ShouldBeFalse();
+        Validation<int, int>.Invalid(3).TryGetValue(out int number, out _).ShouldBeFalse();
         number.ShouldBe(0);
     }
 
@@ -109,7 +109,7 @@ public sealed class ValidationStateTests {
 
     [Fact]
     public void Match_checks_initialization_before_handlers_then_handlers_in_order() {
-        var calls = 0;
+        int calls = 0;
         var valid = Validation<int, string>.Valid(1);
 
         Should.Throw<InvalidOperationException>(() => default(Validation<int, string>).Match<int>(null!, null!)).ShouldBeOfType<InvalidOperationException>();
@@ -124,7 +124,7 @@ public sealed class ValidationStateTests {
         var input = ImmutableArray.Create("a", "b");
         var calls = new List<string>();
 
-        var valid = Validation<int, string>.Valid(4).Match(value => { calls.Add("valid"); return value; }, issues => { calls.Add("invalid"); return -1; });
+        int valid = Validation<int, string>.Valid(4).Match(value => { calls.Add("valid"); return value; }, issues => { calls.Add("invalid"); return -1; });
         var invalid = Validation<int, string>.InvalidMany(input).Match(
             _ => { calls.Add("valid"); return default(ImmutableArray<string>); },
             issues => { calls.Add("invalid"); return issues; });

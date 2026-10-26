@@ -1,4 +1,11 @@
 <Solution>
+  <Folder Name="/qualification/">
+    <Project Path="qualification/AnalyzerInspector/AnalyzerInspector.csproj" />
+    <Project Path="qualification/AnalyzerReports/AnalyzerReports.csproj" />
+    <Project Path="qualification/Diamond/Inspector/DiamondInspector.csproj" />
+    <Project Path="qualification/PackageInspector/PackageInspector.csproj" />
+    <Project Path="qualification/RunnerReports/RunnerReports.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/Rezultat.Analyzers/Rezultat.Analyzers.csproj" />
     <Project Path="src/Rezultat/Rezultat.csproj" />

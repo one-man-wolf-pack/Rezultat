@@ -3,7 +3,7 @@ namespace Rezultat.Tests;
 public sealed class MaybeFromNullableTests {
     [Fact]
     public void Null_reference_becomes_none() {
-        Maybe<string> maybe = Maybe.FromNullable((string?)null);
+        var maybe = Maybe.FromNullable((string?)null);
 
         maybe.IsSome.ShouldBeFalse();
         maybe.ShouldBe(Maybe<string>.None);
@@ -20,7 +20,7 @@ public sealed class MaybeFromNullableTests {
 
     [Fact]
     public void Empty_nullable_value_becomes_none() {
-        Maybe<int> maybe = Maybe.FromNullable((int?)null);
+        var maybe = Maybe.FromNullable((int?)null);
 
         maybe.IsSome.ShouldBeFalse();
     }

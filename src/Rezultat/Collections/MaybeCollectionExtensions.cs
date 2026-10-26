@@ -12,12 +12,10 @@ public static class MaybeCollectionExtensions {
     /// <exception cref="ArgumentNullException"><paramref name="source"/> is null.</exception>
     public static Maybe<T> FirstOrNone<T>(this IEnumerable<T> source) {
         ArgumentNullException.ThrowIfNull(source);
-        // S1751: stopping at the first element is the contract; foreach keeps the enumerator disposal.
-#pragma warning disable S1751
+        // Stopping at the first element is the contract; foreach keeps the enumerator disposal.
         foreach (var item in source) {
             return Maybe<T>.Some(item);
         }
-#pragma warning restore S1751
 
         return Maybe<T>.None;
     }
@@ -50,12 +48,12 @@ public static class MaybeCollectionExtensions {
     public static Maybe<T> LastOrNone<T>(this IEnumerable<T> source) {
         ArgumentNullException.ThrowIfNull(source);
         if (source is IList<T> list) {
-            var count = list.Count;
+            int count = list.Count;
             return count == 0 ? Maybe<T>.None : Maybe<T>.Some(list[count - 1]);
         }
 
         if (source is IReadOnlyList<T> readOnlyList) {
-            var count = readOnlyList.Count;
+            int count = readOnlyList.Count;
             return count == 0 ? Maybe<T>.None : Maybe<T>.Some(readOnlyList[count - 1]);
         }
 
@@ -80,7 +78,7 @@ public static class MaybeCollectionExtensions {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(predicate);
         if (source is IList<T> list) {
-            for (var index = list.Count - 1; index >= 0; index--) {
+            for (int index = list.Count - 1; index >= 0; index--) {
                 var item = list[index];
                 if (predicate(item)) {
                     return Maybe<T>.Some(item);
@@ -91,7 +89,7 @@ public static class MaybeCollectionExtensions {
         }
 
         if (source is IReadOnlyList<T> readOnlyList) {
-            for (var index = readOnlyList.Count - 1; index >= 0; index--) {
+            for (int index = readOnlyList.Count - 1; index >= 0; index--) {
                 var item = readOnlyList[index];
                 if (predicate(item)) {
                     return Maybe<T>.Some(item);
@@ -209,7 +207,7 @@ public static class MaybeCollectionExtensions {
         }
 
         using var enumerator = source.GetEnumerator();
-        var remaining = index;
+        int remaining = index;
         while (enumerator.MoveNext()) {
             if (remaining == 0) {
                 return Maybe<T>.Some(enumerator.Current);
@@ -267,7 +265,7 @@ public static class MaybeCollectionExtensions {
             values.Add(value);
         }
 
-        return Maybe<TResult[]>.Some(values.ToArray());
+        return Maybe<TResult[]>.Some([.. values]);
     }
 
     /// <summary>

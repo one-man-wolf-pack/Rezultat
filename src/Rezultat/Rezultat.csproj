@@ -13,4 +13,10 @@
     <PackageTags>result;maybe;option;validation;error-handling</PackageTags>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" IncludeAssets="analyzers;build;buildtransitive" />
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+
 </Project>

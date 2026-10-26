@@ -11,11 +11,11 @@ public readonly struct Unit : IEquatable<Unit> {
 
     public bool Equals(Unit other) => true;
 
-    // CA1725/S927: the parameter name is part of the accepted public API; renaming it would change named-argument
+    // CA1725: the parameter name is part of the accepted public API; renaming it would change named-argument
     // source compatibility for a diagnostic preference.
-#pragma warning disable CA1725, S927
+#pragma warning disable CA1725
     public override bool Equals(object? other) => other is Unit;
-#pragma warning restore CA1725, S927
+#pragma warning restore CA1725
 
     public override int GetHashCode() => 0;
 

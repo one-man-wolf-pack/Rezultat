@@ -2,19 +2,16 @@ using System.Text.Json;
 using System.Xml.Linq;
 using Rezultat.Qualification;
 
-// S6966/S3903: a synchronous top-level program; nothing awaits here, and its file-local helper types share the
-// global namespace of the generated Program class.
-#pragma warning disable S6966, S3903
 
 if (args.Length < 3 || args[0] is not ("v2" or "v3") || (args[0] == "v3" && args.Length < 4)) {
     Console.Error.WriteLine("usage: RunnerReports v2 <pair> <trx> | RunnerReports v3 <xunit.v3-version> <xunit.xml> <native-json-log>");
     return 2;
 }
 
-var pair = args[0] == "v3" ? $"xunit.v3 {args[1]}" : args[1];
-var framework = $"xUnit.net v3 {args[1]}+";
+string pair = args[0] == "v3" ? $"xunit.v3 {args[1]}" : args[1];
+string framework = $"xUnit.net v3 {args[1]}+";
 var checks = new Checks();
-var family = args[0] == "v2" ? "Family.FailureIsTheV3FailExceptionNotTheV2AssertionFamily" : "Family.FailureIsTheV3FailException";
+string family = args[0] == "v2" ? "Family.FailureIsTheV3FailExceptionNotTheV2AssertionFamily" : "Family.FailureIsTheV3FailException";
 string[] passing = ["Positive.ExtractsAllFourBranches", "Positive.ExtractsAllFourBranchesWithoutPayload", "Positive.KeepsNullablePayloads", "Positive.FailureStopsOnlyTheCurrentMultipleLambda", family];
 var failing = new Dictionary<string, string> {
     ["ExpectedFailures.WrongBranch"] = "actual Result.Error(wrong-branch-evidence)",
@@ -35,7 +32,7 @@ if (args[0] == "v3") {
 checks.That($"{pair}: report has no runner errors ({report.Errors})", report.Errors == 0);
 checks.That($"{pair}: report counts total {report.Results.Count}, expected {passing.Length + failing.Count}",
     report.Results.Count == passing.Length + failing.Count);
-foreach (var name in passing) {
+foreach (string name in passing) {
     checks.That($"{pair}: {name} passed", report.Results.TryGetValue(name, out var result) && result.Outcome == Outcome.Passed);
 }
 
@@ -56,8 +53,8 @@ foreach (var (name, evidence) in failing) {
         checks.Text($"{pair}: {name} exception type", "Xunit.Sdk.FailException", result.ExceptionType);
     }
 
-    var top = result.StackTrace.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? string.Empty;
-    var method = name.Split('.')[1];
+    string top = result.StackTrace.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? string.Empty;
+    string method = name.Split('.')[1];
     checks.That($"{pair}: {name} top frame is the test caller with source line: {top}",
         top.StartsWith("at RunnerConsumer.ExpectedFailures.", StringComparison.Ordinal)
         && top.Contains(method, StringComparison.Ordinal)
@@ -113,7 +110,7 @@ static Report ReadTrx(string path) {
                 error?.Element(ns + "StackTrace")?.Value ?? string.Empty, null);
         });
     var counters = root.Descendants(ns + "Counters").Single();
-    var runnerMessages = root.Descendants(ns + "RunInfo")
+    int runnerMessages = root.Descendants(ns + "RunInfo")
         .Select(info => info.Value.Trim())
         .Count(text => !text.EndsWith("[FAIL]", StringComparison.Ordinal) || !text.Contains("RunnerConsumer.ExpectedFailures.", StringComparison.Ordinal));
     return new Report((int)counters.Attribute("error")! + runnerMessages, results, null);
@@ -123,11 +120,11 @@ static (string? Framework, Dictionary<string, (string Cause, string Exception)> 
     string? framework = null;
     var names = new Dictionary<string, string>();
     var causes = new Dictionary<string, (string, string)>();
-    foreach (var line in File.ReadLines(path).Where(line => line.StartsWith('{'))) {
+    foreach (string? line in File.ReadLines(path).Where(line => line.StartsWith('{'))) {
         using var message = JsonDocument.Parse(line);
         var root = message.RootElement;
-        var type = root.GetProperty("$type").GetString();
-        var id = root.TryGetProperty("TestUniqueID", out var value) ? value.GetString()! : string.Empty;
+        string? type = root.GetProperty("$type").GetString();
+        string id = root.TryGetProperty("TestUniqueID", out var value) ? value.GetString()! : string.Empty;
         if (type == "test-assembly-starting") {
             framework = root.GetProperty("TestFrameworkDisplayName").GetString();
         } else if (type == "test-starting") {

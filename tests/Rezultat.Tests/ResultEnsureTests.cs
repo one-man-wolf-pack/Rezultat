@@ -33,7 +33,7 @@ public sealed class ResultEnsureTests {
 
     [Fact]
     public void Ensure_passes_value_type_payload_by_value_to_each_callback() {
-        var factoryInput = -1;
+        int factoryInput = -1;
 
         var result = Result<int, int>.Ok(5).Ensure(
             candidate => { candidate++; return candidate < 0; },
@@ -68,7 +68,7 @@ public sealed class ResultEnsureTests {
     [Fact]
     public void Ensure_on_failure_skips_both_callbacks_and_keeps_error_identity() {
         var error = new ReferenceProbe(3);
-        var calls = 0;
+        int calls = 0;
 
         var result = Result<int, ReferenceProbe>.Error(error).Ensure(_ => ++calls > 0, _ => new ReferenceProbe(++calls));
 
@@ -99,7 +99,7 @@ public sealed class ResultEnsureTests {
 
     [Fact]
     public void Sequential_Ensure_keeps_first_failure_and_skips_later_checks() {
-        var calls = 0;
+        int calls = 0;
 
         var result = Result<int, string>.Ok(1)
             .Ensure(static _ => false, static _ => "first")

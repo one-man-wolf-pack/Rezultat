@@ -14,7 +14,7 @@ public sealed class ResultMapTests {
     [Fact]
     public void Map_on_failure_skips_selector_and_keeps_error_identity() {
         var error = new ReferenceProbe(1);
-        var calls = 0;
+        int calls = 0;
 
         var mapped = Result<int, ReferenceProbe>.Error(error).Map(value => ++calls + value);
 
@@ -81,7 +81,7 @@ public sealed class ResultMapTests {
     [Fact]
     public void MapError_on_success_skips_selector_and_keeps_value_identity() {
         var value = new ReferenceProbe(3);
-        var calls = 0;
+        int calls = 0;
 
         var mapped = Result<ReferenceProbe, string>.Ok(value).MapError(error => ++calls + error.Length);
 
@@ -131,7 +131,7 @@ public sealed class ResultMapTests {
 
     [Fact]
     public void Contextual_MapError_on_success_skips_selector_and_keeps_value() {
-        var calls = 0;
+        int calls = 0;
 
         var mapped = Result<int, string>.Ok(7).MapError(10, (error, state) => ++calls + state + error.Length);
 

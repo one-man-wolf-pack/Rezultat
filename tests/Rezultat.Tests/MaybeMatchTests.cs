@@ -4,8 +4,8 @@ public sealed class MaybeMatchTests {
     [Fact]
     public void Some_invokes_only_on_some_once_with_exact_payload() {
         var payload = new ReferenceProbe(1);
-        var someCalls = 0;
-        var noneCalls = 0;
+        int someCalls = 0;
+        int noneCalls = 0;
 
         var result = Maybe<ReferenceProbe>.Some(payload).Match<ReferenceProbe?>(
             value => {
@@ -24,10 +24,10 @@ public sealed class MaybeMatchTests {
     [Fact]
     public void None_and_default_invoke_only_on_none_once() {
         foreach (var maybe in new[] { Maybe<int>.None, default }) {
-            var someCalls = 0;
-            var noneCalls = 0;
+            int someCalls = 0;
+            int noneCalls = 0;
 
-            var result = maybe.Match(
+            string result = maybe.Match(
                 _ => {
                     someCalls++;
                     return "some";
@@ -65,7 +65,7 @@ public sealed class MaybeMatchTests {
 
     [Fact]
     public void Null_handler_check_precedes_invoking_the_other_handler() {
-        var calls = 0;
+        int calls = 0;
 
         Should.Throw<ArgumentNullException>(() => Maybe<int>.Some(1).Match(_ => ++calls, null!)).ShouldBeOfType<ArgumentNullException>();
         Should.Throw<ArgumentNullException>(() => Maybe<int>.None.Match(null!, () => ++calls)).ShouldBeOfType<ArgumentNullException>();

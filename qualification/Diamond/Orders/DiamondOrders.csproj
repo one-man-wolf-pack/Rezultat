@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
     <!-- The restored package graph of this consumer is inspected evidence: no private development analyzers. -->
     <RezultatDevelopmentAnalyzers>false</RezultatDevelopmentAnalyzers>
     <Nullable>enable</Nullable>

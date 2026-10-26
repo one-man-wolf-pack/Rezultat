@@ -192,8 +192,8 @@ public sealed class PublicSurfaceTests {
         var returned = new NullabilityInfoContext().Create(traverse.ReturnParameter);
 
         returned.GenericTypeArguments[0].ReadState.ShouldBe(NullabilityState.NotNull);
-        (new NullabilityInfoContext().Create(typeof(MaybeCollectionExtensions).GetMethod(nameof(MaybeCollectionExtensions.Sequence))!.ReturnParameter)
-                .GenericTypeArguments[0].ReadState).ShouldBe(NullabilityState.NotNull);
+        new NullabilityInfoContext().Create(typeof(MaybeCollectionExtensions).GetMethod(nameof(MaybeCollectionExtensions.Sequence))!.ReturnParameter)
+                .GenericTypeArguments[0].ReadState.ShouldBe(NullabilityState.NotNull);
     }
 
     [Fact]
@@ -429,7 +429,7 @@ public sealed class PublicSurfaceTests {
         method.GetGenericArguments().Select(argument => NullableFlag(argument, method)).ToArray().ShouldBe(expected);
 
     private static byte NullableFlag(Type parameter, MethodInfo method) {
-        var flag = NullableValue(parameter.CustomAttributes, "System.Runtime.CompilerServices.NullableAttribute");
+        byte? flag = NullableValue(parameter.CustomAttributes, "System.Runtime.CompilerServices.NullableAttribute");
         for (MemberInfo? owner = method; flag is null && owner is not null; owner = owner.DeclaringType) {
             flag = NullableValue(owner.CustomAttributes, "System.Runtime.CompilerServices.NullableContextAttribute");
         }
@@ -452,9 +452,8 @@ public sealed class PublicSurfaceTests {
     }
 
     private static string[] DeclaredMembers(Type type) =>
-        type.GetMembers(DeclaredPublic)
+        [.. type.GetMembers(DeclaredPublic)
             .Where(member => member is not ConstructorInfo)
             .Select(member => member.ToString()!)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
+            .Order(StringComparer.Ordinal)];
 }

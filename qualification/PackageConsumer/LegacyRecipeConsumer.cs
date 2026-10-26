@@ -47,7 +47,7 @@ internal static class LegacyRecipes {
 
 internal static class LegacyRecipeConsumer {
     public static void Run(Checks checks) {
-        var seen = 0;
+        int seen = 0;
         checks.Text("legacy observe success", "Result.Ok(1)", Result<int, string>.Ok(1).ObserveSuccess(_ => seen++).ToString());
         checks.Text("legacy convert field", "Result.Ok(Presence.Null)", Presence<string>.Null.ConvertField(Parse).ToString());
         checks.That("legacy recipes bind by their own names", LegacyRecipes.Calls == 2 && seen == 1);
@@ -66,5 +66,5 @@ internal static class LegacyRecipeConsumer {
     }
 
     private static Result<int, string> Parse(string text) =>
-        int.TryParse(text, out var value) ? Result<int, string>.Ok(value) : Result<int, string>.Error(text);
+        int.TryParse(text, out int value) ? Result<int, string>.Ok(value) : Result<int, string>.Error(text);
 }

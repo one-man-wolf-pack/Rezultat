@@ -14,10 +14,7 @@ public sealed class PoisonException : Exception {
 
     public override string ToString() {
         TextReads++;
-        // S3877: poison text; reading it is the failure the tests rule out.
-#pragma warning disable S3877
         throw new InvalidOperationException("exception text must not be read");
-#pragma warning restore S3877
     }
 }
 

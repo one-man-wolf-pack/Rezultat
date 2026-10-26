@@ -12,7 +12,7 @@ public static class Inventory {
 
     public static Validation<int[], string> ParseQuantities(IEnumerable<string> lines) =>
         lines.Traverse(static line =>
-            !int.TryParse(line, out var quantity) ? Validation<int, string>.Invalid($"not a number: {line}")
+            !int.TryParse(line, out int quantity) ? Validation<int, string>.Invalid($"not a number: {line}")
             : quantity < 0 ? Validation<int, string>.Invalid($"negative: {line}")
             : Validation<int, string>.Valid(quantity));
 }

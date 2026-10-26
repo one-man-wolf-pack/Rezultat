@@ -32,7 +32,7 @@ public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
     /// <summary>
     /// Creates Invalid with exactly one issue; a collection-typed issue stays one opaque element.
     /// </summary>
-    public static Validation<T, TIssue> Invalid(TIssue issue) => new(InvalidState, default!, ImmutableArray.Create(issue));
+    public static Validation<T, TIssue> Invalid(TIssue issue) => new(InvalidState, default!, [issue]);
 
     /// <summary>
     /// Keeps <paramref name="issues"/> as is, without an additional snapshot; materialize a mutable or lazy source
@@ -71,7 +71,7 @@ public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
     public bool TryGetValue([MaybeNullWhen(false)] out T value, out ImmutableArray<TIssue> issues) {
         EnsureInitialized();
         value = _value;
-        issues = _state == ValidState ? ImmutableArray<TIssue>.Empty : _issues;
+        issues = _state == ValidState ? [] : _issues;
         return _state == ValidState;
     }
 
@@ -281,12 +281,10 @@ public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
 
     private static Validation<T, TIssue> FromIssues(ImmutableArray<TIssue> issues) => new(InvalidState, default!, issues);
 
-    // S1168: a default array is the "no issues contributed" marker that the combining code tests with IsDefault;
+    // A default array is the "no issues contributed" marker that the combining code tests with IsDefault;
     // an empty array would be a different value.
-#pragma warning disable S1168
     private static ImmutableArray<TIssue> IssuesOf<TAny>(in Validation<TAny, TIssue> validation) =>
         validation._state == InvalidState ? validation._issues : default;
-#pragma warning restore S1168
 
     private static ImmutableArray<TIssue> Concat(
         ImmutableArray<TIssue> a,
@@ -294,8 +292,8 @@ public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
         ImmutableArray<TIssue> c,
         ImmutableArray<TIssue> d) {
         ReadOnlySpan<ImmutableArray<TIssue>> parts = [a, b, c, d];
-        var failed = 0;
-        var total = 0;
+        int failed = 0;
+        int total = 0;
         var single = default(ImmutableArray<TIssue>);
         foreach (var part in parts) {
             if (!part.IsDefault) {
@@ -325,7 +323,7 @@ public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
         }
 
         var comparer = EqualityComparer<TIssue>.Default;
-        for (var i = 0; i < left.Length; i++) {
+        for (int i = 0; i < left.Length; i++) {
             if (!comparer.Equals(left[i], right[i])) {
                 return false;
             }
@@ -346,7 +344,7 @@ public readonly struct Validation<T, TIssue> : IEquatable<Validation<T, TIssue>>
 
     private static string FormatIssues(ImmutableArray<TIssue> issues) {
         var text = new StringBuilder("Validation.Invalid([");
-        for (var i = 0; i < issues.Length; i++) {
+        for (int i = 0; i < issues.Length; i++) {
             if (i > 0) {
                 text.Append(", ");
             }

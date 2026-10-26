@@ -3,7 +3,7 @@ namespace Rezultat.Tests;
 public sealed class MaybeCompositionTests {
     [Fact]
     public void Map_invokes_selector_once_for_some_and_skips_none() {
-        var calls = 0;
+        int calls = 0;
 
         Maybe<int>.Some(1).Map(value => { calls++; return $"{value + 1}"; }).ShouldBe(Maybe<string>.Some("2"));
         calls.ShouldBe(1);
@@ -20,8 +20,8 @@ public sealed class MaybeCompositionTests {
         var emptyNullable = Maybe<int>.Some(1).Map(static _ => (int?)null);
 
         observed.ShouldBeNull();
-        (mapped.TryGetValue(out var payload) && payload is null).ShouldBeTrue();
-        (emptyNullable.TryGetValue(out var empty) && !empty.HasValue).ShouldBeTrue();
+        (mapped.TryGetValue(out string? payload) && payload is null).ShouldBeTrue();
+        (emptyNullable.TryGetValue(out int? empty) && !empty.HasValue).ShouldBeTrue();
     }
 
     [Fact]
@@ -52,18 +52,18 @@ public sealed class MaybeCompositionTests {
 
     [Fact]
     public void AndThen_returns_next_outcome_including_default_and_skips_none() {
-        var calls = 0;
+        int calls = 0;
 
         Maybe<int>.Some(1).AndThen(value => { calls++; return Maybe<int>.Some(value + 1); }).ShouldBe(Maybe<int>.Some(2));
         Maybe<int>.Some(1).AndThen(_ => { calls++; return default(Maybe<int>); }).ShouldBe(Maybe<int>.None);
         Maybe<int>.None.AndThen(_ => { calls++; return Maybe<int>.Some(0); }).ShouldBe(Maybe<int>.None);
         calls.ShouldBe(2);
-        (Maybe<string?>.Some(null).AndThen(static value => Maybe<string?>.Some(value)).TryGetValue(out var payload) && payload is null).ShouldBeTrue();
+        (Maybe<string?>.Some(null).AndThen(static value => Maybe<string?>.Some(value)).TryGetValue(out string? payload) && payload is null).ShouldBeTrue();
     }
 
     [Fact]
     public void OrElse_keeps_some_without_fallback_and_returns_fallback_for_none() {
-        var calls = 0;
+        int calls = 0;
 
         Maybe<int>.Some(1).OrElse(() => { calls++; return Maybe<int>.Some(2); }).ShouldBe(Maybe<int>.Some(1));
         Maybe<string?>.Some(null).OrElse(() => { calls++; return Maybe<string?>.Some("x"); }).ShouldBe(Maybe<string?>.Some(null));
@@ -77,7 +77,7 @@ public sealed class MaybeCompositionTests {
     [Fact]
     public void Filter_keeps_some_on_true_and_gives_none_on_false_or_none() {
         var probe = new ReferenceProbe(1);
-        var calls = 0;
+        int calls = 0;
 
         var kept = Maybe<ReferenceProbe>.Some(probe).Filter(_ => { calls++; return true; });
         var rejected = Maybe<ReferenceProbe>.Some(probe).Filter(_ => { calls++; return false; });
@@ -153,7 +153,7 @@ public sealed class MaybeCompositionTests {
 
     [Fact]
     public void Zip_other_argument_is_evaluated_even_when_receiver_is_none() {
-        var evaluations = 0;
+        int evaluations = 0;
         Maybe<int> Find() {
             evaluations++;
             return Maybe<int>.Some(2);

@@ -20,7 +20,7 @@ public sealed class MaybeQueryTests {
 
     [Fact]
     public void Where_keeps_matching_some_including_null_and_gives_none_otherwise() {
-        var calls = 0;
+        int calls = 0;
 
         Maybe<string?>.Some(null).Where(value => { calls++; return value is null; }).ShouldBe(Maybe<string?>.Some(null));
         Maybe<int>.Some(1).Where(_ => { calls++; return false; }).ShouldBe(Maybe<int>.None);
@@ -43,7 +43,7 @@ public sealed class MaybeQueryTests {
 
     [Fact]
     public void SelectMany_over_none_and_default_calls_no_callbacks() {
-        var calls = 0;
+        int calls = 0;
 
         default(Maybe<int>).SelectMany(
             value => { calls++; return Maybe<int>.Some(value); },
@@ -55,8 +55,8 @@ public sealed class MaybeQueryTests {
     [InlineData(false)]
     [InlineData(true)]
     public void SelectMany_with_none_or_default_next_does_not_project(bool useDefault) {
-        var nextCalls = 0;
-        var projectCalls = 0;
+        int nextCalls = 0;
+        int projectCalls = 0;
 
         var result = Maybe<int>.Some(1).SelectMany(
             _ => { nextCalls++; return useDefault ? default : Maybe<int>.None; },
@@ -109,7 +109,7 @@ public sealed class MaybeQueryTests {
 
     [Fact]
     public void Query_expressions_with_one_to_three_sources_let_and_where() {
-        static Maybe<int> Parse(string text) => int.TryParse(text, out var value) ? Maybe<int>.Some(value) : Maybe<int>.None;
+        static Maybe<int> Parse(string text) => int.TryParse(text, out int value) ? Maybe<int>.Some(value) : Maybe<int>.None;
 
         var one = from x in Parse("1") select x + 1;
         var two = from x in Parse("1") from y in Parse("2") select x + y;

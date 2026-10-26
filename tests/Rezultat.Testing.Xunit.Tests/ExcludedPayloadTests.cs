@@ -58,7 +58,7 @@ public sealed class ExcludedPayloadTests {
 
     [Fact]
     public void FailureStopsTheCurrentLambda() {
-        var continued = false;
+        bool continued = false;
 
         Should.Throw<FailException>(() => {
             _ = Validation<int, string>.Valid(1).ShouldBeInvalid(includePayload: false);
@@ -72,7 +72,7 @@ public sealed class ExcludedPayloadTests {
     public void FailureKeepsTheCallerAsTheTopFrame() {
         var failure = Should.Throw<FailException>(ExtractFromError).ShouldBeOfType<FailException>();
 
-        var stack = failure.StackTrace ?? string.Empty;
+        string stack = failure.StackTrace ?? string.Empty;
         stack.ShouldStartWith($"   at {typeof(ExcludedPayloadTests).FullName}.{nameof(ExtractFromError)}()", Case.Sensitive);
         stack.ShouldNotContain("Rezultat.Testing.Xunit.ResultAssertions.", Case.Sensitive);
         stack.ShouldNotContain("Rezultat.Testing.Xunit.ValidationAssertions.", Case.Sensitive);

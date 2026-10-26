@@ -14,7 +14,7 @@ public sealed class MaybeSequenceTests {
     public void Empty_source_gives_some_empty_array() {
         var source = new TrackedSequence<Maybe<int>>();
 
-        source.Sequence().TryGetValue(out var values).ShouldBeTrue();
+        source.Sequence().TryGetValue(out int[]? values).ShouldBeTrue();
         values.ShouldBeEmpty();
         (source.Enumerations, source.MoveNextCalls, source.Disposals).ShouldBe((1, 1, 1));
     }
@@ -23,7 +23,7 @@ public sealed class MaybeSequenceTests {
     public void All_some_collects_payloads_including_null_in_one_pass() {
         var source = new TrackedSequence<Maybe<string?>>(Maybe<string?>.Some("a"), Maybe<string?>.Some(null));
 
-        source.Sequence().TryGetValue(out var values).ShouldBeTrue();
+        source.Sequence().TryGetValue(out string?[]? values).ShouldBeTrue();
         values.ShouldBe(["a", null]);
         (source.Enumerations, source.MoveNextCalls, source.CurrentReads, source.Disposals).ShouldBe((1, 3, 2, 1));
     }

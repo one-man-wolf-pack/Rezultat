@@ -48,7 +48,7 @@ public sealed class ResultFormattingTests {
         ValueProbe.Reset();
 
         _ = Result<ValueProbe, ValueProbe>.Error(new ValueProbe(1)).ToString();
-        var touchesAfterActiveError = ValueProbe.Touches;
+        int touchesAfterActiveError = ValueProbe.Touches;
         _ = default(Result<ValueProbe, ValueProbe>).ToString();
 
         touchesAfterActiveError.ShouldBe(1);

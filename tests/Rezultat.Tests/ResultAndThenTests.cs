@@ -27,9 +27,9 @@ public sealed class ResultAndThenTests {
     [Fact]
     public void AndThen_on_failure_skips_next_and_keeps_error_with_new_success_type() {
         var error = new ReferenceProbe(2);
-        var calls = 0;
+        int calls = 0;
 
-        Result<string, ReferenceProbe> result = Result<int, ReferenceProbe>.Error(error)
+        var result = Result<int, ReferenceProbe>.Error(error)
             .AndThen(value => Result<string, ReferenceProbe>.Ok($"{++calls + value}"));
 
         result.TryGetValue(out _, out var observed).ShouldBeFalse();
@@ -44,7 +44,7 @@ public sealed class ResultAndThenTests {
 
     [Fact]
     public void AndThen_rejects_uninitialized_outcome_returned_by_next() {
-        var calls = 0;
+        int calls = 0;
 
         Should.Throw<InvalidOperationException>(() => Result<int, string>.Ok(1).AndThen(_ => {
             calls++;

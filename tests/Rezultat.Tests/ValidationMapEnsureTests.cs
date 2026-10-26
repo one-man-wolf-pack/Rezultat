@@ -26,7 +26,7 @@ public sealed class ValidationMapEnsureTests {
     [Fact]
     public void Map_on_invalid_keeps_the_issue_buffer_without_invoking_the_selector() {
         ImmutableArray<string?> issues = ["a", null, "a"];
-        var calls = 0;
+        int calls = 0;
 
         var mapped = Validation<int, string?>.InvalidMany(issues).Map(value => ++calls);
 
@@ -77,7 +77,7 @@ public sealed class ValidationMapEnsureTests {
     [Fact]
     public void Ensure_on_invalid_keeps_the_issue_buffer_without_invoking_callbacks() {
         ImmutableArray<string> issues = ["a", "b"];
-        var calls = 0;
+        int calls = 0;
 
         var checkedValue = Validation<int, string>.InvalidMany(issues).Ensure(_ => ++calls > 0, _ => $"{++calls}");
 
@@ -100,7 +100,7 @@ public sealed class ValidationMapEnsureTests {
 
     [Fact]
     public void Ensure_passes_value_type_payload_by_value_to_each_callback() {
-        var factoryInput = -1;
+        int factoryInput = -1;
 
         var checkedValue = Validation<int, int>.Valid(5).Ensure(
             value => { value++; return value < 0; },

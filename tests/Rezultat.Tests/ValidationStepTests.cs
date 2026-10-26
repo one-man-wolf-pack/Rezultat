@@ -17,7 +17,7 @@ public sealed class ValidationStepTests {
 
     [Fact]
     public void AndThen_on_invalid_keeps_issues_without_invoking_next() {
-        var calls = 0;
+        int calls = 0;
 
         var result = Validation<int, string>.InvalidMany(["a", "b"]).AndThen(value => { calls++; return Validation<string, string>.Valid("x"); });
 
@@ -48,7 +48,7 @@ public sealed class ValidationStepTests {
 
     [Fact]
     public void OrElse_on_valid_keeps_value_with_new_issue_type_without_fallback() {
-        var calls = 0;
+        int calls = 0;
         var payload = new ReferenceProbe(1);
 
         var result = Validation<ReferenceProbe, string>.Valid(payload).OrElse(issues => { calls++; return Validation<ReferenceProbe, int>.Invalid(issues.Length); });
@@ -94,7 +94,7 @@ public sealed class ValidationStepTests {
 
     [Fact]
     public void MapIssues_on_valid_keeps_value_without_invoking_selector() {
-        var calls = 0;
+        int calls = 0;
 
         var result = Validation<string?, string>.Valid(null).MapIssues(issue => { calls++; return issue.Length; });
 
@@ -114,7 +114,7 @@ public sealed class ValidationStepTests {
 
     [Fact]
     public void MapIssues_keeps_positions_for_effectful_selector_and_default_results() {
-        var counter = 0;
+        int counter = 0;
 
         var numbered = Validation<int, string>.InvalidMany(["x", "x"]).MapIssues(_ => ++counter);
         var defaults = Validation<int, string>.Invalid("x").MapIssues(static _ => (string?)null);

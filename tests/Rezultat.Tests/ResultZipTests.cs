@@ -23,7 +23,7 @@ public sealed class ResultZipTests {
         var errors = new Dictionary<string, ReferenceProbe> { ["left"] = new(1), ["right"] = new(2) };
         var left = leftSuccess ? Result<int, ReferenceProbe>.Ok(1) : Result<int, ReferenceProbe>.Error(errors["left"]);
         var right = rightSuccess ? Result<int, ReferenceProbe>.Ok(2) : Result<int, ReferenceProbe>.Error(errors["right"]);
-        var calls = 0;
+        int calls = 0;
 
         var result = left.Zip(right, (a, b) => ++calls + a + b);
 

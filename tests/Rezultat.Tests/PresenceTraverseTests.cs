@@ -3,7 +3,7 @@ namespace Rezultat.Tests;
 public sealed class PresenceTraverseTests {
     [Fact]
     public void Missing_and_null_become_ok_with_the_same_state_without_invoking_the_selector() {
-        var calls = 0;
+        int calls = 0;
 
         Presence<int>.Missing.Traverse(_ => { calls++; return Result<string, int>.Ok("x"); }).ShouldBe(Result<Presence<string>, int>.Ok(Presence<string>.Missing));
         default(Presence<int>).Traverse(_ => { calls++; return Result<string, int>.Ok("x"); }).ShouldBe(Result<Presence<string>, int>.Ok(Presence<string>.Missing));
@@ -48,7 +48,7 @@ public sealed class PresenceTraverseTests {
         Should.Throw<InvalidOperationException>(() => Presence<int>.Value(1).Traverse(static _ => Result<int?, string>.Ok(null))).ShouldBeOfType<InvalidOperationException>();
 
         var kept = Presence<int>.Value(1).Traverse(static value => Result<int?, string>.Ok(value + 1));
-        (kept.TryGetValue(out var presence, out _) && presence.TryGetValue(out var value) && value == 2).ShouldBeTrue();
+        (kept.TryGetValue(out var presence, out _) && presence.TryGetValue(out int? value) && value == 2).ShouldBeTrue();
     }
 #pragma warning restore CS8714
 

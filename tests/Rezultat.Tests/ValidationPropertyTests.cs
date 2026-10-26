@@ -31,16 +31,13 @@ public static class ValidationValues {
 
 [Properties(Arbitrary = [typeof(ValidationValues)])]
 public sealed class ValidationPropertyTests {
-    // S1940: the negated operator form is the subject of this equality law.
-#pragma warning disable S1940
     [Property]
     public bool Equality_forms_agree_and_are_symmetric(Validation<int, int> left, Validation<int, int> right) =>
         left.Equals(right) == (left == right)
-        && (left != right) == !(left == right)
+        && left != right == !(left == right)
         && left.Equals((object)right) == left.Equals(right)
         && left.Equals(right) == right.Equals(left)
         && (!left.Equals(right) || left.GetHashCode() == right.GetHashCode());
-#pragma warning restore S1940
 
     [Property]
     public bool Copied_issue_buffer_is_equal_with_equal_hash(Validation<int, int> validation) {

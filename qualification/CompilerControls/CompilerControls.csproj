@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
     <RezultatConsumerInput>true</RezultatConsumerInput>
     <Nullable>enable</Nullable>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>

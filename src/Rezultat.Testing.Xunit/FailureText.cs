@@ -15,7 +15,7 @@ internal static class FailureText {
         var text = new StringBuilder($"Expected {expected}; actual Validation.Invalid; issues=")
             .Append(issues.Length)
             .Append(" [");
-        for (var index = 0; index < issues.Length; index++) {
+        for (int index = 0; index < issues.Length; index++) {
             text.Append(index == 0 ? string.Empty : ", ").Append(index).Append('=').Append(Payload(issues[index]));
         }
 

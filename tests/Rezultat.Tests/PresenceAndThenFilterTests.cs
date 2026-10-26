@@ -23,7 +23,7 @@ public sealed class PresenceAndThenFilterTests {
 
     [Fact]
     public void AndThen_keeps_missing_and_null_in_the_new_type_without_invoking_next() {
-        var calls = 0;
+        int calls = 0;
 
         Presence<int>.Missing.AndThen(_ => { calls++; return Presence<string>.Value("x"); }).IsMissing.ShouldBeTrue();
         default(Presence<int>).AndThen(_ => { calls++; return Presence<string>.Value("x"); }).IsMissing.ShouldBeTrue();
@@ -65,7 +65,7 @@ public sealed class PresenceAndThenFilterTests {
 
     [Fact]
     public void Filters_keep_missing_and_null_without_invoking_the_predicate() {
-        var calls = 0;
+        int calls = 0;
 
         Presence<int>.Missing.FilterToNull(_ => ++calls > 0).IsMissing.ShouldBeTrue();
         default(Presence<int>).FilterToNull(_ => ++calls > 0).IsMissing.ShouldBeTrue();

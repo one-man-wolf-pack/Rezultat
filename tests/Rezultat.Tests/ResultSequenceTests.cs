@@ -16,7 +16,7 @@ public sealed class ResultSequenceTests {
 
         var result = source.Sequence();
 
-        result.TryGetValue(out var values, out _).ShouldBeTrue();
+        result.TryGetValue(out int[]? values, out _).ShouldBeTrue();
         values.ShouldBeEmpty();
         (source.Enumerations, source.MoveNextCalls, source.CurrentReads, source.Disposals).ShouldBe((1, 1, 0, 1));
     }
@@ -28,7 +28,7 @@ public sealed class ResultSequenceTests {
 
         var result = source.Sequence();
 
-        result.TryGetValue(out var values, out _).ShouldBeTrue();
+        result.TryGetValue(out string?[]? values, out _).ShouldBeTrue();
         values.ShouldBe(["a", null, "c"]);
         (source.Enumerations, source.MoveNextCalls, source.CurrentReads, source.Disposals).ShouldBe((1, 4, 3, 1));
     }
@@ -58,7 +58,7 @@ public sealed class ResultSequenceTests {
 
         var result = items.Sequence();
 
-        result.TryGetValue(out _, out var error).ShouldBeFalse();
+        result.TryGetValue(out _, out string? error).ShouldBeFalse();
         error.ShouldBeNull();
     }
 
@@ -101,7 +101,7 @@ public sealed class ResultSequenceTests {
     [InlineData("default")]
     public void Dispose_exception_replaces_the_outcome_or_earlier_exception(string exit) {
         var disposeException = new ProbeException("dispose");
-        Result<int, string> item = exit switch {
+        var item = exit switch {
             "ok" => Result<int, string>.Ok(1),
             "error" => Result<int, string>.Error("e"),
             _ => default,

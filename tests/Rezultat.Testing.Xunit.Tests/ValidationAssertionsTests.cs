@@ -104,7 +104,7 @@ public sealed class ValidationAssertionsTests {
 
     [Fact]
     public void FailureStopsTheCurrentLambda() {
-        var continued = false;
+        bool continued = false;
 
         Should.Throw<FailException>(() => {
             _ = Validation<int, string>.Valid(1).ShouldBeInvalid();
@@ -118,7 +118,7 @@ public sealed class ValidationAssertionsTests {
     public void FailureKeepsTheCallerAsTheTopFrame() {
         var failure = Should.Throw<FailException>(ExtractFromValid).ShouldBeOfType<FailException>();
 
-        var stack = failure.StackTrace ?? string.Empty;
+        string stack = failure.StackTrace ?? string.Empty;
         stack.ShouldStartWith($"   at {typeof(ValidationAssertionsTests).FullName}.{nameof(ExtractFromValid)}()", Case.Sensitive);
         stack.ShouldNotContain($"{typeof(ValidationAssertions).FullName}.", Case.Sensitive);
     }

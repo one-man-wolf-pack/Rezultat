@@ -2,7 +2,7 @@ namespace Rezultat.Qualification.DiamondOrders;
 
 public static class Orders {
     public static string DescribeNote(Result<string?, string> note) {
-        if (!note.TryGetValue(out var text, out var error)) {
+        if (!note.TryGetValue(out string? text, out string? error)) {
             return $"rejected: {error}";
         }
 

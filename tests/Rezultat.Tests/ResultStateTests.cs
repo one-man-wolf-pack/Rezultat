@@ -31,7 +31,7 @@ public sealed class ResultStateTests {
     [Fact]
     public void Factories_accept_upcast_payload_and_keep_its_identity() {
         var error = new ArgumentException("bad");
-        Result<object, Exception> result = Result<object, Exception>.Error(error);
+        var result = Result<object, Exception>.Error(error);
 
         result.TryGetValue(out _, out var observed).ShouldBeFalse();
         observed.ShouldBeSameAs(error);
@@ -61,21 +61,21 @@ public sealed class ResultStateTests {
     public void TryGetValue_success_returns_active_value_and_default_error() {
         var payload = new ReferenceProbe(1);
 
-        Result<ReferenceProbe, string>.Ok(payload).TryGetValue(out var value, out var error).ShouldBeTrue();
+        Result<ReferenceProbe, string>.Ok(payload).TryGetValue(out var value, out string? error).ShouldBeTrue();
         value.ShouldBeSameAs(payload);
         error.ShouldBeNull();
     }
 
     [Fact]
     public void TryGetValue_failure_returns_active_error_and_default_value() {
-        Result<int, string>.Error("e").TryGetValue(out var value, out var error).ShouldBeFalse();
+        Result<int, string>.Error("e").TryGetValue(out int value, out string? error).ShouldBeFalse();
         value.ShouldBe(0);
         error.ShouldBe("e");
     }
 
     [Fact]
     public void TryGetValue_bool_selects_branch_independently_of_null_or_default_outputs() {
-        Result<string?, string?>.Ok(null).TryGetValue(out var okValue, out var okError).ShouldBeTrue();
+        Result<string?, string?>.Ok(null).TryGetValue(out string? okValue, out string? okError).ShouldBeTrue();
         okValue.ShouldBeNull();
         okError.ShouldBeNull();
 
@@ -83,7 +83,7 @@ public sealed class ResultStateTests {
         unitValue.ShouldBe(Unit.Value);
         unitError.ShouldBe(Unit.Value);
 
-        Result<int?, int?>.Ok(null).TryGetValue(out var nullableValue, out _).ShouldBeTrue();
+        Result<int?, int?>.Ok(null).TryGetValue(out int? nullableValue, out _).ShouldBeTrue();
         nullableValue.HasValue.ShouldBeFalse();
     }
 }

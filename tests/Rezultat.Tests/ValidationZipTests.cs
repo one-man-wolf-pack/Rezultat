@@ -13,13 +13,13 @@ public sealed class ValidationZipTests {
     [InlineData(true, false)]
     [InlineData(true, true)]
     public void Binary_combinations_accumulate_issues_in_operand_order(bool leftInvalid, bool rightInvalid) {
-        var calls = 0;
+        int calls = 0;
         var left = leftInvalid ? Validation<int, string>.InvalidMany(["l1", "l2"]) : Validation<int, string>.Valid(1);
         var right = rightInvalid ? Validation<string, string>.Invalid("r") : Validation<string, string>.Valid("x");
 
         var result = left.Zip(right, (a, b) => { calls++; return $"{a}{b}"; });
 
-        string[] expected = [.. (leftInvalid ? new[] { "l1", "l2" } : []), .. (rightInvalid ? new[] { "r" } : [])];
+        string[] expected = [.. leftInvalid ? new[] { "l1", "l2" } : [], .. rightInvalid ? new[] { "r" } : []];
         if (expected.Length == 0) {
             result.ShouldBe(Validation<string, string>.Valid("1x"));
             calls.ShouldBe(1);
@@ -32,7 +32,7 @@ public sealed class ValidationZipTests {
     [Theory]
     [MemberData(nameof(ThreeInputMasks))]
     public void Three_inputs_accumulate_every_invalid_in_operand_order(int invalidMask) {
-        var calls = 0;
+        int calls = 0;
         var inputs = Enumerable.Range(0, 3).Select(index => Input(index, invalidMask)).ToArray();
 
         var result = inputs[0].Zip(inputs[1], inputs[2], (a, b, c) => { calls++; return a + b + c; });
@@ -43,7 +43,7 @@ public sealed class ValidationZipTests {
     [Theory]
     [MemberData(nameof(FourInputMasks))]
     public void Four_inputs_accumulate_every_invalid_in_operand_order(int invalidMask) {
-        var calls = 0;
+        int calls = 0;
         var inputs = Enumerable.Range(0, 4).Select(index => Input(index, invalidMask)).ToArray();
 
         var result = inputs[0].Zip(inputs[1], inputs[2], inputs[3], (a, b, c, d) => { calls++; return a + b + c + d; });
@@ -73,7 +73,7 @@ public sealed class ValidationZipTests {
 
     [Fact]
     public void Uninitialized_receiver_is_rejected_before_inputs_and_selector() {
-        var calls = 0;
+        int calls = 0;
 
         Should.Throw<InvalidOperationException>(() => default(Validation<int, string>).Zip<int, int>(default, null!)).ShouldBeOfType<InvalidOperationException>();
         Should.Throw<InvalidOperationException>(() => default(Validation<int, string>).Zip(Validation<int, string>.Invalid("e"), (a, b) => ++calls)).ShouldBeOfType<InvalidOperationException>();

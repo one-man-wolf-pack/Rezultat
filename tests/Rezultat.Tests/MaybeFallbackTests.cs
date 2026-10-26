@@ -24,7 +24,7 @@ public sealed class MaybeFallbackTests {
 
     [Fact]
     public void ValueOr_receives_an_eagerly_evaluated_argument() {
-        var evaluations = 0;
+        int evaluations = 0;
 
         Maybe<int>.Some(1).ValueOr(++evaluations).ShouldBe(1);
         evaluations.ShouldBe(1);
@@ -32,7 +32,7 @@ public sealed class MaybeFallbackTests {
 
     [Fact]
     public void ValueOrElse_invokes_factory_once_only_for_none() {
-        var calls = 0;
+        int calls = 0;
 
         Maybe<int>.Some(1).ValueOrElse(() => ++calls + 10).ShouldBe(1);
         calls.ShouldBe(0);

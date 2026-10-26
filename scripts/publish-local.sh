@@ -50,7 +50,7 @@ if $legacy; then
     destinations=("$feed/records/$record")
 else
     [[ -f "$packages/$record" ]] || {
-        echo "Build-time source record is missing: $packages/$record. Issue only artifacts built by scripts/qualify.sh release <commit> <package-id>." >&2
+        echo "Build-time source record is missing: $packages/$record. Issue only artifacts built by just release <commit> <package-id>." >&2
         exit 1
     }
     artifacts=("$packages/$nupkg")
