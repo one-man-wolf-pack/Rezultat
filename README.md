@@ -71,6 +71,15 @@ behavior in `rfc/`, technical mapping in `realization/`, engineering rules in `c
 - There is no general zero-allocation claim; `just alloc` measures selected operations in warmed
   Release.
 
+## Agent-built, specification-first
+
+All code is written by LLM agents under human direction. Development is specification-first: agents maintain the
+specification, implement scoped tasks and review changes against its requirements, architecture, design and
+engineering standards. Tests, measurements, benchmarks and independent agent feedback inform technical decisions.
+
+Bug reports and feature requests are welcome; code PRs are not accepted. Proposed changes go through specification
+and architecture review, with adoption based on the project's goals and constraints.
+
 ## Development
 
 The consumer READMEs `src/Rezultat/README.md`, `src/Rezultat.Testing.Xunit/README.md` and
