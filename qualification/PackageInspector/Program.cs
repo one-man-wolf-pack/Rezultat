@@ -6,24 +6,50 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using Rezultat.Qualification;
 
 
-if (args.Length < 7 || args[0] is not (Inspection.CoreId or Inspection.AssertionsId)) {
-    Console.Error.WriteLine("usage: PackageInspector <Rezultat|Rezultat.Testing.Xunit> <repo-root> <version> <nupkg> <snupkg> <packages-folder> <project.assets.json>...");
+string? repositoryUrl = null;
+string? sourceRevision = null;
+int next = 1;
+while (next + 1 < args.Length && args[next] is "--repository-url" or "--source-revision") {
+    if (args[next] == "--repository-url") {
+        repositoryUrl = args[next + 1];
+    } else {
+        sourceRevision = args[next + 1];
+    }
+
+    next += 2;
+}
+
+string[] rest = args[next..];
+if (rest.Length < 6 || args[0] is not (Inspection.CoreId or Inspection.AssertionsId)
+    || repositoryUrl is null || !SourceMetadata.RepositoryUrl().IsMatch(repositoryUrl)
+    || (sourceRevision is not null && !SourceMetadata.Commit().IsMatch(sourceRevision))) {
+    Console.Error.WriteLine("usage: PackageInspector <Rezultat|Rezultat.Testing.Xunit> --repository-url https://github.com/<owner>/<repo> "
+        + "[--source-revision <full commit>] <repo-root> <version> <nupkg> <snupkg> <packages-folder> <project.assets.json>...");
     return 2;
 }
 
-string repoRoot = Path.GetFullPath(args[1]);
-var inspection = new Inspection(args[0], args[2]);
-byte[] nupkgDll = inspection.InspectPackage(args[3], repoRoot);
-inspection.InspectSymbols(args[4], nupkgDll, repoRoot);
-foreach (string? assets in args[6..]) {
-    inspection.InspectConsumer(assets, Path.GetFullPath(args[5]), Path.GetDirectoryName(Path.GetFullPath(args[3]))!, nupkgDll);
+string repoRoot = Path.GetFullPath(rest[0]);
+var inspection = new Inspection(args[0], rest[1], new Source(repositoryUrl, sourceRevision));
+byte[] nupkgDll = inspection.InspectPackage(rest[2], repoRoot);
+inspection.InspectSymbols(rest[3], nupkgDll, repoRoot);
+foreach (string? assets in rest[5..]) {
+    inspection.InspectConsumer(assets, Path.GetFullPath(rest[4]), Path.GetDirectoryName(Path.GetFullPath(rest[2]))!, nupkgDll);
 }
 
 return inspection.Complete();
 
-internal sealed class Inspection(string packageId, string packageVersion) {
+internal sealed record Source(string RepositoryUrl, string? Revision) {
+    public string Label => Revision is null ? "bootstrap" : $"source-bound {Revision}";
+
+    public string InformationalVersion(string version) => Revision is null ? version : $"{version}+{Revision}";
+
+    public string SourceLinkTarget => $"https://raw.githubusercontent.com/{RepositoryUrl["https://github.com/".Length..]}/{Revision}/*";
+}
+
+internal sealed class Inspection(string packageId, string packageVersion, Source source) {
     public const string CoreId = "Rezultat";
     public const string AssertionsId = "Rezultat.Testing.Xunit";
     private const string AssertId = "xunit.v3.assert";
@@ -80,17 +106,22 @@ internal sealed class Inspection(string packageId, string packageVersion) {
             InspectAssertionDependencies(packageDependencies);
         }
 
+        Report("source expectation", source.Label);
+        Check($"nuspec projectUrl is {source.RepositoryUrl}", Value("projectUrl") == source.RepositoryUrl, SourceMetadata.Describe(Value("projectUrl"), source.RepositoryUrl));
         var repository = metadata.Elements().SingleOrDefault(element => element.Name.LocalName == "repository");
-        Report("nuspec repository", repository?.ToString(SaveOptions.DisableFormatting) ?? "<none>");
-        Check("nuspec carries no invented repository url/commit",
-            repository is null || (repository.Attribute("url") is null && repository.Attribute("commit") is null));
+        string? type = repository?.Attribute("type")?.Value;
+        string? url = repository?.Attribute("url")?.Value;
+        string? commit = repository?.Attribute("commit")?.Value;
+        Check($"nuspec repository is git {source.RepositoryUrl} with {(source.Revision is null ? "no commit" : $"commit {source.Revision}")}",
+            type == "git" && url == source.RepositoryUrl && commit == source.Revision,
+            $"type {SourceMetadata.Describe(type, "git")}, url {SourceMetadata.Describe(url, source.RepositoryUrl)}, commit {SourceMetadata.Describe(commit, source.Revision)}");
 
         byte[] dll = ReadAll(package.GetEntry($"{LibPath}{packageId}.dll")!);
         Report("dll sha256", Sha256(dll));
         string? informationalVersion = ReadInformationalVersion(dll);
         Report("dll informational version", informationalVersion ?? "<none>");
-        Check("dll informational version is the package version without unconfirmed source revision",
-            informationalVersion == packageVersion, informationalVersion);
+        Check($"dll informational version is {source.InformationalVersion(packageVersion)}",
+            informationalVersion == source.InformationalVersion(packageVersion), informationalVersion);
 
         var references = ReadAssemblyReferences(dll);
         Report("dll assembly references", string.Join(", ", references.Select(reference => $"{reference.Name} {reference.Version}")));
@@ -156,15 +187,26 @@ internal sealed class Inspection(string packageId, string packageVersion) {
             checksum.AlgorithmName);
 
         int embedded = 0;
-        int sourceLink = 0;
+        List<string> sourceLinks = [];
         foreach (var handle in pdbReader.CustomDebugInformation) {
-            var kind = pdbReader.GetGuid(pdbReader.GetCustomDebugInformation(handle).Kind);
+            var information = pdbReader.GetCustomDebugInformation(handle);
+            var kind = pdbReader.GetGuid(information.Kind);
             embedded += kind == _embeddedSourceKind ? 1 : 0;
-            sourceLink += kind == _sourceLinkKind ? 1 : 0;
+            if (kind == _sourceLinkKind) {
+                sourceLinks.Add(System.Text.Encoding.UTF8.GetString(pdbReader.GetBlobBytes(information.Value)));
+            }
         }
 
         Check("pdb has no embedded sources", embedded == 0, $"{embedded} embedded");
-        Report("pdb source link mapping", sourceLink == 0 ? "absent (not generated in this bootstrap)" : "present");
+        if (source.Revision is null) {
+            Check("pdb has no Source Link mapping for a bootstrap candidate", sourceLinks.Count == 0);
+        } else {
+            var documents = sourceLinks.Count == 1 ? SourceLinkDocuments(sourceLinks[0]) : [];
+            Check($"pdb Source Link maps exactly {LogicalRoot}* to {source.SourceLinkTarget}",
+                documents is [var (key, target)] && key == $"{LogicalRoot}*" && target == source.SourceLinkTarget,
+                $"{sourceLinks.Count} Source Link blob(s), {documents.Length} mapping(s), "
+                + $"{(documents.Length == 1 ? $"key {SourceMetadata.Describe(documents[0].Key, $"{LogicalRoot}*")}, target {SourceMetadata.Describe(documents[0].Target, source.SourceLinkTarget)}" : "no single mapping")}");
+        }
 
         string[] authoredSources = [.. Directory.EnumerateFiles(Path.Combine(repoRoot, "src", packageId), "*.cs", SearchOption.AllDirectories)
             .Select(path => LogicalRoot + Path.GetRelativePath(repoRoot, path).Replace('\\', '/'))
@@ -189,6 +231,8 @@ internal sealed class Inspection(string packageId, string packageVersion) {
             string path = Path.Combine(repoRoot, name[LogicalRoot.Length..]);
             bool exists = File.Exists(path);
             bool matches = exists && algorithm == _sha256Algorithm && SHA256.HashData(File.ReadAllBytes(path)).AsSpan().SequenceEqual(hash);
+            // Under a source-bound expectation the lane has checked that the checkout is the clean commit, so an authored
+            // match is a match with the file Source Link names; generated documents have no tracked counterpart.
             string origin = name.StartsWith($"{LogicalRoot}src/", StringComparison.Ordinal) ? "authored" : "generated";
             Check($"pdb document {name} ({origin}) checksum matches build input", matches, exists ? "hash mismatch" : $"missing {path}");
         }
@@ -355,6 +399,13 @@ internal sealed class Inspection(string packageId, string packageVersion) {
     private void Check(string name, bool condition, string? detail = null) {
         Console.WriteLine($"{(condition ? "PASS" : "FAIL")} {name}{(condition || detail is null ? string.Empty : $": {detail}")}");
         _failures += condition ? 0 : 1;
+    }
+
+    private static (string Key, string Target)[] SourceLinkDocuments(string json) {
+        using var document = JsonDocument.Parse(json);
+        return document.RootElement.TryGetProperty("documents", out var documents)
+            ? [.. documents.EnumerateObject().Select(entry => (entry.Name, entry.Value.GetString() ?? string.Empty))]
+            : [];
     }
 
     private static bool IsLogical(string path) => path.StartsWith(LogicalRoot, StringComparison.Ordinal);

@@ -57,7 +57,7 @@ internal sealed class Inspection(string label, string packagesFolder, string lib
         byte[] dll = ReadAll(package.GetEntry($"lib/{Framework}/{id}.dll")!);
         var reference = CoreReference(dll);
         Report($"{name} dll", $"sha256 {Sha256(dll)}, mvid {Mvid(dll)}, references Rezultat {reference}");
-        Check($"{name}: dll was compiled against Rezultat {core.Version}", reference == AssemblyVersion(core.Version), reference?.ToString());
+        Check($"{name}: dll was compiled against the assembly of Rezultat {core.Version}", reference == AssemblyVersion(core), reference?.ToString());
         return dll;
     }
 
@@ -148,9 +148,10 @@ internal sealed class Inspection(string label, string packagesFolder, string lib
         return Path.TrimEndingDirectorySeparator(Path.GetFullPath(document.RootElement.GetProperty("source").GetString()!));
     }
 
-    private static Version AssemblyVersion(string version) {
-        var parsed = Version.Parse(version);
-        return new Version(parsed.Major, parsed.Minor, parsed.Build, 0);
+    private static Version AssemblyVersion(Core core) {
+        using var package = ZipFile.OpenRead(Path.Combine(core.Feed, $"{CoreId}.{core.Version}.nupkg"));
+        using var peReader = new PEReader(ImmutableArray.Create(ReadAll(package.GetEntry($"lib/{Framework}/{CoreId}.dll")!)));
+        return peReader.GetMetadataReader().GetAssemblyDefinition().Version;
     }
 
     private static Version? CoreReference(byte[] dll) {

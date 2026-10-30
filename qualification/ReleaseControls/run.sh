@@ -7,6 +7,7 @@ work="$(mktemp -d "$root/artifacts/qualification/release-controls.XXXXXX")"
 repo="$work/repo"
 echo "release controls work directory: $work"
 failures=0
+marker=rzt-synthetic-credential-marker
 publish_path="$PATH"
 broken_bin="$work/broken-bin"
 mkdir -p "$broken_bin"
@@ -28,6 +29,22 @@ empty_feed() { [[ -z "$(find "$1" -type f 2>/dev/null)" ]]; }
 new_feed() { mkdir -p "$work/feeds/$1"; echo "$work/feeds/$1"; }
 rewrite() { sed "$2" "$1" >"$1.new" && mv "$1.new" "$1"; }
 copy_packages() { rm -rf "$work/packages/$1"; mkdir -p "$work/packages"; cp -R "$packages" "$work/packages/$1"; echo "$work/packages/$1"; }
+retag() {
+    local archive="$1" expression="$2" unpacked nuspec
+    unpacked="$(mktemp -d "$work/retag.XXXXXX")"
+    nuspec="$(unzip -Z1 "$archive" | grep -E '^[^/]+\.nuspec$')"
+    unzip -q "$archive" "$nuspec" -d "$unpacked"
+    rewrite "$unpacked/$nuspec" "$expression"
+    chmod u+w "$archive"
+    (cd "$unpacked" && zip -q "$archive" "$nuspec")
+    rm -rf "$unpacked"
+}
+rerecord() {
+    local directory="$1" id="$2" revision="$3" archives=("$1/$2.$version.nupkg")
+    [[ "$id" == Rezultat.Analyzers ]] || archives+=("$directory/$id.$version.snupkg")
+    (. "$repo/scripts/release-record.sh" && release_record "$id" "$version" "$revision" "${archives[@]}") >"$directory/$id.$version.record"
+}
+bound() { (. "$repo/scripts/release-record.sh" && release_bound "$@"); }
 
 refused() {
     local name="$1" feed="$2"
@@ -45,8 +62,10 @@ refused() {
 mkdir -p "$repo"
 (cd "$root" && git ls-files -z -co --exclude-standard | tar --null -T - -cf -) | tar -xf - -C "$repo"
 git -C "$repo" init -q
+url="$(. "$repo/scripts/release-record.sh" && release_repository_url "$repo/src/Directory.Build.props")"
 fixture_git add -A
 fixture_git commit -q -m snapshot
+fixture_git remote add origin "$url"
 built="$(git -C "$repo" rev-parse HEAD)"
 
 printf '\nDirty working tree marker.\n' >>"$repo/src/Rezultat/README.md"
@@ -67,6 +86,13 @@ core_record="$packages/Rezultat.$version.record"
 analyzer_record="$packages/Rezultat.Analyzers.$version.record"
 
 check "HEAD moved after the build ($head)" test "$head" != "$built"
+check "snapshot is a detached clean checkout of $built" \
+    test "$(git -C "$snapshot" rev-parse HEAD)/$(git -C "$snapshot" status --porcelain --untracked-files=all)/$(git -C "$snapshot" symbolic-ref -q HEAD)" == "$built//"
+check "snapshot origin is the agreed $url" test "$(git -C "$snapshot" remote get-url origin)" == "$url"
+check "packages are marked as built from $built" test "$(cat "$packages/source-revision")" == "$built"
+for id in Rezultat Rezultat.Testing.Xunit Rezultat.Analyzers; do
+    check "$id nuspec names $url and $built" bound "$packages/$id.$version.nupkg" "$built" "$url"
+done
 check "record names the built commit $built" grep -qx "source-revision=$built" "$core_record"
 check "modified tracked README did not reach the package" \
     cmp -s <(unzip -p "$packages/Rezultat.$version.nupkg" README.md) <(git -C "$repo" show "$built:src/Rezultat/README.md")
@@ -117,6 +143,44 @@ rewrite "$unknown/Rezultat.$version.record" 's/^source-revision=.*/source-revisi
 feed="$(new_feed unknown)"
 refused "new issuance with unknown revision" "$feed" "$version" "$unknown" "$feed"
 
+incomplete="$(copy_packages incomplete)"
+rewrite "$incomplete/Rezultat.$version.record" '/^snupkg-sha256=/d'
+feed="$(new_feed incomplete)"
+refused "record without the symbols hash" "$feed" "$version" "$incomplete" "$feed"
+
+bootstrap="$(copy_packages bootstrap)"
+retag "$bootstrap/Rezultat.$version.nupkg" 's/ commit="[0-9a-f]*"//'
+rerecord "$bootstrap" Rezultat "$built"
+feed="$(new_feed bootstrap)"
+refused "stable package without a source commit (bootstrap)" "$feed" "$version" "$bootstrap" "$feed"
+
+other_commit="$(copy_packages other-commit)"
+retag "$other_commit/Rezultat.$version.nupkg" "s/ commit=\"$built\"/ commit=\"$head\"/"
+rerecord "$other_commit" Rezultat "$built"
+feed="$(new_feed other-commit)"
+refused "package of another commit than its record" "$feed" "$version" "$other_commit" "$feed"
+
+other_url="$(copy_packages other-url)"
+retag "$other_url/Rezultat.Analyzers.$version.nupkg" "s|url=\"$url\"|url=\"https://github.com/example/Rezultat\"|"
+rerecord "$other_url" Rezultat.Analyzers "$built"
+feed="$(new_feed other-url)"
+refused "package naming another repository" "$feed" --package Rezultat.Analyzers "$version" "$other_url" "$feed"
+
+credentialed_url="$(copy_packages credentialed-url)"
+retag "$credentialed_url/Rezultat.$version.nupkg" "s|url=\"https://|url=\"https://x-access-token:$marker@|"
+rerecord "$credentialed_url" Rezultat "$built"
+feed="$(new_feed credentialed-url)"
+refused "package naming a credentialed repository URL" "$feed" "$version" "$credentialed_url" "$feed"
+check "refusal of a credentialed package URL does not log the credential" bash -c "! grep -q '$marker' '$work/publish.log'"
+
+feed="$(new_feed stable-legacy)"
+mkdir -p "$feed/symbols"
+cp "$packages/Rezultat.$version.nupkg" "$feed/"
+cp "$packages/Rezultat.$version.snupkg" "$feed/symbols/"
+before="$(listing "$feed")"
+if publish --legacy-record "$version" "$feed"; then fail "stable legacy record: published"; else pass "stable legacy record: $(tail -1 "$work/publish.log")"; fi
+check "refused stable legacy record keeps the feed unchanged" test "$before" == "$(listing "$feed")"
+
 feed="$(new_feed conflict)"
 mkdir -p "$feed/records"
 sed "s/^source-revision=.*/source-revision=$head/" "$core_record" >"$feed/records/Rezultat.$version.record"
@@ -125,14 +189,23 @@ before="$(listing "$feed")"
 if publish "$version" "$packages" "$feed"; then fail "conflicting record: published"; else pass "conflicting record: $(tail -1 "$work/publish.log")"; fi
 check "conflicting record keeps the feed unchanged" test "$before" == "$(listing "$feed")"
 
+# Legacy records cover only issued private 0.y.z: an issued 0.99.0 stands in for them.
+private="$(copy_packages private)"
+for archive in Rezultat.$version.nupkg Rezultat.$version.snupkg Rezultat.Analyzers.$version.nupkg; do
+    retag "$private/$archive" "s|<version>$version</version>|<version>0.99.0</version>|"
+    mv "$private/$archive" "$private/${archive/$version/0.99.0}"
+done
+stable_version="$version"
+version=0.99.0
+rerecord "$private" Rezultat "$built"
 feed="$(new_feed legacy)"
 mkdir -p "$feed/symbols"
-cp "$packages/Rezultat.$version.nupkg" "$feed/"
-cp "$packages/Rezultat.$version.snupkg" "$feed/symbols/"
-cp "$packages/Rezultat.Analyzers.$version.nupkg" "$feed/"
+cp "$private/Rezultat.$version.nupkg" "$feed/"
+cp "$private/Rezultat.$version.snupkg" "$feed/symbols/"
+cp "$private/Rezultat.Analyzers.$version.nupkg" "$feed/"
 chmod 444 "$feed/Rezultat.$version.nupkg" "$feed/symbols/Rezultat.$version.snupkg" "$feed/Rezultat.Analyzers.$version.nupkg"
 archives="$(listing "$feed")"
-if publish "$version" "$packages" "$feed"; then fail "commit record for a legacy archive: published"; else pass "commit record for a legacy archive: $(tail -1 "$work/publish.log")"; fi
+if publish "$version" "$private" "$feed"; then fail "commit record for a legacy archive: published"; else pass "commit record for a legacy archive: $(tail -1 "$work/publish.log")"; fi
 publish --legacy-record "$version" "$feed" && publish --legacy-record --package Rezultat.Analyzers "$version" "$feed" \
     && pass "legacy records written" || { fail "legacy records"; cat "$work/publish.log"; }
 check "legacy core record is unknown with the issued hashes" test "$(cat "$feed/records/Rezultat.$version.record")" == \
@@ -145,20 +218,43 @@ check "legacy archives keep their bytes and modes" test "$archives" == "$(listin
 before="$(listing "$feed")"
 publish --legacy-record "$version" "$feed" && grep -q Unchanged "$work/publish.log" \
     && pass "legacy retry is a no-op" || fail "legacy retry"
-if publish "$version" "$packages" "$feed"; then fail "commit record after legacy record: published"; else pass "commit record after legacy record: $(tail -1 "$work/publish.log")"; fi
+if publish "$version" "$private" "$feed"; then fail "commit record after legacy record: published"; else pass "commit record after legacy record: $(tail -1 "$work/publish.log")"; fi
 check "legacy feed unchanged by retries and refusals" test "$before" == "$(listing "$feed")"
 
 publish_path="$broken_bin:$PATH"
 feed="$(new_feed hashing-issue)"
-refused "new issuance when hashing fails" "$feed" "$version" "$packages" "$feed"
+refused "new issuance when hashing fails" "$feed" "$stable_version" "$packages" "$feed"
 feed="$(new_feed hashing-legacy)"
 mkdir -p "$feed/symbols"
-cp "$packages/Rezultat.$version.nupkg" "$feed/"
-cp "$packages/Rezultat.$version.snupkg" "$feed/symbols/"
+cp "$private/Rezultat.$version.nupkg" "$feed/"
+cp "$private/Rezultat.$version.snupkg" "$feed/symbols/"
 before="$(listing "$feed")"
 if publish --legacy-record "$version" "$feed"; then fail "legacy record when hashing fails: published"; else pass "legacy record when hashing fails: $(tail -1 "$work/publish.log")"; fi
 check "failed legacy record keeps the feed unchanged" test "$before" == "$(listing "$feed")"
 publish_path="$PATH"
+version="$stable_version"
+
+printf 'untracked\n' >"$snapshot/untracked.txt"
+if just --justfile "$snapshot/justfile" linux pack-bound "$built" >"$work/pack-dirty.log" 2>&1; then
+    fail "source-bound pack of a dirty checkout: packed"
+else
+    pass "source-bound pack of a dirty checkout: $(grep FAIL "$work/pack-dirty.log" | tail -1)"
+fi
+rm "$snapshot/untracked.txt"
+git -C "$snapshot" remote set-url origin "https://x-access-token:$marker@github.com/one-man-wolf-pack/Rezultat"
+if just --justfile "$snapshot/justfile" linux pack-bound "$built" >"$work/pack-credentialed.log" 2>&1; then
+    fail "source-bound pack with a credentialed origin: packed"
+else
+    pass "source-bound pack with a credentialed origin: $(grep FAIL "$work/pack-credentialed.log" | tail -1)"
+fi
+git -C "$snapshot" remote set-url origin "$url"
+if just --justfile "$snapshot/justfile" linux pack-bound "$head" >"$work/pack-other.log" 2>&1; then
+    fail "source-bound pack of another commit: packed"
+else
+    pass "source-bound pack of another commit: $(grep FAIL "$work/pack-other.log" | tail -1)"
+fi
+check "refused source-bound packs keep the recorded archives" \
+    test "$(sha "$packages/Rezultat.$version.nupkg")" == "$(sed -n 's/^nupkg-sha256=//p' "$core_record")"
 
 rm "$repo/src/Rezultat/UntrackedInput.cs"
 fixture_git add -A
@@ -172,6 +268,18 @@ else
 fi
 check "failed generation still built the archives" test -f "$hashing_packages/Rezultat.$version.nupkg"
 check "failed generation writes no record" test -z "$(find "$hashing_packages" -name '*.record*')"
+
+rewrite "$repo/src/Directory.Build.props" "s|<RepositoryUrl>https://|<RepositoryUrl>https://x-access-token:$marker@|"
+fixture_git commit -q -am credentialed
+credentialed="$(git -C "$repo" rev-parse HEAD)"
+if "$repo/scripts/qualify.sh" release "$credentialed" Rezultat >"$work/release-credentialed.log" 2>&1; then
+    fail "release of a commit with a credentialed RepositoryUrl: released"
+else
+    pass "release of a commit with a credentialed RepositoryUrl: $(tail -1 "$work/release-credentialed.log")"
+fi
+check "credentialed release built nothing" test ! -e "$repo/artifacts/release/$credentialed/artifacts"
+check "no control or nested log contains the credential marker" \
+    test -z "$(grep -rl --include='*.log' "$marker" "$work" 2>/dev/null)"
 
 echo "release controls: $failures failure(s)"
 exit "$failures"

@@ -6,9 +6,16 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <Version>0.8.3</Version>
+    <VersionPrefix>1.0.0</VersionPrefix>
+    <!-- A runtime binding identity per major line: a compatible 1.x update must load where an older 1.x was
+         referenced, so only the major reaches AssemblyVersion; package and file versions name the release. -->
+    <AssemblyVersion>$([System.Version]::Parse('$(VersionPrefix)').Major).0.0.0</AssemblyVersion>
     <Authors>Zada Zorg</Authors>
     <Copyright>Copyright (c) 2026 Zada Zorg</Copyright>
+    <PackageProjectUrl>https://github.com/one-man-wolf-pack/Rezultat</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/one-man-wolf-pack/Rezultat</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <IsPackable>true</IsPackable>
@@ -17,11 +24,11 @@
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <EmbedUntrackedSources>false</EmbedUntrackedSources>
     <EmbedAllSources>false</EmbedAllSources>
-    <!-- No supported source host exists yet and local builds may contain uncommitted sources, so
-         neither a Source Link mapping nor an SCM-derived commit (nuspec repository commit,
-         informational version suffix) is truthful (library-distribution.md, local bootstrap before
-         source binding). Enable both once an agreed host/URL exists and artifacts are built from
-         the exact commit. -->
+    <!-- An ordinary build may compile modified or untracked sources, so its HEAD is not the source of the
+         artifact: a Source Link mapping or an SCM-derived commit (nuspec repository commit, informational
+         version suffix) would attribute those inputs to that commit. Only the release lane (qualify.sh
+         pack-bound) enables both, after checking that it builds a clean isolated checkout of the requested
+         commit with the agreed origin. -->
     <EnableSourceLink>false</EnableSourceLink>
     <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>
   </PropertyGroup>

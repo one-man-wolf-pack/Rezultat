@@ -78,6 +78,10 @@ gc:
 pack: setup
     {{ qualify }} pack
 
+[private]
+pack-bound commit: setup
+    {{ qualify }} pack-bound "$1"
+
 [doc('Packed core: consumers, compiler controls, README examples and recipes, reference diamond, package inspection.')]
 [group('qualification')]
 consumers: setup
@@ -117,7 +121,7 @@ qualify rid: check pack consumers assertions analyzers alloc (publish rid)
 linux +recipes:
     REZULTAT_RUNNER='scripts/linux.sh ' just "$@"
 
-[doc('Export a commit to artifacts/release/<commit>, pack it on Linux and record the named packages.')]
+[doc('Clone a commit to artifacts/release/<commit>, pack it source-bound on Linux and record the named packages.')]
 [group('release')]
 release commit +packages:
     bash scripts/qualify.sh release "$@"

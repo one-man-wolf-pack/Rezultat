@@ -11,6 +11,7 @@ issued_feed="${REZULTAT_LOCAL_FEED:-$HOME/.local/share/nuget/rezultat}"
 # different file under the same version would compile the old library against other bytes and prove nothing.
 issued_core_version=0.8.0
 issued_core_sha256=4f2d6cdd7e84380515e559cdf42c2c14e8d9d357373b7d5e82e5c33389cc5469
+issued_core_assembly=0.8.0.0
 . "$root/scripts/release-record.sh"
 
 export DOTNET_NOLOGO=1 DOTNET_CLI_TELEMETRY_OPTOUT=1 TESTINGPLATFORM_TELEMETRY_OPTOUT=1
@@ -19,20 +20,56 @@ package_version() {
     dotnet msbuild "$root/src/Rezultat" -getProperty:Version
 }
 
+repository_url() {
+    local url
+    url="$(dotnet msbuild "$root/src/Rezultat" -getProperty:RepositoryUrl)" || return 1
+    release_repository_url_valid "$url" || { echo "RepositoryUrl is not a credential-free https://github.com/<owner>/<repo> URL." >&2; return 1; }
+    echo "$url"
+}
+
 usage() {
     cat <<'EOF'
 usage: scripts/qualify.sh <lane> [args]; normally reached through the root justfile (just --list)
-  pack | consumers | diamond | assertions | analyzers | alloc | publish <rid> | release <commit> <package-id>... |
-  release-controls
+  pack | pack-bound <commit> | consumers | diamond | assertions | analyzers | alloc | publish <rid> |
+  release <commit> <package-id>... | release-controls
 EOF
 }
 
-# Restored in locked mode by the setup recipe; the archives land in the SDK package output.
+# Restored in locked mode by the setup recipe; the archives land in the SDK package output. Arguments are passed to
+# every dotnet pack.
 pack() {
+    local id
     rm -rf "$feed"
-    dotnet pack "$root/src/Rezultat" -c Release --no-restore
-    dotnet pack "$root/src/Rezultat.Testing.Xunit" -c Release --no-restore
-    dotnet pack "$root/src/Rezultat.Analyzers" -c Release --no-restore
+    for id in Rezultat Rezultat.Testing.Xunit Rezultat.Analyzers; do
+        dotnet pack "$root/src/$id" -c Release --no-restore "$@"
+    done
+}
+
+# The source-bound pack of the release lane. Source Link and the SCM commit are truthful only when every build input
+# is the requested commit, so the checkout is checked first and the SDK reads the revision from its own Git metadata.
+pack_bound() {
+    local revision="${1:?commit required}" head url origin
+    head="$(git -C "$root" rev-parse --verify HEAD)" || return 1
+    [[ "$head" == "$revision" ]] || { echo "FAIL source-bound pack: HEAD $head, requested $revision" >&2; return 1; }
+    [[ -z "$(git -C "$root" status --porcelain --untracked-files=all)" ]] \
+        || { echo "FAIL source-bound pack: the checkout has modified or untracked files" >&2; return 1; }
+    url="$(repository_url)" || { echo "FAIL source-bound pack: no agreed RepositoryUrl" >&2; return 1; }
+    origin="$(git -C "$root" remote get-url origin)" || return 1
+    [[ "$origin" == "$url" ]] || { echo "FAIL source-bound pack: origin is not RepositoryUrl $url" >&2; return 1; }
+    pack -p:EnableSourceLink=true -p:EnableSourceControlManagerQueries=true -p:ContinuousIntegrationBuild=true
+    echo "$revision" >"$feed/source-revision"
+}
+
+source_expectation() {
+    local revision url
+    url="$(repository_url)" || return 1
+    expectation=(--repository-url "$url")
+    [[ -f "$feed/source-revision" ]] || return 0
+    revision="$(cat "$feed/source-revision")"
+    release_revision_valid "$revision" || { echo "FAIL $feed/source-revision does not name a full commit" >&2; return 1; }
+    [[ "$(git -C "$root" rev-parse --verify HEAD)" == "$revision" && -z "$(git -C "$root" status --porcelain --untracked-files=all)" ]] \
+        || { echo "FAIL source-bound packages need the clean checkout of $revision" >&2; return 1; }
+    expectation+=(--source-revision "$revision")
 }
 
 reset_package_cache() {
@@ -138,7 +175,8 @@ consumers() {
     readme_recipe HttpReadmeRecipe httprecipe
     readme_recipe JsonReadmeRecipe jsonrecipe
     build_tool "$root/qualification/PackageInspector"
-    dotnet run --project "$root/qualification/PackageInspector" -c Release --no-build -- Rezultat \
+    source_expectation
+    dotnet run --project "$root/qualification/PackageInspector" -c Release --no-build -- Rezultat "${expectation[@]}" \
         "$root" "$RezultatPackageVersion" "$feed/Rezultat.$RezultatPackageVersion.nupkg" \
         "$feed/Rezultat.$RezultatPackageVersion.snupkg" "$packages" \
         "$artifacts/obj/PackageConsumer/project.assets.json" \
@@ -150,7 +188,7 @@ consumers() {
 }
 
 diamond_case() {
-    local name="$1" candidate_sha="$2" inventory_core="$3" inventory_feed="$4" inventory_sha="$5"
+    local name="$1" candidate_sha="$2" inventory_core="$3" inventory_feed="$4" inventory_sha="$5" inventory_assembly="$6"
     local d="$root/qualification/Diamond" out="$qualification/diamond/$name" library_feed="$qualification/diamond/feed"
     local restore
     rm -rf "$out" "$library_feed"
@@ -165,7 +203,7 @@ diamond_case() {
     build_clean "$d/App" "${restore[@]}"
     cp "$artifacts/obj/DiamondApp/project.assets.json" "$out/assets/DiamondApp.json"
     cp -R "$library_feed" "$out/feed"
-    dotnet run --project "$d/App" -c Release --no-build -- "$RezultatPackageVersion.0" "$inventory_core.0"
+    dotnet run --project "$d/App" -c Release --no-build -- "$candidate_assembly" "$inventory_assembly"
     dotnet run --project "$d/Inspector" -c Release --no-build -- "$name" "$out/packages" "$library_feed" \
         "$artifacts/bin/DiamondApp/release" "$out/assets" \
         "$RezultatPackageVersion" "$feed" "$candidate_sha" "$inventory_core" "$inventory_feed" "$inventory_sha"
@@ -173,6 +211,7 @@ diamond_case() {
 
 diamond() {
     local issued="$qualification/diamond/issued" archive="$issued_feed/Rezultat.$issued_core_version.nupkg" actual candidate_sha
+    local candidate_assembly
     reset_package_cache
     [[ "$RezultatPackageVersion" != "$issued_core_version" ]] || { echo "FAIL candidate must differ from issued $issued_core_version"; return 1; }
     [[ -f "$archive" ]] || { echo "FAIL issued Rezultat $issued_core_version not found: $archive (set REZULTAT_LOCAL_FEED)"; return 1; }
@@ -183,8 +222,9 @@ diamond() {
     cp "$archive" "$issued/"
     build_tool "$root/qualification/Diamond/Inspector"
     candidate_sha="$(sha256sum "$feed/Rezultat.$RezultatPackageVersion.nupkg" | cut -d' ' -f1)"
-    diamond_case same-version "$candidate_sha" "$RezultatPackageVersion" "$feed" "$candidate_sha"
-    diamond_case mixed-version "$candidate_sha" "$issued_core_version" "$issued" "$issued_core_sha256"
+    candidate_assembly="$(dotnet msbuild "$root/src/Rezultat" -getProperty:AssemblyVersion)"
+    diamond_case same-version "$candidate_sha" "$RezultatPackageVersion" "$feed" "$candidate_sha" "$candidate_assembly"
+    diamond_case mixed-version "$candidate_sha" "$issued_core_version" "$issued" "$issued_core_sha256" "$issued_core_assembly"
 }
 
 # Runs one xUnit consumer pair. Expected-failure fixtures make the runner exit non-zero, so the exit
@@ -271,7 +311,8 @@ assertions() {
     xunit_v3_pair 4.0.1
     xunit_v3_pair 4.0.2
     build_tool "$root/qualification/PackageInspector"
-    dotnet run --project "$root/qualification/PackageInspector" -c Release --no-build -- Rezultat.Testing.Xunit \
+    source_expectation
+    dotnet run --project "$root/qualification/PackageInspector" -c Release --no-build -- Rezultat.Testing.Xunit "${expectation[@]}" \
         "$root" "$RezultatPackageVersion" "$feed/Rezultat.Testing.Xunit.$RezultatPackageVersion.nupkg" \
         "$feed/Rezultat.Testing.Xunit.$RezultatPackageVersion.snupkg" "$packages" \
         "$artifacts/obj/AssertionConsumer/project.assets.json" \
@@ -328,7 +369,8 @@ analyzers() {
     cp "$qualification/analyzer-readme.ini" "$snippets/.editorconfig"
     analyzer_build readme-editorconfig-error error "$q/AnalyzerReadmeExamples" -p:SnippetDirectory="$snippets" -- "$snippets"
     build_tool "$q/AnalyzerInspector"
-    dotnet run --project "$q/AnalyzerInspector" -c Release --no-build -- "$root" "$RezultatPackageVersion" \
+    source_expectation
+    dotnet run --project "$q/AnalyzerInspector" -c Release --no-build -- "${expectation[@]}" "$root" "$RezultatPackageVersion" \
         "$feed/Rezultat.Analyzers.$RezultatPackageVersion.nupkg" "$packages" \
         "$library_feed/Rezultat.Qualification.AnalyzerLibrary.1.0.0.nupkg" \
         --direct "$qualification/analyzer-assets/AnalyzerConsumer.json" "$qualification/analyzer-assets/AnalyzerLibrary.json" \
@@ -363,7 +405,7 @@ publish() {
 }
 
 release() {
-    local revision snapshot packages id version found archives record
+    local revision snapshot packages id version found archives record url
     revision="$(git -C "$root" rev-parse --verify --end-of-options "${1:?commit required}^{commit}")" || return 1
     shift
     [[ $# -gt 0 ]] || { echo 'at least one package id required' >&2; return 1; }
@@ -373,17 +415,23 @@ release() {
     snapshot="$artifacts/release/$revision"
     packages="$snapshot/artifacts/linux-arm64/package/release"
     rm -rf "$snapshot"
-    mkdir -p "$snapshot"
-    # Build only the exported commit: the working tree may hold modified or untracked inputs, and attributing
-    # them to the commit would make the source record false.
-    git -C "$root" archive "$revision" | tar -x -C "$snapshot"
-    just --justfile "$snapshot/justfile" linux pack
+    # Build only an isolated clean checkout of the commit: the working tree may hold modified or untracked inputs,
+    # and attributing them to the commit would make the source record and Source Link false. The clone keeps Git
+    # metadata for the SDK; its origin is the agreed credential-free repository of that commit, not this checkout.
+    git clone --quiet --no-checkout --no-hardlinks "$root" "$snapshot"
+    url="$(git -C "$snapshot" show "$revision:src/Directory.Build.props" | release_repository_url -)" \
+        || { echo "No agreed repository URL in $revision." >&2; return 1; }
+    git -C "$snapshot" remote set-url origin "$url"
+    git -C "$snapshot" -c advice.detachedHead=false checkout --quiet --detach "$revision"
+    just --justfile "$snapshot/justfile" linux pack-bound "$revision"
+    [[ "$(cat "$packages/source-revision")" == "$revision" ]] || { echo "Packages in $packages are not bound to $revision" >&2; return 1; }
     for id in "$@"; do
         found=("$packages/$id".[0-9]*.nupkg)
         [[ ${#found[@]} -eq 1 && -f "${found[0]}" ]] || { echo "Expected one $id package in $packages" >&2; return 1; }
         version="$(release_nuspec_value "${found[0]}" version)" || return 1
         archives=("$packages/$id.$version.nupkg")
         release_has_symbols "$id" && archives+=("$packages/$id.$version.snupkg")
+        release_bound "${archives[0]}" "$revision" "$url" || { echo "No source record written for $id $version." >&2; return 1; }
         record="$packages/$id.$version.record"
         if ! release_record "$id" "$version" "$revision" "${archives[@]}" >"$record.partial"; then
             rm -f "$record.partial"
@@ -399,6 +447,7 @@ command="${1:-}"
 [[ $# -gt 0 ]] && shift
 case "$command" in
     pack) pack ;;
+    pack-bound) pack_bound "$@" ;;
     consumers) consumers ;;
     diamond) diamond ;;
     assertions) assertions ;;

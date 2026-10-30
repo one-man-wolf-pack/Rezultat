@@ -14,11 +14,25 @@ const string PackageId = "Rezultat.Analyzers";
 const string AnalyzerPath = "analyzers/dotnet/cs/Rezultat.Analyzers.dll";
 const string ReadmePath = "README.md";
 
+string? repositoryUrl = null;
+string? sourceRevision = null;
+while (args.Length > 1 && args[0] is "--repository-url" or "--source-revision") {
+    if (args[0] == "--repository-url") {
+        repositoryUrl = args[1];
+    } else {
+        sourceRevision = args[1];
+    }
+
+    args = args[2..];
+}
+
 int direct = Array.IndexOf(args, "--direct");
 int absent = Array.IndexOf(args, "--absent");
-if (args.Length < 5 || direct != 5 || absent < direct) {
-    Console.Error.WriteLine("usage: AnalyzerInspector <repo-root> <version> <nupkg> <packages-folder> <library-nupkg> "
-        + "--direct <project.assets.json>... --absent <project.assets.json>...");
+if (repositoryUrl is null || !SourceMetadata.RepositoryUrl().IsMatch(repositoryUrl)
+    || (sourceRevision is not null && !SourceMetadata.Commit().IsMatch(sourceRevision))
+    || args.Length < 5 || direct != 5 || absent < direct) {
+    Console.Error.WriteLine("usage: AnalyzerInspector --repository-url https://github.com/<owner>/<repo> [--source-revision <full commit>] <repo-root> <version> <nupkg> "
+        + "<packages-folder> <library-nupkg> --direct <project.assets.json>... --absent <project.assets.json>...");
     return 2;
 }
 
@@ -51,10 +65,20 @@ checks.Text("nuspec readme", ReadmePath, Value("readme") ?? "<none>");
 Info("nuspec description", Value("description") ?? "<none>");
 Info("nuspec tags", Value("tags") ?? "<none>");
 checks.That("nuspec has description and tags", !string.IsNullOrWhiteSpace(Value("description")) && !string.IsNullOrWhiteSpace(Value("tags")));
-string[] forbidden = ["dependencies", "frameworkAssemblies", "frameworkReferences", "references", "contentFiles", "repository", "projectUrl"];
+string[] forbidden = ["dependencies", "frameworkAssemblies", "frameworkReferences", "references", "contentFiles"];
 string[] present = [.. metadata.Elements().Select(element => element.Name.LocalName).Where(forbidden.Contains)];
-checks.That($"nuspec has no dependencies, framework/assembly references, content files or invented repository/project URL: [{string.Join(", ", present)}]",
+checks.That($"nuspec has no dependencies, framework/assembly references or content files: [{string.Join(", ", present)}]",
     present.Length == 0);
+Info("source expectation", sourceRevision is null ? "bootstrap" : $"source-bound {sourceRevision}");
+checks.That($"nuspec projectUrl is {repositoryUrl}: {SourceMetadata.Describe(Value("projectUrl"), repositoryUrl)}", Value("projectUrl") == repositoryUrl);
+var repository = metadata.Elements().SingleOrDefault(element => element.Name.LocalName == "repository");
+string? repositoryType = repository?.Attribute("type")?.Value;
+string? repositoryValue = repository?.Attribute("url")?.Value;
+string? repositoryCommit = repository?.Attribute("commit")?.Value;
+checks.That($"nuspec repository is git {repositoryUrl} with commit {sourceRevision ?? "<none>"}: type {SourceMetadata.Describe(repositoryType, "git")}, "
+    + $"url {SourceMetadata.Describe(repositoryValue, repositoryUrl)}, commit {SourceMetadata.Describe(repositoryCommit, sourceRevision)}",
+    repositoryType == "git" && repositoryValue == repositoryUrl && repositoryCommit == sourceRevision);
+string informationalVersion = sourceRevision is null ? version : $"{version}+{sourceRevision}";
 
 var readme = package.GetEntry(ReadmePath);
 if (readme is null) {
@@ -69,7 +93,7 @@ if (readme is null) {
     string[] checkoutMarkers = ["../", "scripts/", "qualify.sh", "rezultat-specification", "src/", "artifacts/"];
     string[] checkoutOnly = [.. checkoutMarkers.Where(marker => text.Contains(marker, StringComparison.Ordinal))];
     checks.That($"README.md has no checkout-only paths or tooling: [{string.Join(", ", checkoutOnly)}]", checkoutOnly.Length == 0);
-    // The installation example may name an available issued version rather than this candidate; the candidate's
+    // The installation example may name another release than this candidate; the candidate's
     // own version is checked in the nuspec, restore assets and analyzer execution.
     var recipes = Patterns.PackageReference().Matches(text).Select(match => ParseReference(match.Value))
         .Where(reference => reference?.Attribute("Include")?.Value == PackageId).ToArray();
@@ -102,7 +126,8 @@ using (var peReader = new PEReader(ImmutableArray.Create(dll))) {
     var attributes = reader.GetAssemblyDefinition().GetCustomAttributes().Select(handle => Attribute(reader, handle)).ToArray();
     checks.That("analyzer targets .NETStandard,Version=v2.0",
         attributes.Contains(("TargetFrameworkAttribute", ".NETStandard,Version=v2.0")));
-    checks.That($"analyzer informational version is {version}", attributes.Contains(("AssemblyInformationalVersionAttribute", version)));
+    checks.That($"analyzer informational version is {informationalVersion}",
+        attributes.Contains(("AssemblyInformationalVersionAttribute", informationalVersion)));
 
     string[] types = [.. reader.TypeDefinitions.Select(handle => reader.GetTypeDefinition(handle)).Select(type => $"{reader.GetString(type.Namespace)}.{reader.GetString(type.Name)}")];
     Info("analyzer types", string.Join(", ", types));

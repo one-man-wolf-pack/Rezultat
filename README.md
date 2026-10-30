@@ -21,13 +21,13 @@ outcome, and the caller handles success, absence or problems with ordinary C#.
 
 ## Use the package
 
-The packages are issued to a private local NuGet feed, not to nuget.org. Register the feed once (see
-[Local releases](#local-releases) for other locations and projects with their own `NuGet.Config`), then reference
-the package:
+Version `1.0.0` of the three packages is prepared here as the first public stable release. It is not published
+yet: nuget.org does not have it, so the command below does not resolve before the release (see
+[Releases](#releases) for the remaining steps). Earlier `0.y.z` versions went only to a private local feed. Once
+`1.0.0` is published:
 
 ```sh
-dotnet nuget add source "$HOME/.local/share/nuget/rezultat" --name rezultat-local
-dotnet add package Rezultat
+dotnet add package Rezultat --version 1.0.0
 ```
 
 ```csharp
@@ -57,17 +57,34 @@ Optional packages:
 - `Rezultat.Analyzers` ([README](src/Rezultat.Analyzers/README.md)): the `RZT0001` warning for a discarded `Result`
   or `Validation`, referenced per project with `PrivateAssets="all"`.
 
-Contracts, decisions and policies live in the specification repository (`../rezultat-specification`): carrier
-behavior in `rfc/`, technical mapping in `realization/`, engineering rules in `constitutions/`.
+The package READMEs are the consumer contract; nothing else needs to be checked out to use the packages. Source:
+https://github.com/one-man-wolf-pack/Rezultat. Questions, bug reports and feature requests:
+https://github.com/one-man-wolf-pack/Rezultat/issues.
+
+## Versions and compatibility
+
+From `1.0.0` the packages follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as one version line:
+compatible fixes are patch releases, compatible additions minor releases, and an incompatible change of the public
+contract a new major version. The contract covers the public source and binary API with its nullable annotations,
+the behavior the READMEs document (states, defaults and `null`, guards, evaluation, failures) and their dependency
+and support limits; for `Rezultat.Analyzers` it covers `RZT0001`, its configuration and severity, and the documented
+reports. It does not cover internal layout, hash codes across processes, performance or unqualified platforms,
+SDKs and IDEs. Correcting behavior that deviates from the documented contract is a fix, not a break.
+
+The assembly version stays `1.0.0.0` for every `1.x` release, so a newer `1.x` binds where an older one was
+referenced; the package and file versions name the release. The promise starts with the first published `1.0.0`;
+the private `0.y.z` versions carried none.
 
 ## Limits
 
 - `net10.0` only. Qualification runs in a Linux ARM64/glibc container with the SDK pinned in `global.json`,
   including trimmed and Native AOT publication of a package consumer; other platforms are not qualified here.
-- Issued only to a private local feed: there is no public repository URL, Source Link or symbol server yet.
-- `0.y.z` versions promise no source, binary or behavioral compatibility. The reference diamond (two separately
-  packed libraries exchanging carriers in one app) is checked for libraries built against the candidate version and
-  for one built against the issued 0.8.0 and run with the candidate; other version pairs are not covered.
+- Source Link and the commit in package metadata are produced only by a release build of an exact commit; ordinary
+  candidate packages name the repository but no commit. Download of the packages, symbols and sources from
+  nuget.org, its symbol server and GitHub is not verified before the release.
+- The reference diamond (two separately packed libraries exchanging carriers in one app) is checked for libraries
+  built against the candidate version and for one built against the private 0.8.0 and run with the candidate.
+  That check is evidence, not a compatibility promise for `0.y.z`; other version pairs are not covered.
 - There is no general zero-allocation claim; `just alloc` measures selected operations in warmed
   Release.
 
@@ -96,7 +113,7 @@ and MSBuild warnings are errors, with the .NET 10 recommended analysis, the enab
 Roslynator rules. `Directory.Packages.props` owns the versions, including those used by `qualification/` projects
 outside central package management. The core and `Rezultat.Testing.Xunit` track their public API in
 `PublicAPI.Shipped.txt` and `PublicAPI.Unshipped.txt`; an unrecorded API change fails the build, and `just fix`
-records it for review. Owned qualification support code inherits the profile; consumers whose restored package graph
+records it for review. `Shipped` stays empty until the first stable release promotes the accepted surface into it. Owned qualification support code inherits the profile; consumers whose restored package graph
 is inspected keep it without the private analyzers. Projects marked `RezultatConsumerInput` (diagnostic corpus,
 compiler controls, compiled README text and runner fixtures) compile with ordinary consumer settings and keep their
 source layout, so development diagnostics do not change what they check.
@@ -111,7 +128,8 @@ isolated `artifacts/qualification/packages`, which the lanes reset, and their re
 - .NET SDK pinned in `global.json`; tests use Microsoft.Testing.Platform mode of `dotnet test`. The xUnit v2
   consumer `qualification/XunitV2Consumer` has its own `global.json` with the same SDK and VSTest mode; keep the
   two SDK versions equal.
-- [Just](https://just.systems) for the commands below, plus Git and Bash.
+- [Just](https://just.systems) for the commands below, plus Git and Bash. The release lane, `publish-local.sh` and
+  the release controls also run `unzip`, `xmllint` and `sha256sum` on the host; the controls also need `zip`.
 - Docker with a native `linux/arm64` engine for the Linux qualification contour.
 
 ## Commands
@@ -126,7 +144,7 @@ just fmt                    # whitespace and Just formatting only
 just fix --diagnostics IDE0011   # supported style/analyzer repairs, optionally scoped; review the diff
 just pack                   # artifacts/package/release: Rezultat and Rezultat.Testing.Xunit .nupkg/.snupkg, Rezultat.Analyzers .nupkg
 just consumers              # package consumers, compiler controls, README examples and recipes, reference diamond, package inspection
-just diamond                # only the reference diamond (needs the issued Rezultat 0.8.0, see below)
+just diamond                # only the reference diamond (needs the private Rezultat 0.8.0, see below)
 just assertions             # assertion package consumers, xUnit v2/v3 runner scenarios, package inspection
 just analyzers              # RZT0001 corpus in all severity modes, downstream isolation, README, package inspection
 just alloc                  # warmed Release allocation controls
@@ -134,8 +152,8 @@ just publish <rid>          # rooted and unrooted trimmed and Native AOT consume
 just qualify <rid>          # check, pack, every package lane and publish for the runtime
 just linux qualify linux-arm64   # the same recipes inside the Linux ARM64/glibc SDK container
 just linux pack analyzers   # any recipes inside the same container
-just release <commit> Rezultat   # commit-bound package build with its source record (see Local releases)
-just release-controls       # release/publish controls in a disposable Git fixture (host Git, Just and Docker)
+just release <commit> Rezultat   # source-bound package build with its source record (see Releases)
+just release-controls       # release/publish controls in a disposable Git fixture (host tools above and Docker)
 just gc                     # delete artifacts/ (not the local feed)
 ```
 
@@ -166,44 +184,75 @@ local feed (`REZULTAT_LOCAL_FEED`, default below; `linux` mounts it read-only), 
 issue and is copied into `artifacts/qualification/diamond`. `qualification/Diamond/Inspector` checks the restore
 inputs, resolved versions, sources and bytes of every case; results stay in `artifacts/qualification/diamond/<case>`.
 
-## Local releases
+## Releases
 
-The durable local feed defaults to `$HOME/.local/share/nuget/rezultat`, outside checkout,
-build outputs and NuGet caches. `REZULTAT_LOCAL_FEED` or the last command argument can
-select another directory.
+Packages have two kinds of origin, and the package metadata says which one:
 
-Packages built from the working tree are candidates for review and are never issued. An issued
-package is built from a commit, and its private source record goes with it into the feed:
+- A candidate from `just pack` is built from the working tree, which may hold modified or untracked files. Its
+  nuspec names the project and repository URL but no commit, its informational version is the bare package version,
+  and its PDB has no Source Link. Candidates are for review and qualification; they are never issued.
+- A release from `just release <commit> <package-id>...` is built from that commit only. The lane clones this
+  repository into `artifacts/release/<full-commit>`, sets the clone's `origin` to the `RepositoryUrl` of that commit
+  (a credential-free GitHub URL, otherwise it refuses) and checks out the commit detached. The clone's own
+  `just linux pack-bound` refuses unless the checkout is exactly that commit, clean and with that origin, then packs
+  with the SDK's Git and GitHub Source Link support. The nuspec names the repository and commit, the informational
+  version is `<version>+<commit>`, and the PDB maps `/_/*` to `https://raw.githubusercontent.com/<owner>/<repo>/<commit>/*`.
+  For each named package the lane checks that commit and URL in the nuspec and writes `<id>.<version>.record`:
+  package ID, version, full commit and SHA-256 of the `.nupkg` and, when shipped, `.snupkg`.
+
+Qualify a release with the clone's own lanes; they inspect the packages against the recorded commit:
 
 ```sh
-just release <commit> Rezultat                                    # name each package to issue
-just --justfile artifacts/release/<full-commit>/justfile linux consumers   # qualify those exact archives
-scripts/publish-local.sh 0.8.2 artifacts/release/<full-commit>/artifacts/linux-arm64/package/release
+just release <commit> Rezultat Rezultat.Testing.Xunit Rezultat.Analyzers
+just --justfile artifacts/release/<full-commit>/justfile linux consumers assertions analyzers alloc publish linux-arm64
+```
+
+Generated sources (assembly attributes, global usings) are in the PDB with their checksums but are not in the
+repository, so Source Link cannot serve them. Running `release` again rebuilds the clone and its archives.
+
+### Steps of the first public release
+
+Source acceptance of this preparation leaves these steps, in order:
+
+1. Promote the accepted API: move the entries of `PublicAPI.Unshipped.txt` into `PublicAPI.Shipped.txt` for
+   `Rezultat` and `Rezultat.Testing.Xunit`, and review the version and release notes.
+2. Review and commit that release source.
+3. Run `just release` for the commit and qualify the clone as above. Every later source change needs a new commit
+   and a new release build.
+4. Make the commit reachable at the repository URL with the agreed visibility.
+5. Transfer exactly those archives, without rebuilding or repacking, to the package feed, and keep them with their
+   records in the local feed below. CI, release automation and credentials are set up separately.
+6. Verify installation, symbols and Source Link source download as an anonymous consumer.
+7. After `1.0.0` is issued, later releases enable the SDK's package validation against it
+   (`EnablePackageValidation` with `PackageValidationBaselineVersion` `1.0.0`).
+
+### Local feed
+
+The durable local feed defaults to `$HOME/.local/share/nuget/rezultat`, outside checkout, build outputs and NuGet
+caches. `REZULTAT_LOCAL_FEED` or the last command argument can select another directory. It holds the private
+`0.y.z` packages and keeps released archives with their records.
+
+```sh
+scripts/publish-local.sh 1.0.0 artifacts/release/<full-commit>/artifacts/linux-arm64/package/release
 # Other packages and explicit destination:
 scripts/publish-local.sh --package Rezultat.Analyzers <version> <package-directory> /absolute/path/to/rezultat-feed
 ```
 
-`release` exports the committed tree of `<commit>` with `git archive` into `artifacts/release/<full-commit>`,
-so modified and untracked working-tree files never enter the build, and runs that tree's own `just linux pack`.
-For each named package it writes `<id>.<version>.record` next to the archives: package ID, version, full
-commit and SHA-256 of the `.nupkg` and, when shipped, `.snupkg`. Qualify a package with its own command
-in the exported tree (`consumers`, `assertions` or `analyzers`). Running `release` again rebuilds the snapshot
-with new archive bytes.
-
 `publish-local.sh` publishes one package (`Rezultat` by default) only with a matching record: it reads the
 package ID and version from the archives' nuspec, compares the hashes and refuses a missing record, an
-`unknown` revision or any mismatch. It copies without repacking, publishes the symbols archive, then the record
-into `records/`, then the package, as read-only files with atomic no-replace names. Publishing identical files
-again is a no-op; different bytes under an issued version fail. Changed package contents always receive a new
-`0.y.z` version: change `Version` in `src/Directory.Build.props`. The packages of one `release` share that
-version; publish only the changed ones and keep the issued versions of the others. Do not use
-`dotnet nuget push` directly to this directory: its local-folder path can overwrite a version. Keep this feed
-when cleaning build outputs. `Rezultat.Analyzers` has no `.snupkg`. The `symbols/` directory retains matching
-`.snupkg` files; it is an archive, not a symbol server or Source Link support claim. A record is not a
+`unknown` revision or any mismatch. A stable version (`1.0.0` and later) must also be the release build of its
+recorded commit: a nuspec without that commit or with another repository URL is refused. It copies without
+repacking, publishes the symbols archive, then the record into `records/`, then the package, as read-only files
+with atomic no-replace names. Publishing identical files again is a no-op; different bytes under an issued version
+fail. Changed package contents always receive a new version: change `VersionPrefix` in `src/Directory.Build.props`
+following the rules above. The packages of one `release` share that version; publish only the changed ones and keep
+the issued versions of the others. Do not use `dotnet nuget push` directly to this directory: its local-folder path
+can overwrite a version. Keep this feed when cleaning build outputs. `Rezultat.Analyzers` has no `.snupkg`. The
+`symbols/` directory retains matching `.snupkg` files; it is an archive, not a symbol server. A record is not a
 reproducible-build proof or signature and gives no source retrieval.
 
-A package issued before records existed keeps its bytes and gets a record with `source-revision=unknown` and the
-hashes of the issued files:
+A private `0.y.z` package issued before records existed keeps its bytes and gets a record with
+`source-revision=unknown` and the hashes of the issued files. A stable version never gets such a record:
 
 ```sh
 scripts/publish-local.sh --legacy-record 0.8.0
@@ -240,7 +289,7 @@ For example, merge these entries with the project's existing sources/mappings:
 ```
 
 Consumers reference the package, not its source project. An exact reference
-is `<PackageReference Include="Rezultat" Version="[0.8.2]" />`; projects with central package
+is `<PackageReference Include="Rezultat" Version="[0.8.3]" />`; projects with central package
 management put the version on their `PackageVersion` entry. The analyzer is referenced per checked project as
 `<PackageReference Include="Rezultat.Analyzers" Version="0.8.0" PrivateAssets="all" IncludeAssets="analyzers" />`;
 it does not bring `Rezultat` and is not brought by it. Consumer repositories own the
@@ -260,7 +309,7 @@ switch and qualification of their API, adapters and deployment profiles.
 | `justfile` | The command interface. |
 | `scripts/qualify.sh` | Package qualification and release lanes behind the `justfile`. |
 | `scripts/linux.sh` | Transport of one command into the Linux ARM64/glibc SDK container. |
-| `scripts/publish-local.sh`, `scripts/release-record.sh` | Local feed publication and the package source record. |
+| `scripts/publish-local.sh`, `scripts/release-record.sh` | Local feed publication, the package source record and its source-binding check. |
 
 ## License
 

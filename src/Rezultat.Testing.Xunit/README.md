@@ -5,7 +5,7 @@ branch and returns its active payload, so the test continues with ordinary frame
 payload. The package is optional: production code depends only on `Rezultat`.
 
 ```xml
-<PackageReference Include="Rezultat.Testing.Xunit" Version="0.8.2" />
+<PackageReference Include="Rezultat.Testing.Xunit" Version="1.0.0" />
 ```
 
 Add it to a test project. It brings the `Rezultat` package and the `xunit.v3.assert` runtime assembly;
@@ -116,8 +116,22 @@ Qualified with the .NET 10 SDK command line on `net10.0` test projects:
 The package requires `xunit.v3.assert` 4.0.1 or later. Other versions, runners and IDE test explorers are not
 qualified. Trimming and Native AOT of test projects are not supported claims of this package.
 
+## Versions and support
+
+The package shares the version line of `Rezultat` and follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
+from `1.0.0`: an incompatible change of its public API, nullable annotations or documented behavior, including the
+failure messages above, needs a new major version. Qualified runners and versions are the ones listed above. The
+assembly version stays `1.0.0.0` for every `1.x` release. The earlier `0.y.z` versions carried no compatibility
+promise.
+
+Source: https://github.com/one-man-wolf-pack/Rezultat. Questions, bug reports and feature requests:
+https://github.com/one-man-wolf-pack/Rezultat/issues.
+
 ## Release notes
 
+- 1.0.0: the first stable release. Compared with 0.8.2 the public API has the same members; the assembly version
+  becomes `1.0.0.0`, the package names its project and repository, and the minimum `Rezultat` dependency is now
+  1.0.0. No action is needed besides updating the version.
 - 0.8.2: compared with 0.8.0, adds the four overloads `ShouldBeOk`, `ShouldBeError`, `ShouldBeValid` and
   `ShouldBeInvalid` with a required `bool includePayload`. Calls without the flag keep their signatures, nullable
   annotations, exception type and message. The minimum `Rezultat` dependency is now 0.8.2. To keep data out of a

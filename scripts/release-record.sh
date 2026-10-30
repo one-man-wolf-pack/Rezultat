@@ -18,6 +18,32 @@ release_nuspec_value() {
         xmllint --xpath "string(/*[local-name()='package']/*[local-name()='metadata']/*[local-name()='$field'])" -
 }
 
+release_repository_url() {
+    local url
+    url="$(xmllint --xpath 'string(/Project/PropertyGroup/RepositoryUrl)' "$1")" || return 1
+    release_repository_url_valid "$url" || { echo "RepositoryUrl is not a credential-free https://github.com/<owner>/<repo> URL." >&2; return 1; }
+    echo "$url"
+}
+
+release_repository_url_valid() {
+    [[ "$1" =~ ^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]
+}
+
+release_nuspec_repository() {
+    local archive="$1" attribute="$2" nuspec
+    nuspec="$(unzip -Z1 "$archive" | grep -E '^[^/]+\.nuspec$')" || { echo "No root nuspec in $archive." >&2; return 1; }
+    unzip -p "$archive" "$nuspec" |
+        xmllint --xpath "string(/*[local-name()='package']/*[local-name()='metadata']/*[local-name()='repository']/@$attribute)" -
+}
+
+release_bound() {
+    local archive="$1" revision="$2" url="$3" actual_url actual_commit
+    actual_url="$(release_nuspec_repository "$archive" url)" || return 1
+    actual_commit="$(release_nuspec_repository "$archive" commit)" || return 1
+    [[ "$actual_url" == "$url" ]] || { echo "$archive: nuspec repository url is not $url." >&2; return 1; }
+    [[ "$actual_commit" == "$revision" ]] || { echo "$archive: nuspec repository commit is not $revision." >&2; return 1; }
+}
+
 release_sha256() {
     local sum
     sum="$(sha256sum "$1")" || { echo "Cannot hash $1." >&2; return 1; }

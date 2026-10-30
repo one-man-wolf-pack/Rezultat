@@ -5,4 +5,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Compile Include="../Shared/SourceMetadata.cs" Link="SourceMetadata.cs" />
+  </ItemGroup>
+
 </Project>

@@ -3,7 +3,7 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$root/scripts/release-record.sh"
-usage='usage: scripts/publish-local.sh [--package ID] <0.y.z> <package-directory> [feed-directory]
+usage='usage: scripts/publish-local.sh [--package ID] <x.y.z> <package-directory> [feed-directory]
        scripts/publish-local.sh --legacy-record [--package ID] <0.y.z> [feed-directory]
 ID: Rezultat (default), Rezultat.Testing.Xunit or Rezultat.Analyzers'
 id=Rezultat
@@ -25,7 +25,13 @@ else
 fi
 
 release_known_id "$id" || { echo "Unknown package id: $id. $usage" >&2; exit 1; }
-[[ "$version" =~ ^0\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || { echo 'Expected a private 0.y.z version.' >&2; exit 1; }
+[[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || { echo 'Expected a numeric x.y.z version.' >&2; exit 1; }
+stable=false
+[[ "$version" == 0.* ]] || stable=true
+if $legacy && $stable; then
+    echo "A stable $version is never issued without its source; --legacy-record covers only issued private 0.y.z." >&2
+    exit 1
+fi
 nupkg="$id.$version.nupkg"
 snupkg="$id.$version.snupkg"
 record="$id.$version.record"
@@ -68,6 +74,13 @@ else
         echo "Source record does not match the package artifacts: $packages/$record." >&2
         exit 1
     }
+    if $stable; then
+        url="$(release_repository_url "$root/src/Directory.Build.props")" || exit 1
+        release_bound "$packages/$nupkg" "$revision" "$url" || {
+            echo "A stable package must be the source-bound build of its recorded commit: $packages/$nupkg." >&2
+            exit 1
+        }
+    fi
     if [[ -e "$feed/$nupkg" && ! -e "$feed/records/$record" ]]; then
         echo "Issued without a source record: $feed/$nupkg. Record it with --legacy-record instead." >&2
         exit 1

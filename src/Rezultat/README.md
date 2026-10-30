@@ -10,7 +10,7 @@ Contents: [Choose a type](#choose-a-type), [Install](#install), [Quickstart](#qu
 [Collection operations](#collection-operations), [Query syntax](#query-syntax), [HTTP responses](#http-responses),
 [Presence in JSON fields](#presence-in-json-fields), [Behavior to know](#behavior-to-know),
 [Moving from local outcome types](#moving-from-local-outcome-types), [Limits](#limits),
-[Release notes](#release-notes).
+[Versions and support](#versions-and-support), [Release notes](#release-notes).
 
 ## Choose a type
 
@@ -32,7 +32,7 @@ type. Several domain states with different data that are not simply success or f
 
 ## Install
 
-The package is distributed through a private NuGet feed, not nuget.org. With that feed among your package sources:
+Add the package to a project:
 
 ```sh
 dotnet add package Rezultat
@@ -611,13 +611,31 @@ public sealed class RezultatShouldlyRecipeTests
   large value payloads have their usual cost; measure the paths that matter to you.
 - Two libraries packed separately and referencing this package exchange its `Result` and `Validation` values
   directly in one application. That was checked with both libraries built against this version, and with one of
-  them built against 0.8.0 and run with this version. Versions `0.y.z` make no compatibility promise for other or
-  future version pairs.
+  them built against the private 0.8.0 and run with this version. That check is not a compatibility promise for
+  `0.y.z`; other version pairs are not covered.
 - A copy of the package loaded into another `AssemblyLoadContext` defines different types; sharing a carrier needs
   the same loaded assembly.
 
+## Versions and support
+
+From `1.0.0` the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html), in one version line
+with `Rezultat.Testing.Xunit` and `Rezultat.Analyzers`: compatible fixes are patch releases, compatible additions
+minor releases, and an incompatible change of the public contract a new major version. The contract is the public
+source and binary API with its nullable annotations and the behavior this README documents: states, defaults and
+`null`, guards, evaluation, failures, dependencies and the limits above. It does not cover internal layout, hash
+codes across processes, performance or unqualified platforms. Correcting behavior that deviates from this README is
+a fix, not a break. The assembly version stays `1.0.0.0` for every `1.x` release, so a newer `1.x` binds where an
+older one was referenced. The earlier `0.y.z` versions carried no compatibility promise.
+
+Source: https://github.com/one-man-wolf-pack/Rezultat. Questions, bug reports and feature requests:
+https://github.com/one-man-wolf-pack/Rezultat/issues.
+
 ## Release notes
 
+- 1.0.0: the first stable release, and the start of the compatibility promise in
+  [Versions and support](#versions-and-support). Compared with 0.8.3 the public API has the same members; the
+  assembly version becomes `1.0.0.0` and the package names its project and repository. No action is needed besides
+  updating the version.
 - 0.8.3: documentation only. The README starts with choosing a type, installation and a quickstart, and adds the
   HTTP response and Presence JSON examples and the limits. Compared with 0.8.2, operations, signatures, nullable
   annotations, guards and exceptions, namespaces and overload binding are unchanged; no action is needed besides
