@@ -2,7 +2,7 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-image="mcr.microsoft.com/dotnet/sdk:10.0.402-noble-aot"
+image="mcr.microsoft.com/dotnet/sdk:10.0.403-noble-aot"
 issued_feed="${REZULTAT_LOCAL_FEED:-$HOME/.local/share/nuget/rezultat}"
 host_output="$root/artifacts/linux-arm64"
 

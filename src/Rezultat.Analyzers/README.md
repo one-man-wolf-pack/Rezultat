@@ -85,6 +85,6 @@ diagnostic message is for people; do not parse it.
 
 ## Supported hosts
 
-Qualified with the .NET SDK 10.0.402 command line (`dotnet build`) on macOS ARM64 and Linux ARM64. The
+Qualified with the .NET SDK 10.0.403 command line (`dotnet build`) on macOS ARM64 and Linux ARM64. The
 analyzer targets `netstandard2.0` and compiles against the Roslyn 4.14 API. Other SDK versions, IDEs and
 their live analysis are not qualified by this release.

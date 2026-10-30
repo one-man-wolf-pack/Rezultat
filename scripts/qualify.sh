@@ -287,7 +287,7 @@ analyzer_build() {
     shift 3
     while [[ $# -gt 0 && "$1" != -- ]]; do properties+=("$1"); shift; done
     shift
-    # SDK 10.0.402: the console logger prints each diagnostic twice even with NoSummary, which would fail the
+    # SDK 10.0.403: the console logger prints each diagnostic twice even with NoSummary, which would fail the
     # exactly-once check of AnalyzerReports. Return to the console log once it reports every diagnostic once.
     dotnet build "$project" -c Release --no-incremental -tl:off -noconlog -flp:"logfile=$log;verbosity=minimal;NoSummary" \
         ${properties[@]+"${properties[@]}"} </dev/null >/dev/null 2>&1 || status=$?
