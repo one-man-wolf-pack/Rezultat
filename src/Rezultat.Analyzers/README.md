@@ -7,7 +7,7 @@ method is covered regardless of its name or assembly. The package contains only 
 bring the `Rezultat` package, carriers or any runtime code.
 
 ```xml
-<PackageReference Include="Rezultat.Analyzers" Version="1.0.0" PrivateAssets="all" IncludeAssets="analyzers" />
+<PackageReference Include="Rezultat.Analyzers" Version="0.8.0" PrivateAssets="all" IncludeAssets="analyzers" />
 ```
 
 Add this reference to every project whose own source should be checked; a repository can put it into its
@@ -91,15 +91,18 @@ their live analysis are not qualified by this release.
 
 ## Versions and support
 
-The package shares the version line of `Rezultat` and follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
-from `1.0.0`: the rule ID `RZT0001`, its configuration and default severity and the reports documented above change
-incompatibly only in a new major version. Reporting a case this README says is reported, or no longer reporting one
-it says is not, is a fix. The diagnostic message text and the hosts not listed above are not part of the promise.
-The earlier `0.y.z` versions carried no compatibility promise.
+The available version is the private `0.8.0`; it carries no compatibility promise. The package shares the version line
+of `Rezultat`. The first public stable release is planned as `1.0.0` and is not published yet. From `1.0.0` the package
+will follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html): the rule ID `RZT0001`, its configuration and
+default severity and the reports documented above will change incompatibly only in a new major version. Reporting a
+case this README says is reported, or no longer reporting one it says is not, will be a fix. The diagnostic message
+text and the hosts not listed above are not part of the promise.
 
 Source: https://github.com/one-man-wolf-pack/Rezultat. Questions, bug reports and feature requests:
 https://github.com/one-man-wolf-pack/Rezultat/issues.
 
 ## Release notes
 
-- 1.0.0: the first stable release of `RZT0001` as described here; the package names its project and repository.
+- 1.0.0 (planned, not published): the first stable release of `RZT0001` as described here; the package will name its
+  project and repository.
+- 0.8.0: the first issued `Rezultat.Analyzers` package with `RZT0001`.
