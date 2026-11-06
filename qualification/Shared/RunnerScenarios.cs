@@ -25,6 +25,15 @@ public sealed class Positive
     }
 
     [Fact]
+    public void ExtractsMaybeBranchesInBothForms()
+    {
+        Assert.Equal(42, Maybe<int>.Some(42).ShouldBeSome());
+        Assert.Null(Maybe<string?>.Some(null).ShouldBeSome(includePayload: false));
+        Maybe<int>.None.ShouldBeNone();
+        default(Maybe<string>).ShouldBeNone(includePayload: false);
+    }
+
+    [Fact]
     public void KeepsNullablePayloads()
     {
         string? text = Result<string?, string>.Ok(null).ShouldBeOk();
@@ -70,6 +79,15 @@ public sealed class ExpectedFailures
 
     [Fact]
     public void UninitializedWithoutPayload() => _ = default(Result<int, string>).ShouldBeError(includePayload: false);
+
+    [Fact]
+    public void SomeOnNone() => _ = default(Maybe<string>).ShouldBeSome();
+
+    [Fact]
+    public void NoneOnSome() => Maybe<string>.Some("some-evidence").ShouldBeNone();
+
+    [Fact]
+    public void NoneOnSomeWithoutPayload() => Maybe<ThrowingText>.Some(new ThrowingText()).ShouldBeNone(includePayload: false);
 
     [Fact]
     public void InsideMultiple() => Assert.Multiple(

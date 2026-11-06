@@ -3,9 +3,11 @@ NullableOkPayload             warning  CS8602
 NullableErrorPayload          warning  CS8602
 NullableValidPayload          warning  CS8602
 NullableIssue                 warning  CS8602
+NullableSomePayload           warning  CS8602
 ExcludedPayloadNullableOkPayload    warning  CS8602
 ExcludedPayloadNullableErrorPayload warning  CS8602
 ExcludedPayloadNullableValidPayload warning  CS8602
 ExcludedPayloadNullableIssue        warning  CS8602
+ExcludedPayloadNullableSomePayload  warning  CS8602
 NoXunitCompileAssets          error    CS0246
 NoAsyncVariant                error    CS1061

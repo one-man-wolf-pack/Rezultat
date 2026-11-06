@@ -16,6 +16,9 @@ public sealed class RecipeWitness {
         Assert.Same(payload, Result<Probe, Probe>.Error(payload).ShouldBeError());
         Assert.Same(payload, Validation<Probe, Probe>.Valid(payload).ShouldBeValid());
         Assert.Same(payload, Assert.Single(Validation<Probe, Probe>.Invalid(payload).ShouldBeInvalid()));
+        Assert.Same(payload, Maybe<Probe>.Some(payload).ShouldBeSome());
+        Maybe<Probe>.None.ShouldBeNone();
+        default(Maybe<Probe>).ShouldBeNone();
         Assert.Equal(0, payload.Calls + other.Calls);
     }
 
@@ -25,11 +28,13 @@ public sealed class RecipeWitness {
         string? error = Result<int, string?>.Error(null).ShouldBeError();
         int? valid = Validation<int?, string>.Valid(null).ShouldBeValid();
         ImmutableArray<string?> issues = Validation<int, string?>.Invalid(null).ShouldBeInvalid();
+        string? some = Maybe<string?>.Some(null).ShouldBeSome();
 
         Assert.Null(ok);
         Assert.Null(error);
         Assert.Null(valid);
         Assert.Null(Assert.Single(issues));
+        Assert.Null(some);
     }
 
     [Fact]
@@ -51,6 +56,10 @@ public sealed class RecipeWitness {
             () => Result<Probe, int>.Ok(payload).ShouldBeError(),
             () => Validation<int, Probe>.InvalidMany([payload, second]).ShouldBeValid(),
             () => Validation<Probe, int>.Valid(payload).ShouldBeInvalid(),
+            () => Maybe<Probe>.Some(payload).ShouldBeNone(),
+            () => Maybe<Probe>.None.ShouldBeSome(),
+            () => default(Maybe<Probe>).ShouldBeSome(),
+            () => Maybe<Probe?>.Some(null).ShouldBeNone(),
         ];
 
         foreach (var action in wrong) {
@@ -79,8 +88,10 @@ public sealed class RecipeWitness {
     }
 
     [Fact]
-    public void RecipeDoesNotNeedTheXunitAssertionsPackage() =>
+    public void RecipeDoesNotNeedTheXunitAssertionsPackage() {
         Assert.Null(Type.GetType("Rezultat.Testing.Xunit.ResultAssertions, Rezultat.Testing.Xunit"));
+        Assert.Null(Type.GetType("Rezultat.Testing.Xunit.MaybeAssertions, Rezultat.Testing.Xunit"));
+    }
 
     private sealed class Probe(string text = "probe") {
         public int Calls { get; private set; }

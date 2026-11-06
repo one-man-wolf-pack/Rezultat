@@ -5,14 +5,17 @@ using Rezultat;
 using Rezultat.Qualification;
 using Rezultat.Testing.Xunit;
 
+const int Issues = -1;
+const int Void = -2;
 var checks = new Checks();
 var assembly = typeof(ResultAssertions).Assembly;
 
-checks.That("exported types are exactly ResultAssertions and ValidationAssertions",
+checks.That("exported types are exactly MaybeAssertions, ResultAssertions and ValidationAssertions",
     assembly.GetExportedTypes().Select(type => type.FullName).Order(StringComparer.Ordinal)
-        .SequenceEqual(["Rezultat.Testing.Xunit.ResultAssertions", "Rezultat.Testing.Xunit.ValidationAssertions"]));
+        .SequenceEqual(["Rezultat.Testing.Xunit.MaybeAssertions", "Rezultat.Testing.Xunit.ResultAssertions", "Rezultat.Testing.Xunit.ValidationAssertions"]));
 CheckOwner(typeof(ResultAssertions), typeof(Result<,>), ("ShouldBeOk", 0), ("ShouldBeError", 1));
-CheckOwner(typeof(ValidationAssertions), typeof(Validation<,>), ("ShouldBeValid", 0), ("ShouldBeInvalid", -1));
+CheckOwner(typeof(ValidationAssertions), typeof(Validation<,>), ("ShouldBeValid", 0), ("ShouldBeInvalid", Issues));
+CheckOwner(typeof(MaybeAssertions), typeof(Maybe<>), ("ShouldBeSome", 0), ("ShouldBeNone", Void));
 
 object reference = new object();
 checks.That("ShouldBeOk returns the exact reference", ReferenceEquals(reference, Result<object, string>.Ok(reference).ShouldBeOk()));
@@ -25,11 +28,23 @@ checks.That("static owner call form", ResultAssertions.ShouldBeOk(Result<int, st
     && ValidationAssertions.ShouldBeValid(Validation<int, string>.Valid(6)) == 6);
 checks.That("nullable payload extracts null", Result<string?, string>.Ok(null).ShouldBeOk() is null);
 checks.That("unconstrained generic caller", Extract(Result<int?, string>.Ok(null)) is null && Extract(Result<string, string>.Ok("x")).Length == 1);
+checks.That("unconstrained generic Maybe caller", ExtractSome(Maybe<int?>.Some(null)) is null && ExtractSome(Maybe<string>.Some("x")).Length == 1);
 
 CheckFailure("wrong branch", () => Result<int, string>.Error("evidence").ShouldBeOk(), "Result.Error(evidence)");
 CheckFailure("uninitialized", () => default(Validation<int, string>).ShouldBeInvalid(), "Validation.Uninitialized");
 CheckFailure("formatter", () => Result<Throwing, int>.Ok(new Throwing()).ShouldBeError(), "<ToString threw System.InvalidOperationException>");
 CheckFailure("included payload", () => Result<int, string>.Error("evidence").ShouldBeOk(includePayload: true), "Result.Error(evidence)");
+CheckFailure("Maybe None", () => Maybe<int>.None.ShouldBeSome(), "Expected Maybe.Some; actual Maybe.None.");
+CheckFailure("Maybe default", () => default(Maybe<string>).ShouldBeSome(includePayload: true), "Expected Maybe.Some; actual Maybe.None.");
+CheckFailure("Maybe Some", () => Maybe<string>.Some("evidence").ShouldBeNone(), "Maybe.Some(evidence)");
+CheckFailure("Maybe Some(null)", () => Maybe<string?>.Some(null).ShouldBeNone(includePayload: true), "Maybe.Some(null)");
+
+checks.That("ShouldBeSome returns the exact reference", ReferenceEquals(reference, Maybe<object>.Some(reference).ShouldBeSome()));
+checks.That("ShouldBeSome keeps Some(null) and Some(default)",
+    Maybe<string?>.Some(null).ShouldBeSome() is null && Maybe<int?>.Some(null).ShouldBeSome() is null && Maybe<int>.Some(0).ShouldBeSome() == 0);
+Maybe<int>.None.ShouldBeNone();
+default(Maybe<object>).ShouldBeNone();
+checks.That("static owner call form for Maybe", MaybeAssertions.ShouldBeSome(Maybe<int>.Some(7)) == 7);
 
 Throwing.Calls = 0;
 checks.That("excluded payload: success extracts exact values",
@@ -43,11 +58,23 @@ CheckExcluded("excluded wrong Ok branch", () => Result<Throwing, int>.Ok(new Thr
 CheckExcluded("excluded Invalid issues", () => Validation<int, Throwing>.InvalidMany([new Throwing(), new Throwing()]).ShouldBeValid(includePayload: false), "Validation.Invalid");
 CheckExcluded("excluded wrong Valid branch", () => Validation<Throwing, int>.Valid(new Throwing()).ShouldBeInvalid(includePayload: false), "Validation.Valid");
 CheckExcluded("excluded uninitialized", () => default(Result<Throwing, Throwing>).ShouldBeOk(includePayload: false), "Result.Uninitialized");
+checks.That("excluded payload: Maybe success extracts exact values",
+    ReferenceEquals(reference, Maybe<object>.Some(reference).ShouldBeSome(includePayload: false))
+    && Maybe<Throwing?>.Some(null).ShouldBeSome(includePayload: false) is null);
+var someThrowing = Maybe<Throwing>.Some(new Throwing());
+_ = someThrowing.ShouldBeSome(includePayload: false);
+Maybe<Throwing>.None.ShouldBeNone(includePayload: false);
+default(Maybe<Throwing>).ShouldBeNone(includePayload: false);
+CheckExcluded("excluded Maybe Some", () => someThrowing.ShouldBeNone(includePayload: false), "Expected Maybe.None; actual Maybe.Some.");
+CheckExcluded("excluded Maybe Some(null)", () => Maybe<Throwing?>.Some(null).ShouldBeNone(includePayload: false), "Expected Maybe.None; actual Maybe.Some.");
+CheckExcluded("excluded Maybe None", () => Maybe<Throwing>.None.ShouldBeSome(includePayload: false), "Expected Maybe.Some; actual Maybe.None.");
 checks.That($"excluded payload: no formatter call ({Throwing.Calls})", Throwing.Calls == 0);
 
 return checks.Complete();
 
 static T Extract<T>(Result<T, string> result) => result.ShouldBeOk();
+
+static T ExtractSome<T>(Maybe<T> value) => value.ShouldBeSome();
 
 void CheckOwner(Type owner, Type carrier, params (string Name, int Returned)[] expected) {
     checks.That($"{owner.Name} is a public static extension owner",
@@ -77,15 +104,20 @@ void CheckSignature(Type owner, Type carrier, string shortName, int returned, Me
     string name = $"{shortName}({string.Join(", ", method.GetParameters().Select(item => item.ParameterType.Name))})";
     var arguments = method.GetGenericArguments();
     var parameter = method.GetParameters()[0].ParameterType;
-    var returnType = returned < 0 ? typeof(ImmutableArray<>).MakeGenericType(arguments[1]) : arguments[returned];
-    checks.That($"{owner.Name}.{name} is an extension over {carrier.Name} with two unconstrained type parameters",
-        method.IsDefined(typeof(ExtensionAttribute)) && arguments.Length == 2
+    var returnType = returned switch {
+        Issues => typeof(ImmutableArray<>).MakeGenericType(arguments[1]),
+        Void => typeof(void),
+        _ => arguments[returned],
+    };
+    int arity = carrier.GetGenericArguments().Length;
+    checks.That($"{owner.Name}.{name} is an extension over {carrier.Name} with {arity} unconstrained type parameter(s)",
+        method.IsDefined(typeof(ExtensionAttribute)) && arguments.Length == arity
         && arguments.All(argument => argument.GenericParameterAttributes == GenericParameterAttributes.None && argument.GetGenericParameterConstraints().Length == 0)
         && parameter == carrier.MakeGenericType(arguments) && method.ReturnType == returnType);
     checks.That($"{owner.Name}.{name} signature uses only Rezultat and BCL types",
         new[] { method.ReturnType, parameter }.SelectMany(Flatten).All(type => type.Assembly == typeof(Unit).Assembly || type.Assembly == typeof(object).Assembly || type.Assembly == typeof(ImmutableArray).Assembly));
     checks.That($"{owner.Name}.{name} declares carrier and payload without nullable annotations or flow attributes",
-        new[] { method.ReturnParameter, method.GetParameters()[0] }.All(item =>
+        new[] { method.ReturnParameter, method.GetParameters()[0] }.Where(item => item.ParameterType != typeof(void)).All(item =>
             NullableFlags(item, method).All(flag => flag != 2)
             && !item.GetCustomAttributesData().Any(attribute => attribute.AttributeType.Namespace == "System.Diagnostics.CodeAnalysis")));
 }

@@ -182,3 +182,5 @@ ValidationNullableMatchResult          warning  CS8603
 ValidationMapNullableSelectorInput     warning  CS8602
 ValidationEnsureNullablePredicateInput warning  CS8602
 ValidationEnsureNoNullableNarrowing    warning  CS8602
+RefLikeResultPayload                   error    CS9244
+RefStructEnumeratorMaybePayload        error    CS9244

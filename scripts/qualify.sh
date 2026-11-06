@@ -130,6 +130,8 @@ extract_readme_examples() {
         /^```csharp shouldly$/ { file = sprintf("%s/recipe%02d.shouldly", dir, ++count); inside = 1; next }
         /^```csharp http$/ { file = sprintf("%s/recipe%02d.httprecipe", dir, ++count); inside = 1; next }
         /^```csharp json$/ { file = sprintf("%s/recipe%02d.jsonrecipe", dir, ++count); inside = 1; next }
+        /^```csharp async$/ { file = sprintf("%s/recipe%02d.asyncrecipe", dir, ++count); inside = 1; next }
+        /^```csharp span$/ { file = sprintf("%s/recipe%02d.spanrecipe", dir, ++count); inside = 1; next }
         /^```$/ { if (inside) close(file); inside = 0; next }
         inside { print > file }
     ' "$readme"
@@ -174,6 +176,8 @@ consumers() {
     shouldly_recipe
     readme_recipe HttpReadmeRecipe httprecipe
     readme_recipe JsonReadmeRecipe jsonrecipe
+    readme_recipe AsyncReadmeRecipe asyncrecipe
+    readme_recipe SpanReadmeRecipe spanrecipe
     build_tool "$root/qualification/PackageInspector"
     source_expectation
     dotnet run --project "$root/qualification/PackageInspector" -c Release --no-build -- Rezultat "${expectation[@]}" \
@@ -183,7 +187,9 @@ consumers() {
         "$artifacts/obj/NullableDisabledConsumer/project.assets.json" \
         "$artifacts/obj/ShouldlyRecipeConsumer/project.assets.json" \
         "$artifacts/obj/HttpReadmeRecipe/project.assets.json" \
-        "$artifacts/obj/JsonReadmeRecipe/project.assets.json"
+        "$artifacts/obj/JsonReadmeRecipe/project.assets.json" \
+        "$artifacts/obj/AsyncReadmeRecipe/project.assets.json" \
+        "$artifacts/obj/SpanReadmeRecipe/project.assets.json"
     diamond
 }
 

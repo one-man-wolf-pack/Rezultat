@@ -21,10 +21,10 @@ outcome, and the caller handles success, absence or problems with ordinary C#.
 
 ## Use the package
 
-Version `1.0.0` of the three packages is prepared here as the first public stable release. It is not published
-yet: nuget.org does not have it, so the command below does not resolve before the release (see
-[Releases](#releases) for the remaining steps). Earlier `0.y.z` versions went only to a private local feed. Once
-`1.0.0` is published:
+This source builds the private version `0.8.4`; private `0.y.z` packages go only to a private
+[local feed](#local-feed). The first public stable release is planned as `1.0.0` of the three packages and is not
+published yet: nuget.org does not have it, so the command below does not resolve before that release (see
+[Releases](#releases) for the remaining steps). Once `1.0.0` is published:
 
 ```sh
 dotnet add package Rezultat --version 1.0.0
@@ -53,7 +53,7 @@ foreach (var input in new[] { "3", "zero" })
 Optional packages:
 
 - `Rezultat.Testing.Xunit` ([README](src/Rezultat.Testing.Xunit/README.md)): `ShouldBeOk`, `ShouldBeError`,
-  `ShouldBeValid` and `ShouldBeInvalid` for xUnit v2 and v3 test projects.
+  `ShouldBeValid`, `ShouldBeInvalid`, `ShouldBeSome` and `ShouldBeNone` for xUnit v2 and v3 test projects.
 - `Rezultat.Analyzers` ([README](src/Rezultat.Analyzers/README.md)): the `RZT0001` warning for a discarded `Result`
   or `Validation`, referenced per project with `PrivateAssets="all"`.
 
@@ -63,7 +63,7 @@ https://github.com/one-man-wolf-pack/Rezultat/issues.
 
 ## Versions and compatibility
 
-From `1.0.0` the packages follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as one version line:
+From `1.0.0` the packages will follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as one version line:
 compatible fixes are patch releases, compatible additions minor releases, and an incompatible change of the public
 contract a new major version. The contract covers the public source and binary API with its nullable annotations,
 the behavior the READMEs document (states, defaults and `null`, guards, evaluation, failures) and their dependency
@@ -71,9 +71,10 @@ and support limits; for `Rezultat.Analyzers` it covers `RZT0001`, its configurat
 reports. It does not cover internal layout, hash codes across processes, performance or unqualified platforms,
 SDKs and IDEs. Correcting behavior that deviates from the documented contract is a fix, not a break.
 
-The assembly version stays `1.0.0.0` for every `1.x` release, so a newer `1.x` binds where an older one was
+The assembly version will stay `1.0.0.0` for every `1.x` release, so a newer `1.x` binds where an older one was
 referenced; the package and file versions name the release. The promise starts with the first published `1.0.0`;
-the private `0.y.z` versions carried none.
+the private `0.y.z` versions, including the current `0.8.4`, carry none, and their assembly version is the full
+number, such as `0.8.4.0`.
 
 ## Limits
 
@@ -104,9 +105,10 @@ The consumer READMEs `src/Rezultat/README.md`, `src/Rezultat.Testing.Xunit/READM
 this README, are compiled against the built package and run (or checked for the `RZT0001` lines they mark). Tagged
 blocks of the core README are compiled from the installed package by their own checking consumers: `csharp shouldly`
 by `qualification/ShouldlyRecipeConsumer` (with Shouldly and xUnit v3, without `Rezultat.Testing.Xunit`),
-`csharp http` by `qualification/HttpReadmeRecipe` (ASP.NET Core shared framework, no host) and `csharp json` by
-`qualification/JsonReadmeRecipe`. All packages share the version and packaging settings in
-`src/Directory.Build.props`.
+`csharp http` by `qualification/HttpReadmeRecipe` (ASP.NET Core shared framework, no host), `csharp json` by
+`qualification/JsonReadmeRecipe`, `csharp async` by `qualification/AsyncReadmeRecipe` (pending, cancelled and
+faulted steps) and `csharp span` by `qualification/SpanReadmeRecipe`. All packages share the version and packaging
+settings in `src/Directory.Build.props`.
 
 `.editorconfig` and `Directory.Build.props` make every restore and build equally strict, focused or not: compiler
 and MSBuild warnings are errors, with the .NET 10 recommended analysis, the enabled code-style rules and the selected
@@ -214,8 +216,9 @@ repository, so Source Link cannot serve them. Running `release` again rebuilds t
 
 Source acceptance of this preparation leaves these steps, in order:
 
-1. Promote the accepted API: move the entries of `PublicAPI.Unshipped.txt` into `PublicAPI.Shipped.txt` for
-   `Rezultat` and `Rezultat.Testing.Xunit`, and review the version and release notes.
+1. Set `VersionPrefix` in `src/Directory.Build.props` to `1.0.0`, promote the accepted API (move the entries of
+   `PublicAPI.Unshipped.txt` into `PublicAPI.Shipped.txt` for `Rezultat` and `Rezultat.Testing.Xunit`) and review
+   the READMEs and release notes for the stable release.
 2. Review and commit that release source.
 3. Run `just release` for the commit and qualify the clone as above. Every later source change needs a new commit
    and a new release build.
@@ -233,7 +236,7 @@ caches. `REZULTAT_LOCAL_FEED` or the last command argument can select another di
 `0.y.z` packages and keeps released archives with their records.
 
 ```sh
-scripts/publish-local.sh 1.0.0 artifacts/release/<full-commit>/artifacts/linux-arm64/package/release
+scripts/publish-local.sh <version> artifacts/release/<full-commit>/artifacts/linux-arm64/package/release
 # Other packages and explicit destination:
 scripts/publish-local.sh --package Rezultat.Analyzers <version> <package-directory> /absolute/path/to/rezultat-feed
 ```

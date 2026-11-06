@@ -8,7 +8,8 @@ dependencies beyond the .NET framework; all operations are synchronous.
 Contents: [Choose a type](#choose-a-type), [Install](#install), [Quickstart](#quickstart),
 [States, defaults and null](#states-defaults-and-null), [Carriers and composition](#carriers-and-composition),
 [Collection operations](#collection-operations), [Query syntax](#query-syntax), [HTTP responses](#http-responses),
-[Presence in JSON fields](#presence-in-json-fields), [Behavior to know](#behavior-to-know),
+[Presence in JSON fields](#presence-in-json-fields), [Async code](#async-code),
+[Spans and borrowed data](#spans-and-borrowed-data), [Behavior to know](#behavior-to-know),
 [Moving from local outcome types](#moving-from-local-outcome-types), [Limits](#limits),
 [Versions and support](#versions-and-support), [Release notes](#release-notes).
 
@@ -88,10 +89,11 @@ every issue, here `name is empty; age is negative`.
 Equality, hashing and `ToString` of an uninitialized `Result` or `Validation` do not throw: two uninitialized
 values of the same type are equal, and `ToString` shows `Result.Uninitialized` or `Validation.Uninitialized`.
 
-**`Result` and `Validation` are not safe-to-log containers.** Their `ToString` shows the active payload or every
-issue and calls the payload's own `ToString`, with its side effects and exceptions. String interpolation, a log
-message argument, an assertion message or a debugger display can run it even without an explicit
-`Console.WriteLine`. For diagnostics, select the facts that may be shown instead of passing the carrier:
+**`Result`, `Maybe`, `Presence` and `Validation` are not safe-to-log containers.** For Ok, Error, Some, Value,
+Valid and Invalid their `ToString` shows the active payload or every issue and calls the payload's own `ToString`,
+with its side effects and exceptions; None, Missing, Null and an uninitialized carrier show only the state. String
+interpolation, a log message argument, an assertion message or a debugger display can run it even without an
+explicit `Console.WriteLine`. For diagnostics, select the facts that may be shown instead of passing the carrier:
 
 ```csharp
 using Rezultat;
@@ -100,7 +102,9 @@ Result<Receipt, PaymentError> payment = Result<Receipt, PaymentError>.Error(new 
 
 string state = !payment.IsInitialized ? "Uninitialized" : payment.IsSuccess ? "Ok" : "Error";
 string? code = payment.IsInitialized && !payment.TryGetValue(out _, out var error) ? error.Code : null;
-Console.WriteLine($"payment {state} {code}");
+Maybe<string> coupon = Maybe<string>.Some("SECRET-COUPON");
+string couponState = coupon.IsSome ? "Some" : "None";
+Console.WriteLine($"payment {state} {code}, coupon {couponState}");
 
 internal sealed record Receipt(string Id);
 
@@ -390,6 +394,89 @@ at the document root or in an array. `null` is handled before the payload is rea
 state, is the contract of that field. This converter is a recipe for your code, not part of the package; with
 source-generated metadata, register the DTO and every payload type in your context and check the exact DTO there.
 
+## Async code
+
+Await the operation first, then handle its outcome with the same `TryGetValue`, `Match` and early `return` as in
+synchronous code. A failed step returns its Error and the next step does not start:
+
+```csharp async
+using Rezultat;
+
+public sealed record Order(int Id, decimal Total);
+
+public sealed record Receipt(int OrderId, string Reference);
+
+public abstract record CheckoutError
+{
+    public sealed record NotFound(int OrderId) : CheckoutError;
+
+    public sealed record Declined(string Reason) : CheckoutError;
+}
+
+public interface IOrders
+{
+    Task<Result<Order, CheckoutError>> LoadAsync(int orderId, CancellationToken cancellationToken);
+}
+
+public interface IPayments
+{
+    Task<Result<Receipt, CheckoutError>> ChargeAsync(Order order, CancellationToken cancellationToken);
+}
+
+public sealed class Checkout(IOrders orders, IPayments payments)
+{
+    public async Task<Result<Receipt, CheckoutError>> PayAsync(int orderId, CancellationToken cancellationToken)
+    {
+        var loaded = await orders.LoadAsync(orderId, cancellationToken);
+        if (!loaded.TryGetValue(out var order, out var error))
+        {
+            return Result<Receipt, CheckoutError>.Error(error);
+        }
+
+        return await payments.ChargeAsync(order, cancellationToken);
+    }
+}
+```
+
+- Pass the `CancellationToken` to each step that can be cancelled; the step that uses it decides when to stop.
+- An expected failure the caller acts on is an Error. A fault and a cancellation stay in the `Task`: `await` rethrows
+  them, and `PayAsync` completes as faulted or canceled, not with an Error. Do not catch every exception or
+  `OperationCanceledException` to turn it into an Error or None.
+- When the steps have different error types, convert the error explicitly before returning it.
+- The same applies to `Task` or `ValueTask` of `Maybe`, `Presence` and `Validation`. A completed task does not mean
+  Ok, Some, Value or Valid; the carrier says that.
+
+## Spans and borrowed data
+
+The ordinary carriers cannot hold a ref-like payload: `Result<ReadOnlySpan<char>, ParseError>`, a `Maybe` of a
+`Span<T>` or of a ref struct enumerator does not compile. This is a limit of these types, which store their payload
+in ordinary fields and travel through tasks and collections; modern C# itself allows ref structs in generic APIs
+that opt in. To hand out a borrowed slice, keep the ordinary `Try` pattern with an `out` span:
+
+```csharp span
+public static class Words
+{
+    public static bool TryFirstWord(ReadOnlySpan<char> text, out ReadOnlySpan<char> word)
+    {
+        text = text.TrimStart();
+        int end = text.IndexOf(' ');
+        word = end < 0 ? text : text[..end];
+        return !word.IsEmpty;
+    }
+}
+```
+
+The compiler checks that the slice does not outlive its source, which can also be a `stackalloc` buffer. A span
+input can still produce an ordinary outcome that does not hold the span, such as a `Result` with a value, an index
+or an error. When the slice must outlive the call, choose by who owns the data:
+
+- `ReadOnlyMemory<char>` is a view of a buffer that lives long enough, such as a string or an array; it copies
+  nothing and the owner may still change an array behind it. A `stackalloc` buffer has no `Memory` view.
+- A `Range` or offset and length copies nothing and keeps nothing alive: the caller keeps the right buffer.
+- A pooled buffer keeps its lease: a carrier holding its memory does not extend or return it, and copies of the
+  carrier share it. The owner decides when the buffer goes back.
+- Copy the data (`ToArray`, `ToString`) only when it has to outlive every buffer; that is a choice, not a default.
+
 ## Behavior to know
 
 - `Ensure` is a dependent check: it runs only on a valid value and adds one issue. Chained `Ensure` calls stop at
@@ -418,7 +505,8 @@ source-generated metadata, register the DTO and every payload type in your conte
   values explicitly. If another imported query provider makes a call ambiguous, call the static class directly.
 - For a type implementing both dictionary interfaces, `GetOrNone` prefers the `IReadOnlyDictionary` overload;
   callers compiled with C# 12 or earlier may get an ambiguity error instead.
-- All operations are synchronous; there are no overloads for `Task` or `ValueTask` callbacks.
+- All operations are synchronous; there are no overloads for `Task` or `ValueTask` callbacks. See
+  [Async code](#async-code).
 - This package contains no test assertion helpers and no analyzer; for tests see "Assertions in tests" below.
 
 ## Moving from local outcome types
@@ -532,12 +620,13 @@ construct a partially valid object.
 ### Assertions in tests
 
 With xUnit, the optional `Rezultat.Testing.Xunit` package gives `ShouldBeOk`, `ShouldBeError`, `ShouldBeValid`
-and `ShouldBeInvalid`. From its version 0.8.2 each has an `includePayload: false` overload whose failure message
-names only the expected and actual branches; version 0.8.0 does not have it. The flag limits only that message:
-later assertions and runner output can still show the data.
+and `ShouldBeInvalid`, and from its version 0.8.4 `ShouldBeSome` and `ShouldBeNone` for `Maybe`. Each has an
+`includePayload: false` overload whose failure message names only the expected and actual branches; versions
+before 0.8.2 have no such overload. The flag limits only that message: later assertions and runner output can
+still show the data.
 
-With Shouldly, a test project can keep a small local recipe of the same four extractions instead. It needs only
-this package and Shouldly, not `Rezultat.Testing.Xunit`:
+With Shouldly, a test project can keep a small local recipe of the same extractions instead. It needs only this
+package and Shouldly, not `Rezultat.Testing.Xunit`:
 
 ```csharp shouldly
 using System.Collections.Immutable;
@@ -557,6 +646,17 @@ internal static class RezultatShouldlyExtensions
 
     public static ImmutableArray<TIssue> ShouldBeInvalid<T, TIssue>(this Validation<T, TIssue> validation) =>
         validation.TryGetValue(out _, out var issues) ? throw new ShouldAssertException("Expected Validation.Invalid; actual Validation.Valid.") : issues;
+
+    public static T ShouldBeSome<T>(this Maybe<T> value) =>
+        value.TryGetValue(out var payload) ? payload : throw new ShouldAssertException("Expected Maybe.Some; actual Maybe.None.");
+
+    public static void ShouldBeNone<T>(this Maybe<T> value)
+    {
+        if (value.IsSome)
+        {
+            throw new ShouldAssertException("Expected Maybe.None; actual Maybe.Some.");
+        }
+    }
 }
 ```
 
@@ -579,6 +679,17 @@ public sealed class RezultatShouldlyRecipeTests
 
         var issues = ImmutableArray.Create("bad name", "bad name");
         Validation<int, string>.InvalidMany(issues).ShouldBeInvalid().ShouldBe(issues);
+
+        Maybe<int>.Some(42).ShouldBeSome().ShouldBe(42);
+        Maybe<int>.None.ShouldBeNone();
+    }
+
+    [Fact]
+    public void KeepsSomeNullApartFromNone()
+    {
+        Maybe<string?>.Some(null).ShouldBeSome().ShouldBeNull();
+        default(Maybe<string>).ShouldBeNone();
+        Should.Throw<ShouldAssertException>(() => Maybe<string?>.Some(null).ShouldBeNone());
     }
 
     [Fact]
@@ -586,6 +697,9 @@ public sealed class RezultatShouldlyRecipeTests
     {
         var failure = Should.Throw<ShouldAssertException>(() => Result<int, string>.Error("secret").ShouldBeOk());
         failure.Message.ShouldNotContain("secret");
+
+        var some = Should.Throw<ShouldAssertException>(() => Maybe<string>.Some("secret").ShouldBeNone());
+        some.Message.ShouldNotContain("secret");
     }
 
     [Fact]
@@ -597,9 +711,11 @@ public sealed class RezultatShouldlyRecipeTests
 - A wrong branch throws `ShouldAssertException` directly with constant branch names; the payload and the issues
   are not formatted. Do not replace the `throw` with a fail callback that could return.
 - Success returns the exact payload, still nullable when its type is, or the stored issue array.
-- An uninitialized carrier keeps the native `InvalidOperationException` of `TryGetValue`. This differs from the
-  xUnit package, which reports `Uninitialized` as an assertion failure; check `IsInitialized` explicitly when a test
-  studies `default`.
+- `Some(null)` is Some: `ShouldBeSome` returns `null` and `ShouldBeNone` fails. `default` of `Maybe` is an ordinary
+  None.
+- An uninitialized `Result` or `Validation` keeps the native `InvalidOperationException` of `TryGetValue`. This
+  differs from the xUnit package, which reports `Uninitialized` as an assertion failure; check `IsInitialized`
+  explicitly when a test studies `default`.
 - If you add a `customMessage` parameter, its content is your responsibility: interpolating the payload into it
   shows the data again. Later Shouldly assertions such as `ShouldBe` format their own values.
 
@@ -618,24 +734,27 @@ public sealed class RezultatShouldlyRecipeTests
 
 ## Versions and support
 
-From `1.0.0` the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html), in one version line
+This is the private version 0.8.4. The first public stable release is planned as `1.0.0` and is not published yet.
+From `1.0.0` the package will follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html), in one version line
 with `Rezultat.Testing.Xunit` and `Rezultat.Analyzers`: compatible fixes are patch releases, compatible additions
 minor releases, and an incompatible change of the public contract a new major version. The contract is the public
 source and binary API with its nullable annotations and the behavior this README documents: states, defaults and
 `null`, guards, evaluation, failures, dependencies and the limits above. It does not cover internal layout, hash
 codes across processes, performance or unqualified platforms. Correcting behavior that deviates from this README is
-a fix, not a break. The assembly version stays `1.0.0.0` for every `1.x` release, so a newer `1.x` binds where an
-older one was referenced. The earlier `0.y.z` versions carried no compatibility promise.
+a fix, not a break. The assembly version will stay `1.0.0.0` for every `1.x` release, so a newer `1.x` binds where
+an older one was referenced. The private `0.y.z` versions, including this one, carry no compatibility promise; their
+assembly version is the full number, such as `0.8.4.0`.
 
 Source: https://github.com/one-man-wolf-pack/Rezultat. Questions, bug reports and feature requests:
 https://github.com/one-man-wolf-pack/Rezultat/issues.
 
 ## Release notes
 
-- 1.0.0: the first stable release, and the start of the compatibility promise in
-  [Versions and support](#versions-and-support). Compared with 0.8.3 the public API has the same members; the
-  assembly version becomes `1.0.0.0` and the package names its project and repository. No action is needed besides
-  updating the version.
+- 0.8.4: documentation and package metadata. Adds the [async example](#async-code), the
+  [limit on span payloads](#spans-and-borrowed-data) with a borrowed `Try` example, extends the formatting warning
+  to `Maybe` and `Presence`, and adds `ShouldBeSome` and `ShouldBeNone` to the Shouldly recipe. The package names
+  its project and repository. Compared with 0.8.3, operations, signatures, nullable annotations, guards and
+  exceptions, namespaces and overload binding are unchanged; no action is needed besides updating the version.
 - 0.8.3: documentation only. The README starts with choosing a type, installation and a quickstart, and adds the
   HTTP response and Presence JSON examples and the limits. Compared with 0.8.2, operations, signatures, nullable
   annotations, guards and exceptions, namespaces and overload binding are unchanged; no action is needed besides

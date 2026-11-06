@@ -31,4 +31,14 @@ try {
         exception.Message.Contains("Result.Error", StringComparison.Ordinal) && !exception.Message.Contains("null", StringComparison.Ordinal));
 }
 
+checks.That("ShouldBeSome keeps Some(null)", Maybe<string>.Some(null).ShouldBeSome() is null && Maybe<string>.Some(null).ShouldBeSome(includePayload: false) is null);
+Maybe<string>.None.ShouldBeNone();
+try {
+    Maybe<string>.Some(null).ShouldBeNone();
+    checks.Fail("Some(null) ShouldBeNone: no failure");
+} catch (Exception exception) {
+    checks.Text("Some(null) ShouldBeNone failure type", "Xunit.Sdk.FailException", exception.GetType().FullName);
+    checks.Text("Some(null) ShouldBeNone message", "Expected Maybe.None; actual Maybe.Some(null).", exception.Message);
+}
+
 return checks.Complete();

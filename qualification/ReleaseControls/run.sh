@@ -28,7 +28,7 @@ listing() { (cd "$1" && find . -type f | sort | while read -r file; do echo "$fi
 empty_feed() { [[ -z "$(find "$1" -type f 2>/dev/null)" ]]; }
 new_feed() { mkdir -p "$work/feeds/$1"; echo "$work/feeds/$1"; }
 rewrite() { sed "$2" "$1" >"$1.new" && mv "$1.new" "$1"; }
-copy_packages() { rm -rf "$work/packages/$1"; mkdir -p "$work/packages"; cp -R "$packages" "$work/packages/$1"; echo "$work/packages/$1"; }
+copy_packages() { rm -rf "$work/packages/$1"; mkdir -p "$work/packages"; cp -R "${2:-$packages}" "$work/packages/$1"; echo "$work/packages/$1"; }
 retag() {
     local archive="$1" expression="$2" unpacked nuspec
     unpacked="$(mktemp -d "$work/retag.XXXXXX")"
@@ -40,9 +40,17 @@ retag() {
     rm -rf "$unpacked"
 }
 rerecord() {
-    local directory="$1" id="$2" revision="$3" archives=("$1/$2.$version.nupkg")
-    [[ "$id" == Rezultat.Analyzers ]] || archives+=("$directory/$id.$version.snupkg")
-    (. "$repo/scripts/release-record.sh" && release_record "$id" "$version" "$revision" "${archives[@]}") >"$directory/$id.$version.record"
+    local directory="$1" id="$2" revision="$3" at="${4:-$version}"
+    local archives=("$directory/$id.$at.nupkg")
+    [[ "$id" == Rezultat.Analyzers ]] || archives+=("$directory/$id.$at.snupkg")
+    (. "$repo/scripts/release-record.sh" && release_record "$id" "$at" "$revision" "${archives[@]}") >"$directory/$id.$at.record"
+}
+restamp() {
+    local directory="$1" from="$2" to="$3" archive
+    for archive in Rezultat.$from.nupkg Rezultat.$from.snupkg Rezultat.Analyzers.$from.nupkg; do
+        retag "$directory/$archive" "s|<version>$from</version>|<version>$to</version>|"
+        mv "$directory/$archive" "$directory/${archive/$from/$to}"
+    done
 }
 bound() { (. "$repo/scripts/release-record.sh" && release_bound "$@"); }
 
@@ -148,37 +156,44 @@ rewrite "$incomplete/Rezultat.$version.record" '/^snupkg-sha256=/d'
 feed="$(new_feed incomplete)"
 refused "record without the symbols hash" "$feed" "$version" "$incomplete" "$feed"
 
-bootstrap="$(copy_packages bootstrap)"
-retag "$bootstrap/Rezultat.$version.nupkg" 's/ commit="[0-9a-f]*"//'
-rerecord "$bootstrap" Rezultat "$built"
+# Source binding is required of stable versions only, so these refusals use a stable stand-in of the build,
+# whatever line the fixture commit builds.
+stable_version=1.99.0
+stable="$(copy_packages stable)"
+restamp "$stable" "$version" "$stable_version"
+for id in Rezultat Rezultat.Analyzers; do rerecord "$stable" "$id" "$built" "$stable_version"; done
+
+bootstrap="$(copy_packages bootstrap "$stable")"
+retag "$bootstrap/Rezultat.$stable_version.nupkg" 's/ commit="[0-9a-f]*"//'
+rerecord "$bootstrap" Rezultat "$built" "$stable_version"
 feed="$(new_feed bootstrap)"
-refused "stable package without a source commit (bootstrap)" "$feed" "$version" "$bootstrap" "$feed"
+refused "stable package without a source commit (bootstrap)" "$feed" "$stable_version" "$bootstrap" "$feed"
 
-other_commit="$(copy_packages other-commit)"
-retag "$other_commit/Rezultat.$version.nupkg" "s/ commit=\"$built\"/ commit=\"$head\"/"
-rerecord "$other_commit" Rezultat "$built"
+other_commit="$(copy_packages other-commit "$stable")"
+retag "$other_commit/Rezultat.$stable_version.nupkg" "s/ commit=\"$built\"/ commit=\"$head\"/"
+rerecord "$other_commit" Rezultat "$built" "$stable_version"
 feed="$(new_feed other-commit)"
-refused "package of another commit than its record" "$feed" "$version" "$other_commit" "$feed"
+refused "package of another commit than its record" "$feed" "$stable_version" "$other_commit" "$feed"
 
-other_url="$(copy_packages other-url)"
-retag "$other_url/Rezultat.Analyzers.$version.nupkg" "s|url=\"$url\"|url=\"https://github.com/example/Rezultat\"|"
-rerecord "$other_url" Rezultat.Analyzers "$built"
+other_url="$(copy_packages other-url "$stable")"
+retag "$other_url/Rezultat.Analyzers.$stable_version.nupkg" "s|url=\"$url\"|url=\"https://github.com/example/Rezultat\"|"
+rerecord "$other_url" Rezultat.Analyzers "$built" "$stable_version"
 feed="$(new_feed other-url)"
-refused "package naming another repository" "$feed" --package Rezultat.Analyzers "$version" "$other_url" "$feed"
+refused "package naming another repository" "$feed" --package Rezultat.Analyzers "$stable_version" "$other_url" "$feed"
 
-credentialed_url="$(copy_packages credentialed-url)"
-retag "$credentialed_url/Rezultat.$version.nupkg" "s|url=\"https://|url=\"https://x-access-token:$marker@|"
-rerecord "$credentialed_url" Rezultat "$built"
+credentialed_url="$(copy_packages credentialed-url "$stable")"
+retag "$credentialed_url/Rezultat.$stable_version.nupkg" "s|url=\"https://|url=\"https://x-access-token:$marker@|"
+rerecord "$credentialed_url" Rezultat "$built" "$stable_version"
 feed="$(new_feed credentialed-url)"
-refused "package naming a credentialed repository URL" "$feed" "$version" "$credentialed_url" "$feed"
+refused "package naming a credentialed repository URL" "$feed" "$stable_version" "$credentialed_url" "$feed"
 check "refusal of a credentialed package URL does not log the credential" bash -c "! grep -q '$marker' '$work/publish.log'"
 
 feed="$(new_feed stable-legacy)"
 mkdir -p "$feed/symbols"
-cp "$packages/Rezultat.$version.nupkg" "$feed/"
-cp "$packages/Rezultat.$version.snupkg" "$feed/symbols/"
+cp "$stable/Rezultat.$stable_version.nupkg" "$feed/"
+cp "$stable/Rezultat.$stable_version.snupkg" "$feed/symbols/"
 before="$(listing "$feed")"
-if publish --legacy-record "$version" "$feed"; then fail "stable legacy record: published"; else pass "stable legacy record: $(tail -1 "$work/publish.log")"; fi
+if publish --legacy-record "$stable_version" "$feed"; then fail "stable legacy record: published"; else pass "stable legacy record: $(tail -1 "$work/publish.log")"; fi
 check "refused stable legacy record keeps the feed unchanged" test "$before" == "$(listing "$feed")"
 
 feed="$(new_feed conflict)"
@@ -191,11 +206,8 @@ check "conflicting record keeps the feed unchanged" test "$before" == "$(listing
 
 # Legacy records cover only issued private 0.y.z: an issued 0.99.0 stands in for them.
 private="$(copy_packages private)"
-for archive in Rezultat.$version.nupkg Rezultat.$version.snupkg Rezultat.Analyzers.$version.nupkg; do
-    retag "$private/$archive" "s|<version>$version</version>|<version>0.99.0</version>|"
-    mv "$private/$archive" "$private/${archive/$version/0.99.0}"
-done
-stable_version="$version"
+restamp "$private" "$version" 0.99.0
+built_version="$version"
 version=0.99.0
 rerecord "$private" Rezultat "$built"
 feed="$(new_feed legacy)"
@@ -223,7 +235,7 @@ check "legacy feed unchanged by retries and refusals" test "$before" == "$(listi
 
 publish_path="$broken_bin:$PATH"
 feed="$(new_feed hashing-issue)"
-refused "new issuance when hashing fails" "$feed" "$stable_version" "$packages" "$feed"
+refused "new issuance when hashing fails" "$feed" "$built_version" "$packages" "$feed"
 feed="$(new_feed hashing-legacy)"
 mkdir -p "$feed/symbols"
 cp "$private/Rezultat.$version.nupkg" "$feed/"
@@ -232,7 +244,7 @@ before="$(listing "$feed")"
 if publish --legacy-record "$version" "$feed"; then fail "legacy record when hashing fails: published"; else pass "legacy record when hashing fails: $(tail -1 "$work/publish.log")"; fi
 check "failed legacy record keeps the feed unchanged" test "$before" == "$(listing "$feed")"
 publish_path="$PATH"
-version="$stable_version"
+version="$built_version"
 
 printf 'untracked\n' >"$snapshot/untracked.txt"
 if just --justfile "$snapshot/justfile" linux pack-bound "$built" >"$work/pack-dirty.log" 2>&1; then

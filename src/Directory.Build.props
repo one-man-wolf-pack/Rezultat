@@ -6,10 +6,13 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <VersionPrefix>1.0.0</VersionPrefix>
-    <!-- A runtime binding identity per major line: a compatible 1.x update must load where an older 1.x was
-         referenced, so only the major reaches AssemblyVersion; package and file versions name the release. -->
-    <AssemblyVersion>$([System.Version]::Parse('$(VersionPrefix)').Major).0.0.0</AssemblyVersion>
+    <VersionPrefix>0.8.4</VersionPrefix>
+    <!-- A stable line keeps one runtime binding identity per major: a compatible 1.x update must load where an older
+         1.x was referenced, so only the major reaches AssemblyVersion; package and file versions name the release.
+         A private 0.y.z keeps its full number, as the issued 0.y.z did: 0.0.0.0 would be lower than the 0.8.0.0 an
+         older library references, and the runtime does not bind a reference to a lower version. -->
+    <AssemblyVersion Condition="$(VersionPrefix.StartsWith('0.'))">$(VersionPrefix).0</AssemblyVersion>
+    <AssemblyVersion Condition="!$(VersionPrefix.StartsWith('0.'))">$([System.Version]::Parse('$(VersionPrefix)').Major).0.0.0</AssemblyVersion>
     <Authors>Zada Zorg</Authors>
     <Copyright>Copyright (c) 2026 Zada Zorg</Copyright>
     <PackageProjectUrl>https://github.com/one-man-wolf-pack/Rezultat</PackageProjectUrl>

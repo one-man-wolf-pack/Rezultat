@@ -12,7 +12,7 @@ string pair = args[0] == "v3" ? $"xunit.v3 {args[1]}" : args[1];
 string framework = $"xUnit.net v3 {args[1]}+";
 var checks = new Checks();
 string family = args[0] == "v2" ? "Family.FailureIsTheV3FailExceptionNotTheV2AssertionFamily" : "Family.FailureIsTheV3FailException";
-string[] passing = ["Positive.ExtractsAllFourBranches", "Positive.ExtractsAllFourBranchesWithoutPayload", "Positive.KeepsNullablePayloads", "Positive.FailureStopsOnlyTheCurrentMultipleLambda", family];
+string[] passing = ["Positive.ExtractsAllFourBranches", "Positive.ExtractsAllFourBranchesWithoutPayload", "Positive.ExtractsMaybeBranchesInBothForms", "Positive.KeepsNullablePayloads", "Positive.FailureStopsOnlyTheCurrentMultipleLambda", family];
 var failing = new Dictionary<string, string> {
     ["ExpectedFailures.WrongBranch"] = "actual Result.Error(wrong-branch-evidence)",
     ["ExpectedFailures.Uninitialized"] = "actual Validation.Uninitialized",
@@ -21,6 +21,9 @@ var failing = new Dictionary<string, string> {
     ["ExpectedFailures.WrongBranchWithoutPayload"] = "actual Result.Error.",
     ["ExpectedFailures.InvalidWithoutPayload"] = "actual Validation.Invalid.",
     ["ExpectedFailures.UninitializedWithoutPayload"] = "actual Result.Uninitialized",
+    ["ExpectedFailures.SomeOnNone"] = "Expected Maybe.Some; actual Maybe.None.",
+    ["ExpectedFailures.NoneOnSome"] = "actual Maybe.Some(some-evidence)",
+    ["ExpectedFailures.NoneOnSomeWithoutPayload"] = "Expected Maybe.None; actual Maybe.Some.",
 };
 string[] undisclosed = ["secret-sentinel", "ToString", "issues"];
 
