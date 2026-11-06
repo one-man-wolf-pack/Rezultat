@@ -18,8 +18,11 @@ mounts=()
 # interrupted lane would keep running. The source stays read-only; the container's artifacts/ is the host's artifacts/linux-arm64, so its outputs never mix
 # with workstation outputs. UseSharedCompilation=false: a one-shot container compiles with the standalone compiler, not
 # a reused Roslyn compiler server; MSBuild reads the variable as a property in every nested build.
+# RestoreDisableParallel=true restores projects one at a time, also inside source-bound release checkouts: cold parallel
+# restores onto the mounted cache intermittently failed with corrupt package archives (cause unknown). Locked graphs,
+# audit and signature checks stay on.
 exec docker run --rm --init --platform linux/arm64 \
-    --user "$(id -u):$(id -g)" ${mounts[@]+"${mounts[@]}"} -e UseSharedCompilation=false \
+    --user "$(id -u):$(id -g)" ${mounts[@]+"${mounts[@]}"} -e UseSharedCompilation=false -e RestoreDisableParallel=true \
     -e HOME=/work/artifacts/home -e DOTNET_CLI_HOME=/work/artifacts/home -e NUGET_PACKAGES=/work/artifacts/nuget \
     -e DOTNET_NOLOGO=1 -e DOTNET_CLI_TELEMETRY_OPTOUT=1 -e TESTINGPLATFORM_TELEMETRY_OPTOUT=1 \
     -v "$root:/work:ro" -v "$host_output:/work/artifacts" -w /work \
