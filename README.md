@@ -21,10 +21,12 @@ outcome, and the caller handles success, absence or problems with ordinary C#.
 
 ## Use the package
 
-This source builds the private version `0.8.4`; private `0.y.z` packages go only to a private
-[local feed](#local-feed). The first public stable release is planned as `1.0.0` of the three packages and is not
-published yet: nuget.org does not have it, so the command below does not resolve before that release (see
-[Releases](#releases) for the remaining steps). Once `1.0.0` is published:
+The first public stable release is `1.0.0` of the three packages. A version is available only once it is listed on
+the [GitHub releases](https://github.com/one-man-wolf-pack/Rezultat/releases) page and on
+[nuget.org](https://www.nuget.org/packages/Rezultat); before `1.0.0` is listed there, the command below does not
+resolve. Source in this repository does not make a release by itself: release-please sets `version.txt` in its release
+pull request, and [.github/RELEASING.md](.github/RELEASING.md) describes the release steps. Packages built from a
+working tree are candidates and are never issued. With `1.0.0` published:
 
 ```sh
 dotnet add package Rezultat --version 1.0.0
@@ -63,7 +65,7 @@ https://github.com/one-man-wolf-pack/Rezultat/issues.
 
 ## Versions and compatibility
 
-From `1.0.0` the packages will follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as one version line:
+From `1.0.0` the packages follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as one version line:
 compatible fixes are patch releases, compatible additions minor releases, and an incompatible change of the public
 contract a new major version. The contract covers the public source and binary API with its nullable annotations,
 the behavior the READMEs document (states, defaults and `null`, guards, evaluation, failures) and their dependency
@@ -71,10 +73,9 @@ and support limits; for `Rezultat.Analyzers` it covers `RZT0001`, its configurat
 reports. It does not cover internal layout, hash codes across processes, performance or unqualified platforms,
 SDKs and IDEs. Correcting behavior that deviates from the documented contract is a fix, not a break.
 
-The assembly version will stay `1.0.0.0` for every `1.x` release, so a newer `1.x` binds where an older one was
+The assembly version stays `1.0.0.0` for every `1.x` release, so a newer `1.x` binds where an older one was
 referenced; the package and file versions name the release. The promise starts with the first published `1.0.0`;
-the private `0.y.z` versions, including the current `0.8.4`, carry none, and their assembly version is the full
-number, such as `0.8.4.0`.
+the earlier private `0.y.z` versions carry none, and their assembly version is the full number, such as `0.8.3.0`.
 
 ## Limits
 
@@ -116,10 +117,11 @@ and MSBuild warnings are errors, with the .NET 10 recommended analysis, the enab
 Roslynator rules. `Directory.Packages.props` owns the versions, including those used by `qualification/` projects
 outside central package management. The core and `Rezultat.Testing.Xunit` track their public API in
 `PublicAPI.Shipped.txt` and `PublicAPI.Unshipped.txt`; an unrecorded API change fails the build, and `just fix`
-records it for review. `Shipped` stays empty until the first stable release promotes the accepted surface into it. Owned qualification support code inherits the profile; consumers whose restored package graph
-is inspected keep it without the private analyzers. Projects marked `RezultatConsumerInput` (diagnostic corpus,
-compiler controls, compiled README text and runner fixtures) compile with ordinary consumer settings and keep their
-source layout, so development diagnostics do not change what they check.
+records it for review. `Shipped` holds the accepted surface of the first stable release; `Unshipped` stays empty
+until a later change adds to it. Owned qualification support code inherits the profile; consumers whose restored
+package graph is inspected keep it without the private analyzers. Projects marked `RezultatConsumerInput`
+(diagnostic corpus, compiler controls, compiled README text and runner fixtures) compile with ordinary consumer
+settings and keep their source layout, so development diagnostics do not change what they check.
 
 The solution's projects restore from committed `packages.lock.json` files in locked mode. After an intentional
 dependency change, run an ordinary `dotnet restore Rezultat.slnx` and review the lock diff. Qualification projects

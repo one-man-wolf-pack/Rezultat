@@ -25,8 +25,33 @@ NuGet publication in any repository other than `one-man-wolf-pack/Rezultat`, wha
 | Runners | The Blacksmith App installed on this repository; labels `blacksmith-2vcpu-ubuntu-2404`, `blacksmith-4vcpu-ubuntu-2404`, `blacksmith-8vcpu-ubuntu-2404` (also listed in `.github/actionlint.yaml`). |
 | Merge method | Rebase merging, as now; release-please supports it. |
 | Required checks on `main` | `lint`, `qualify` and `release-controls` from Validate. Branch protection or a ruleset needs the repository to be public or a paid plan. |
-| Environment | `nuget-release`, without required reviewers or wait timers, with the secret `NUGET_USER`: the nuget.org account's profile name, not its email address. |
-| NuGet policy | On nuget.org, a Trusted Publishing policy for owner `one-man-wolf-pack`, repository `Rezultat`, workflow file `release.yml` (file name only) and environment `nuget-release`. No API key is stored anywhere. |
+| Environment | `nuget-release`, without required reviewers or wait timers, with the secret `NUGET_USER` set to `zadazorg`: the nuget.org profile name, not an email address or the GitHub organization. |
+| NuGet policy | See [NuGet Trusted Publishing policy](#nuget-trusted-publishing-policy). No API key is stored anywhere. |
+
+### NuGet Trusted Publishing policy
+
+Signed in to nuget.org as the profile `zadazorg`, create one Trusted Publishing policy with these fields:
+
+| Field | Value |
+| --- | --- |
+| Policy package owner | `zadazorg` |
+| Publisher | GitHub Actions |
+| Owner | `one-man-wolf-pack` |
+| Repository | `Rezultat` |
+| Workflow file | `release.yml` (file name only) |
+| Environment | `nuget-release` |
+| Scopes | Push new packages and package versions only; not Unlist and not Stage |
+| Packages | Exactly the three package IDs below, each on its own line |
+
+```text
+Rezultat
+Rezultat.Testing.Xunit
+Rezultat.Analyzers
+```
+
+nuget.org offers this policy form. Whether it saves with exactly these fields, whether `zadazorg` has the rights
+the push needs and whether the token exchange works are not verified until the first real release. No API key,
+other NuGet profile or organization is needed.
 
 A policy created while the repository is private may start as temporarily active for 7 days; it becomes permanent
 with the first successful publish. Restart its window on nuget.org if it lapses before the first release.
@@ -34,13 +59,12 @@ NuGet.org repository-signs the uploaded packages; no author-signing certificate 
 
 ## First stable release, in order
 
-1. Prepare the release source in an ordinary reviewed change: promote the accepted API (move the entries of
-   `PublicAPI.Unshipped.txt` into `PublicAPI.Shipped.txt` for `Rezultat` and `Rezultat.Testing.Xunit`) and make the
-   READMEs describe the published `1.0.0`. Leave `version.txt` to release-please. Merge it to `main` with Validate
-   green.
+1. Check the release source on `main`: the accepted API is in `PublicAPI.Shipped.txt` of `Rezultat` and
+   `Rezultat.Testing.Xunit` (their `PublicAPI.Unshipped.txt` are empty), the READMEs describe the first stable
+   `1.0.0`, and Validate is green. Leave `version.txt` to release-please.
 2. Make the repository public, then require the three Validate checks on `main`.
 3. Confirm the App and Blacksmith installations, create the environment with `NUGET_USER`, and create the NuGet
-   policy.
+   policy with the fields above.
 4. Set `REZULTAT_RELEASE_AUTOMATION_ENABLED` to `true`. The next push to `main` (or a re-run of the latest Release
    Please run) opens the release pull request. With no earlier release and an empty `.release-please-manifest.json`,
    it proposes `1.0.0` (`initial-version` in `release-please-config.json`), once; later versions follow the
