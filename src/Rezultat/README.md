@@ -620,7 +620,7 @@ construct a partially valid object.
 ### Assertions in tests
 
 With xUnit, the optional `Rezultat.Testing.Xunit` package gives `ShouldBeOk`, `ShouldBeError`, `ShouldBeValid`
-and `ShouldBeInvalid`, and from its version 0.8.4 `ShouldBeSome` and `ShouldBeNone` for `Maybe`. Each has an
+and `ShouldBeInvalid`, and from its version 1.0.0 `ShouldBeSome` and `ShouldBeNone` for `Maybe`. Each has an
 `includePayload: false` overload whose failure message names only the expected and actual branches; versions
 before 0.8.2 have no such overload. The flag limits only that message: later assertions and runner output can
 still show the data.
@@ -721,40 +721,41 @@ public sealed class RezultatShouldlyRecipeTests
 
 ## Limits
 
-- The package targets only `net10.0`. Its qualification runs on Linux ARM64 with glibc and the .NET 10 SDK,
-  including a trimmed and a Native AOT publication of a consumer there; other platforms are not qualified by it.
+- The package targets only `net10.0`. Its required qualification runs on Linux x64 with glibc (Ubuntu 24.04) and
+  the .NET 10 SDK, including a trimmed and a Native AOT publication of a consumer there. The same checks can also
+  run on Linux ARM64 with glibc as optional evidence; other platforms and architectures are not qualified.
 - There is no general zero-allocation or zero-overhead promise. Delegates, captured variables, issue arrays and
   large value payloads have their usual cost; measure the paths that matter to you.
 - Two libraries packed separately and referencing this package exchange its `Result` and `Validation` values
-  directly in one application. That was checked with both libraries built against this version, and with one of
-  them built against the private 0.8.0 and run with this version. That check is not a compatibility promise for
-  `0.y.z`; other version pairs are not covered.
+  directly in one application. Qualification checks this with both libraries built against this version. A separate
+  check runs one of them built against the private 0.8.0 with this version; it is not a compatibility promise for
+  `0.y.z`. Other version pairs are not covered.
 - A copy of the package loaded into another `AssemblyLoadContext` defines different types; sharing a carrier needs
   the same loaded assembly.
 
 ## Versions and support
 
-This is the private version 0.8.4. The first public stable release is planned as `1.0.0` and is not published yet.
-From `1.0.0` the package will follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html), in one version line
+From `1.0.0` the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html), in one version line
 with `Rezultat.Testing.Xunit` and `Rezultat.Analyzers`: compatible fixes are patch releases, compatible additions
 minor releases, and an incompatible change of the public contract a new major version. The contract is the public
 source and binary API with its nullable annotations and the behavior this README documents: states, defaults and
 `null`, guards, evaluation, failures, dependencies and the limits above. It does not cover internal layout, hash
 codes across processes, performance or unqualified platforms. Correcting behavior that deviates from this README is
-a fix, not a break. The assembly version will stay `1.0.0.0` for every `1.x` release, so a newer `1.x` binds where
-an older one was referenced. The private `0.y.z` versions, including this one, carry no compatibility promise; their
-assembly version is the full number, such as `0.8.4.0`.
+a fix, not a break. The assembly version stays `1.0.0.0` for every `1.x` release, so a newer `1.x` binds where an
+older one was referenced. The earlier private `0.y.z` versions carry no compatibility promise; their assembly version
+is the full number, such as `0.8.3.0`.
 
 Source: https://github.com/one-man-wolf-pack/Rezultat. Questions, bug reports and feature requests:
 https://github.com/one-man-wolf-pack/Rezultat/issues.
 
 ## Release notes
 
-- 0.8.4: documentation and package metadata. Adds the [async example](#async-code), the
+- 1.0.0: the first stable release; the [versioning promise](#versions-and-support) starts here. Compared with
+  0.8.3, operations, signatures, nullable annotations, guards and exceptions, namespaces and overload binding are
+  unchanged; the assembly version becomes `1.0.0.0`. The README adds the [async example](#async-code), the
   [limit on span payloads](#spans-and-borrowed-data) with a borrowed `Try` example, extends the formatting warning
   to `Maybe` and `Presence`, and adds `ShouldBeSome` and `ShouldBeNone` to the Shouldly recipe. The package names
-  its project and repository. Compared with 0.8.3, operations, signatures, nullable annotations, guards and
-  exceptions, namespaces and overload binding are unchanged; no action is needed besides updating the version.
+  its project and repository. No action is needed besides updating the version.
 - 0.8.3: documentation only. The README starts with choosing a type, installation and a quickstart, and adds the
   HTTP response and Presence JSON examples and the limits. Compared with 0.8.2, operations, signatures, nullable
   annotations, guards and exceptions, namespaces and overload binding are unchanged; no action is needed besides

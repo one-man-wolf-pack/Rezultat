@@ -5,7 +5,7 @@ branch and returns its active payload, so the test continues with ordinary frame
 payload. The package is optional: production code depends only on `Rezultat`.
 
 ```xml
-<PackageReference Include="Rezultat.Testing.Xunit" Version="0.8.4" />
+<PackageReference Include="Rezultat.Testing.Xunit" Version="1.0.0" />
 ```
 
 Add it to a test project. It brings the `Rezultat` package and the `xunit.v3.assert` runtime assembly;
@@ -136,25 +136,25 @@ qualified. Trimming and Native AOT of test projects are not supported claims of 
 
 ## Versions and support
 
-This is the private version 0.8.4; it shares the version line of `Rezultat` and requires `Rezultat` 0.8.4 or later.
-The first public stable release is planned as `1.0.0` and is not published yet. From `1.0.0` the package will follow
-[Semantic Versioning](https://semver.org/spec/v2.0.0.html): an incompatible change of its public API, nullable
-annotations or documented behavior, including the failure messages above, will need a new major version, and the
-assembly version will stay `1.0.0.0` for every `1.x` release. Qualified runners and versions are the ones listed
-above. The private `0.y.z` versions, including this one, carry no compatibility promise; their assembly version is
-the full number, such as `0.8.4.0`.
+The package shares the version line of `Rezultat` and requires `Rezultat` of its own version or later. From `1.0.0`
+it follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html): an incompatible change of its public API,
+nullable annotations or documented behavior, including the failure messages above, needs a new major version, and
+the assembly version stays `1.0.0.0` for every `1.x` release. Qualified runners and versions are the ones listed
+above. The earlier private `0.y.z` versions carry no compatibility promise; their assembly version is the full
+number, such as `0.8.2.0`.
 
 Source: https://github.com/one-man-wolf-pack/Rezultat. Questions, bug reports and feature requests:
 https://github.com/one-man-wolf-pack/Rezultat/issues.
 
 ## Release notes
 
-- 0.8.4: compared with 0.8.2, adds `MaybeAssertions` with `ShouldBeSome` and `ShouldBeNone`, each without the flag
-  and with a required `bool includePayload`. `ShouldBeSome` returns `T` with its declared nullability. The existing
-  Result and Validation assertions keep their signatures, nullable annotations, exception type and messages. The
-  minimum `Rezultat` dependency is now 0.8.4, and the package names its project and repository. A project with its
-  own `ShouldBeSome` or `ShouldBeNone` extensions for `Maybe` can get an ambiguous call where both are imported at the
-  same level; keep one of them. No other action is needed.
+- 1.0.0: the first stable release; the [versioning promise](#versions-and-support) starts here. Compared with 0.8.2,
+  adds `MaybeAssertions` with `ShouldBeSome` and `ShouldBeNone`, each without the flag and with a required
+  `bool includePayload`. `ShouldBeSome` returns `T` with its declared nullability. The existing Result and Validation
+  assertions keep their signatures, nullable annotations, exception type and messages. The minimum `Rezultat`
+  dependency is now 1.0.0, the assembly version becomes `1.0.0.0`, and the package names its project and
+  repository. A project with its own `ShouldBeSome` or `ShouldBeNone` extensions for `Maybe` can get an ambiguous
+  call where both are imported at the same level; keep one of them. No other action is needed.
 - 0.8.2: compared with 0.8.0, adds the four overloads `ShouldBeOk`, `ShouldBeError`, `ShouldBeValid` and
   `ShouldBeInvalid` with a required `bool includePayload`. Calls without the flag keep their signatures, nullable
   annotations, exception type and message. The minimum `Rezultat` dependency is now 0.8.2. To keep data out of a
