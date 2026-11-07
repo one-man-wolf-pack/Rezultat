@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <VersionPrefix>0.8.4</VersionPrefix>
+    <VersionPrefix>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)../version.txt').Trim())</VersionPrefix>
     <!-- A stable line keeps one runtime binding identity per major: a compatible 1.x update must load where an older
          1.x was referenced, so only the major reaches AssemblyVersion; package and file versions name the release.
          A private 0.y.z keeps its full number, as the issued 0.y.z did: 0.0.0.0 would be lower than the 0.8.0.0 an
