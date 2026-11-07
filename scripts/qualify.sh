@@ -5,7 +5,9 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 artifacts="$root/artifacts"
 feed="$artifacts/package/release"
 qualification="$artifacts/qualification"
-packages="$qualification/packages"
+# Restore roots of the qualification projects and diamond cases; scripts/linux.sh moves them into its cache volume.
+restore_root="${RezultatRestoreRoot:-$artifacts}"
+packages="$restore_root/qualification/packages"
 issued_feed="${REZULTAT_LOCAL_FEED:-$HOME/.local/share/nuget/rezultat}"
 # The mixed-version diamond must consume the archive that was actually issued as 0.8.0 (review/096). A repack or a
 # different file under the same version would compile the old library against other bytes and prove nothing.
@@ -196,10 +198,10 @@ consumers() {
 diamond_case() {
     local name="$1" candidate_sha="$2" inventory_core="$3" inventory_feed="$4" inventory_sha="$5" inventory_assembly="$6"
     local d="$root/qualification/Diamond" out="$qualification/diamond/$name" library_feed="$qualification/diamond/feed"
-    local restore
-    rm -rf "$out" "$library_feed"
+    local case_packages="$restore_root/qualification/diamond/$name/packages" restore
+    rm -rf "$out" "$library_feed" "$case_packages"
     mkdir -p "$out/assets" "$library_feed"
-    restore=(-p:RestorePackagesPath="$out/packages")
+    restore=(-p:RestorePackagesPath="$case_packages")
     build_clean "$d/Inventory" "${restore[@]}" -p:RezultatPackageVersion="$inventory_core"
     dotnet_clean pack "$d/Inventory" --no-build -o "$library_feed" "${restore[@]}" -p:RezultatPackageVersion="$inventory_core"
     cp "$artifacts/obj/DiamondInventory/project.assets.json" "$out/assets/DiamondInventory.json"
@@ -210,7 +212,7 @@ diamond_case() {
     cp "$artifacts/obj/DiamondApp/project.assets.json" "$out/assets/DiamondApp.json"
     cp -R "$library_feed" "$out/feed"
     dotnet run --project "$d/App" -c Release --no-build -- "$candidate_assembly" "$inventory_assembly"
-    dotnet run --project "$d/Inspector" -c Release --no-build -- "$name" "$out/packages" "$library_feed" \
+    dotnet run --project "$d/Inspector" -c Release --no-build -- "$name" "$case_packages" "$library_feed" \
         "$artifacts/bin/DiamondApp/release" "$out/assets" \
         "$RezultatPackageVersion" "$feed" "$candidate_sha" "$inventory_core" "$inventory_feed" "$inventory_sha"
 }
@@ -420,6 +422,7 @@ release() {
     done
     snapshot="$artifacts/release/$revision"
     packages="$snapshot/artifacts/linux-arm64/package/release"
+    bash "$root/scripts/linux.sh" --remove-caches "$snapshot/artifacts"
     rm -rf "$snapshot"
     # Build only an isolated clean checkout of the commit: the working tree may hold modified or untracked inputs,
     # and attributing them to the commit would make the source record and Source Link false. The clone keeps Git

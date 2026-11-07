@@ -69,8 +69,9 @@ fix *args: setup
     {{ dotnet }} format {{ quote(solution) }} --no-restore --severity warn "$@"
     just --fmt
 
-[doc('Delete reproducible SDK, test and qualification output; do not run during active work.')]
+[doc('Delete reproducible SDK, test and qualification output and the Linux cache volumes it records; not during active work.')]
 gc:
+    bash scripts/linux.sh --remove-caches artifacts
     rm -rf artifacts
 
 [doc('Pack the three packages into artifacts/package/release for the qualification lanes.')]

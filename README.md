@@ -123,7 +123,8 @@ source layout, so development diagnostics do not change what they check.
 The solution's projects restore from committed `packages.lock.json` files in locked mode. After an intentional
 dependency change, run an ordinary `dotnet restore Rezultat.slnx` and review the lock diff. Qualification projects
 that consume the freshly packed candidates, or pin a varied xUnit version, do not use lock files: they resolve into the
-isolated `artifacts/qualification/packages`, which the lanes reset, and their resolved graphs are inspected.
+isolated `artifacts/qualification/packages` (under `just linux`, `/cache/qualification/packages` in the container's
+cache volume), which the lanes reset, and their resolved graphs are inspected.
 
 ## Prerequisites
 
@@ -156,7 +157,7 @@ just linux qualify linux-arm64   # the same recipes inside the Linux ARM64/glibc
 just linux pack analyzers   # any recipes inside the same container
 just release <commit> Rezultat   # source-bound package build with its source record (see Releases)
 just release-controls       # release/publish controls in a disposable Git fixture (host tools above and Docker)
-just gc                     # delete artifacts/ (not the local feed)
+just gc                     # delete artifacts/ and its Linux cache volumes (not the local feed)
 ```
 
 Each test module receives `--minimum-expected-tests 1` after the SDK `--` separator, so a required module that runs
@@ -171,8 +172,13 @@ staged.
 `artifacts/package/release` through `qualification/NuGet.Config` and an isolated package folder, so run `pack` first.
 `just linux` runs the same recipe bodies on the host and sends each `dotnet` and lane command through
 `scripts/linux.sh` into the SDK container, with the source mounted read-only; container outputs are kept separately in
-`artifacts/linux-arm64`. The container compiles with `UseSharedCompilation=false` (standalone compiler, no reused
-compiler server) and does not retry failed builds. Paths passed to recipes are relative to the repository root.
+`artifacts/linux-arm64`. NuGet's package, HTTP and scratch caches, the CLI home and the qualification and diamond
+package folders are not on the host share: they live under `/cache` in a Docker volume of that checkout and SDK image,
+created empty on first use, owned by the calling user and named in `artifacts/linux-arm64/nuget-volume-*`. Every
+`just linux` command of the checkout reuses it; `just gc` removes the recorded volumes with the outputs, and a
+release clone always starts with a new one. The container compiles with `UseSharedCompilation=false` (standalone
+compiler, no reused compiler server) and does not retry failed builds. Paths passed to recipes are relative to the
+repository root.
 `assertions` runs expected-failure fixtures on purpose and checks the native reports kept in
 `artifacts/qualification/runner-reports`. `analyzers` compares every diagnostic of each build with the markers in the
 checked sources: `/*ID*/` expects the diagnostic at the following token (the next line's first token when the marker
@@ -184,7 +190,8 @@ runs twice in fresh package folders: with both libraries built against the candi
 against the issued `Rezultat` 0.8.0 while Orders and the app use the candidate. The 0.8.0 archive is read from the
 local feed (`REZULTAT_LOCAL_FEED`, default below; `linux` mounts it read-only), must have the SHA-256 recorded at its
 issue and is copied into `artifacts/qualification/diamond`. `qualification/Diamond/Inspector` checks the restore
-inputs, resolved versions, sources and bytes of every case; results stay in `artifacts/qualification/diamond/<case>`.
+inputs, resolved versions, sources and bytes of every case; results stay in `artifacts/qualification/diamond/<case>`,
+the restored packages of each case in its own `qualification/diamond/<case>/packages` under the restore root.
 
 ## Releases
 
@@ -210,7 +217,8 @@ just --justfile artifacts/release/<full-commit>/justfile linux consumers asserti
 ```
 
 Generated sources (assembly attributes, global usings) are in the PDB with their checksums but are not in the
-repository, so Source Link cannot serve them. Running `release` again rebuilds the clone and its archives.
+repository, so Source Link cannot serve them. Running `release` again removes the clone with its cache volume, then
+rebuilds it and its archives from an empty cache.
 
 ### Steps of the first public release
 

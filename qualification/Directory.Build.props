@@ -3,7 +3,8 @@
 
   <PropertyGroup>
     <!-- Candidate packages are restored only into this isolated cache, which the lanes reset per run. -->
-    <RestorePackagesPath>$(ArtifactsPath)/qualification/packages</RestorePackagesPath>
+    <RestorePackagesPath Condition="'$(RezultatRestoreRoot)' != ''">$(RezultatRestoreRoot)/qualification/packages</RestorePackagesPath>
+    <RestorePackagesPath Condition="'$(RezultatRestoreRoot)' == ''">$(ArtifactsPath)/qualification/packages</RestorePackagesPath>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 </Project>
