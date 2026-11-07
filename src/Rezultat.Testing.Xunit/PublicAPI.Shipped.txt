@@ -1,1 +1,16 @@
 #nullable enable
+Rezultat.Testing.Xunit.MaybeAssertions
+Rezultat.Testing.Xunit.ResultAssertions
+Rezultat.Testing.Xunit.ValidationAssertions
+static Rezultat.Testing.Xunit.MaybeAssertions.ShouldBeNone<T>(this Rezultat.Maybe<T> value) -> void
+static Rezultat.Testing.Xunit.MaybeAssertions.ShouldBeNone<T>(this Rezultat.Maybe<T> value, bool includePayload) -> void
+static Rezultat.Testing.Xunit.MaybeAssertions.ShouldBeSome<T>(this Rezultat.Maybe<T> value) -> T
+static Rezultat.Testing.Xunit.MaybeAssertions.ShouldBeSome<T>(this Rezultat.Maybe<T> value, bool includePayload) -> T
+static Rezultat.Testing.Xunit.ResultAssertions.ShouldBeError<T, TError>(this Rezultat.Result<T, TError> result) -> TError
+static Rezultat.Testing.Xunit.ResultAssertions.ShouldBeError<T, TError>(this Rezultat.Result<T, TError> result, bool includePayload) -> TError
+static Rezultat.Testing.Xunit.ResultAssertions.ShouldBeOk<T, TError>(this Rezultat.Result<T, TError> result) -> T
+static Rezultat.Testing.Xunit.ResultAssertions.ShouldBeOk<T, TError>(this Rezultat.Result<T, TError> result, bool includePayload) -> T
+static Rezultat.Testing.Xunit.ValidationAssertions.ShouldBeInvalid<T, TIssue>(this Rezultat.Validation<T, TIssue> validation) -> System.Collections.Immutable.ImmutableArray<TIssue>
+static Rezultat.Testing.Xunit.ValidationAssertions.ShouldBeInvalid<T, TIssue>(this Rezultat.Validation<T, TIssue> validation, bool includePayload) -> System.Collections.Immutable.ImmutableArray<TIssue>
+static Rezultat.Testing.Xunit.ValidationAssertions.ShouldBeValid<T, TIssue>(this Rezultat.Validation<T, TIssue> validation) -> T
+static Rezultat.Testing.Xunit.ValidationAssertions.ShouldBeValid<T, TIssue>(this Rezultat.Validation<T, TIssue> validation, bool includePayload) -> T
