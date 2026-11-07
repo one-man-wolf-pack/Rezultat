@@ -88,10 +88,15 @@ pack-bound commit: setup
 consumers: setup
     {{ qualify }} consumers
 
-[doc('Reference diamond only; the issued core comes from REZULTAT_LOCAL_FEED.')]
+[doc('Same-version reference diamond against the packed core only.')]
 [group('qualification')]
 diamond: setup
     {{ qualify }} diamond
+
+[doc('Mixed-version reference diamond with the issued private Rezultat 0.8.0 from REZULTAT_LOCAL_FEED; not part of qualify.')]
+[group('qualification')]
+diamond-historical: setup
+    {{ qualify }} diamond-historical
 
 [doc('Packed Rezultat.Testing.Xunit: consumers, compiler controls, README, xUnit v2/v3 runners, package inspection.')]
 [group('qualification')]
@@ -122,15 +127,19 @@ qualify rid: check pack consumers assertions analyzers alloc (publish rid)
 linux +recipes:
     REZULTAT_RUNNER='scripts/linux.sh ' just "$@"
 
-[doc('Clone a commit to artifacts/release/<commit>, pack it source-bound on Linux and record the named packages.')]
+[doc('Clone a commit to artifacts/release/<commit>, pack it source-bound on this host (`just linux release`: in the Linux container) and record the named packages.')]
 [group('release')]
 release commit +packages:
     bash scripts/qualify.sh release "$@"
 
-[doc('Release and publish controls in a disposable Git fixture.')]
+[doc('Release and publish controls in a disposable Git fixture, packing like `release`.')]
 [group('release')]
 release-controls:
     bash scripts/qualify.sh release-controls
+
+[doc('Lint the GitHub workflows with actionlint and its runner-label configuration.')]
+lint-workflows:
+    docker run --rm --network none -v {{ quote(justfile_directory()) }}:/repo:ro -w /repo rhysd/actionlint:1.7.12 -color
 
 [private]
 _justfile-check:

@@ -65,3 +65,24 @@ release_record() {
     printf 'package-id=%s\nversion=%s\nsource-revision=%s\nnupkg-sha256=%s\n' "$id" "$version" "$revision" "$nupkg_sha"
     [[ -z "$snupkg_sha" ]] || printf 'snupkg-sha256=%s\n' "$snupkg_sha"
 }
+
+# `just linux release` sets REZULTAT_RUNNER: the clone then packs in the Linux ARM64 container, whose outputs stay in
+# artifacts/linux-arm64. Otherwise it packs on this host, restoring into empty package and HTTP caches of the clone, so
+# that a release never reuses a warmed host cache.
+release_pack_bound() {
+    local snapshot="$1" revision="$2"
+    if [[ -n "${REZULTAT_RUNNER:-}" ]]; then
+        just --justfile "$snapshot/justfile" linux pack-bound "$revision"
+    else
+        NUGET_PACKAGES="$snapshot/artifacts/nuget/packages" NUGET_HTTP_CACHE_PATH="$snapshot/artifacts/nuget/http" \
+            just --justfile "$snapshot/justfile" pack-bound "$revision"
+    fi
+}
+
+release_packages() {
+    if [[ -n "${REZULTAT_RUNNER:-}" ]]; then
+        echo "$1/artifacts/linux-arm64/package/release"
+    else
+        echo "$1/artifacts/package/release"
+    fi
+}

@@ -88,7 +88,7 @@ fixture_git commit -q -m later
 head="$(git -C "$repo" rev-parse HEAD)"
 
 snapshot="$repo/artifacts/release/$built"
-packages="$snapshot/artifacts/linux-arm64/package/release"
+packages="$(. "$repo/scripts/release-record.sh" && release_packages "$snapshot")"
 version="$(sed -n 's/^version=//p' "$packages"/Rezultat.[0-9]*.record)"
 core_record="$packages/Rezultat.$version.record"
 analyzer_record="$packages/Rezultat.Analyzers.$version.record"
@@ -247,20 +247,20 @@ publish_path="$PATH"
 version="$built_version"
 
 printf 'untracked\n' >"$snapshot/untracked.txt"
-if just --justfile "$snapshot/justfile" linux pack-bound "$built" >"$work/pack-dirty.log" 2>&1; then
+if (. "$repo/scripts/release-record.sh" && release_pack_bound "$snapshot" "$built") >"$work/pack-dirty.log" 2>&1; then
     fail "source-bound pack of a dirty checkout: packed"
 else
     pass "source-bound pack of a dirty checkout: $(grep FAIL "$work/pack-dirty.log" | tail -1)"
 fi
 rm "$snapshot/untracked.txt"
 git -C "$snapshot" remote set-url origin "https://x-access-token:$marker@github.com/one-man-wolf-pack/Rezultat"
-if just --justfile "$snapshot/justfile" linux pack-bound "$built" >"$work/pack-credentialed.log" 2>&1; then
+if (. "$repo/scripts/release-record.sh" && release_pack_bound "$snapshot" "$built") >"$work/pack-credentialed.log" 2>&1; then
     fail "source-bound pack with a credentialed origin: packed"
 else
     pass "source-bound pack with a credentialed origin: $(grep FAIL "$work/pack-credentialed.log" | tail -1)"
 fi
 git -C "$snapshot" remote set-url origin "$url"
-if just --justfile "$snapshot/justfile" linux pack-bound "$head" >"$work/pack-other.log" 2>&1; then
+if (. "$repo/scripts/release-record.sh" && release_pack_bound "$snapshot" "$head") >"$work/pack-other.log" 2>&1; then
     fail "source-bound pack of another commit: packed"
 else
     pass "source-bound pack of another commit: $(grep FAIL "$work/pack-other.log" | tail -1)"
@@ -272,7 +272,7 @@ rm "$repo/src/Rezultat/UntrackedInput.cs"
 fixture_git add -A
 fixture_git commit -q -m buildable
 buildable="$(git -C "$repo" rev-parse HEAD)"
-hashing_packages="$repo/artifacts/release/$buildable/artifacts/linux-arm64/package/release"
+hashing_packages="$(. "$repo/scripts/release-record.sh" && release_packages "$repo/artifacts/release/$buildable")"
 if PATH="$broken_bin:$PATH" "$repo/scripts/qualify.sh" release "$buildable" Rezultat >"$work/release-hashing.log" 2>&1; then
     fail "record generation when hashing fails: release succeeded"
 else

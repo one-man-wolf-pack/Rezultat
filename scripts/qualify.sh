@@ -32,7 +32,7 @@ repository_url() {
 usage() {
     cat <<'EOF'
 usage: scripts/qualify.sh <lane> [args]; normally reached through the root justfile (just --list)
-  pack | pack-bound <commit> | consumers | diamond | assertions | analyzers | alloc | publish <rid> |
+  pack | pack-bound <commit> | consumers | diamond | diamond-historical | assertions | analyzers | alloc | publish <rid> |
   release <commit> <package-id>... | release-controls
 EOF
 }
@@ -217,7 +217,24 @@ diamond_case() {
         "$RezultatPackageVersion" "$feed" "$candidate_sha" "$inventory_core" "$inventory_feed" "$inventory_sha"
 }
 
+diamond_candidate() {
+    reset_package_cache
+    build_tool "$root/qualification/Diamond/Inspector"
+    candidate_sha="$(sha256sum "$feed/Rezultat.$RezultatPackageVersion.nupkg" | cut -d' ' -f1)"
+    candidate_assembly="$(dotnet msbuild "$root/src/Rezultat" -getProperty:AssemblyVersion)"
+}
+
 diamond() {
+    local issued="$qualification/diamond/issued" candidate_sha candidate_assembly
+    # qualification/Diamond/NuGet.Config always lists this issued source; NuGet fails on a missing local source, so the
+    # same-version case keeps it present and empty and every Rezultat archive can come only from the candidate feed.
+    rm -rf "$issued"
+    mkdir -p "$issued"
+    diamond_candidate
+    diamond_case same-version "$candidate_sha" "$RezultatPackageVersion" "$feed" "$candidate_sha" "$candidate_assembly"
+}
+
+diamond_historical() {
     local issued="$qualification/diamond/issued" archive="$issued_feed/Rezultat.$issued_core_version.nupkg" actual candidate_sha
     local candidate_assembly
     reset_package_cache
@@ -228,10 +245,7 @@ diamond() {
     rm -rf "$issued"
     mkdir -p "$issued"
     cp "$archive" "$issued/"
-    build_tool "$root/qualification/Diamond/Inspector"
-    candidate_sha="$(sha256sum "$feed/Rezultat.$RezultatPackageVersion.nupkg" | cut -d' ' -f1)"
-    candidate_assembly="$(dotnet msbuild "$root/src/Rezultat" -getProperty:AssemblyVersion)"
-    diamond_case same-version "$candidate_sha" "$RezultatPackageVersion" "$feed" "$candidate_sha" "$candidate_assembly"
+    diamond_candidate
     diamond_case mixed-version "$candidate_sha" "$issued_core_version" "$issued" "$issued_core_sha256" "$issued_core_assembly"
 }
 
@@ -421,7 +435,7 @@ release() {
         release_known_id "$id" || { echo "Unknown package id: $id" >&2; return 1; }
     done
     snapshot="$artifacts/release/$revision"
-    packages="$snapshot/artifacts/linux-arm64/package/release"
+    packages="$(release_packages "$snapshot")"
     bash "$root/scripts/linux.sh" --remove-caches "$snapshot/artifacts"
     rm -rf "$snapshot"
     # Build only an isolated clean checkout of the commit: the working tree may hold modified or untracked inputs,
@@ -432,7 +446,7 @@ release() {
         || { echo "No agreed repository URL in $revision." >&2; return 1; }
     git -C "$snapshot" remote set-url origin "$url"
     git -C "$snapshot" -c advice.detachedHead=false checkout --quiet --detach "$revision"
-    just --justfile "$snapshot/justfile" linux pack-bound "$revision"
+    release_pack_bound "$snapshot" "$revision"
     [[ "$(cat "$packages/source-revision")" == "$revision" ]] || { echo "Packages in $packages are not bound to $revision" >&2; return 1; }
     for id in "$@"; do
         found=("$packages/$id".[0-9]*.nupkg)
@@ -459,6 +473,7 @@ case "$command" in
     pack-bound) pack_bound "$@" ;;
     consumers) consumers ;;
     diamond) diamond ;;
+    diamond-historical) diamond_historical ;;
     assertions) assertions ;;
     alloc) alloc ;;
     publish) publish "$@" ;;

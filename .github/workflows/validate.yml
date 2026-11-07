@@ -1,0 +1,62 @@
+name: Validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint:
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+        with:
+          just-version: "1.59.0"
+      - run: just lint-workflows
+
+  qualify:
+    runs-on: blacksmith-8vcpu-ubuntu-2404
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+        with:
+          just-version: "1.59.0"
+      - name: Install the Native AOT prerequisites
+        run: sudo apt-get update -q && sudo apt-get install -q -y --no-install-recommends clang zlib1g-dev
+      - run: just qualify linux-x64
+
+  release-controls:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+        with:
+          just-version: "1.59.0"
+      # The release lane, its records and the controls run xmllint, unzip and zip on the host; the runner image lacks xmllint.
+      - name: Install the release host tools
+        run: sudo apt-get update -q && sudo apt-get install -q -y --no-install-recommends libxml2-utils unzip zip
+      - run: just release-controls

@@ -1,0 +1,174 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+# Event data reaches shell only as this variable, never as interpolated script text.
+env:
+  RELEASE_TAG: ${{ github.event.release.tag_name }}
+
+jobs:
+  qualify:
+    if: ${{ vars.REZULTAT_RELEASE_AUTOMATION_ENABLED == 'true' && !github.event.release.draft && !github.event.release.prerelease }}
+    runs-on: blacksmith-8vcpu-ubuntu-2404
+    timeout-minutes: 60
+    steps:
+      # fetch-depth 0 creates refs/remotes/origin/main for the ancestry proof and gives the release clone full history.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+        with:
+          just-version: "1.59.0"
+      # The release lane and its records run xmllint, unzip and zip on the host; the runner image lacks xmllint.
+      - name: Install the release host tools and the Native AOT prerequisites
+        run: sudo apt-get update -q && sudo apt-get install -q -y --no-install-recommends libxml2-utils unzip zip clang zlib1g-dev
+      - name: Prove the release tag, its commit and version
+        id: source
+        run: |
+          set -euo pipefail
+          : "${RELEASE_TAG:?the release event supplied no tag}"
+          [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] \
+            || { echo "$RELEASE_TAG is not a strict vMAJOR.MINOR.PATCH release tag"; exit 1; }
+          tagged="$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}")"
+          head="$(git rev-parse --verify HEAD)"
+          [[ "$tagged" == "$head" ]] || { echo "the checkout is at $head but $RELEASE_TAG names $tagged"; exit 1; }
+          git rev-parse --verify --quiet refs/remotes/origin/main >/dev/null \
+            || { echo "refs/remotes/origin/main is absent; ancestry cannot be proved"; exit 1; }
+          git merge-base --is-ancestor "$head" refs/remotes/origin/main \
+            || { echo "$RELEASE_TAG ($head) is not an ancestor of origin/main"; exit 1; }
+          version="$(cat version.txt)"
+          [[ "$version" == "${RELEASE_TAG#v}" ]] || { echo "version.txt at $head is '$version', not ${RELEASE_TAG#v}"; exit 1; }
+          status="$(git status --porcelain --untracked-files=all)"
+          [[ -z "$status" ]] || { echo "the checkout of $RELEASE_TAG is not clean:"; echo "$status"; exit 1; }
+          echo "$RELEASE_TAG is $head on main with version $version"
+          echo "commit=$head" >>"$GITHUB_OUTPUT"
+
+      - name: Build the source-bound packages and their records
+        env:
+          RELEASE_COMMIT: ${{ steps.source.outputs.commit }}
+        run: just release "$RELEASE_COMMIT" Rezultat Rezultat.Testing.Xunit Rezultat.Analyzers
+
+      # The lanes of the release clone consume the archives just built there; a fresh pack would qualify other bytes.
+      - name: Qualify those archives
+        env:
+          RELEASE_COMMIT: ${{ steps.source.outputs.commit }}
+        run: just --justfile "artifacts/release/$RELEASE_COMMIT/justfile" consumers assertions analyzers alloc publish linux-x64
+
+      - name: Collect the qualified archives with their records
+        env:
+          RELEASE_COMMIT: ${{ steps.source.outputs.commit }}
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          packages="artifacts/release/$RELEASE_COMMIT/artifacts/package/release"
+          outgoing="$RUNNER_TEMP/outgoing"
+          mkdir "$outgoing"
+          for id in Rezultat Rezultat.Testing.Xunit Rezultat.Analyzers; do
+            record="$packages/$id.$version.record"
+            grep -qx "source-revision=$RELEASE_COMMIT" "$record"
+            cp "$record" "$packages/$id.$version.nupkg" "$outgoing/"
+            [[ "$(sha256sum "$outgoing/$id.$version.nupkg" | cut -d' ' -f1)" == "$(sed -n 's/^nupkg-sha256=//p' "$record")" ]]
+            if [[ "$id" != Rezultat.Analyzers ]]; then
+              cp "$packages/$id.$version.snupkg" "$outgoing/"
+              [[ "$(sha256sum "$outgoing/$id.$version.snupkg" | cut -d' ' -f1)" == "$(sed -n 's/^snupkg-sha256=//p' "$record")" ]]
+            fi
+          done
+          (cd "$outgoing" && sha256sum -- *.nupkg *.snupkg >SHA256SUMS && cat SHA256SUMS)
+          status="$(git status --porcelain --untracked-files=all)"
+          [[ -z "$status" ]] || { echo "qualification modified the checkout:"; echo "$status"; exit 1; }
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: packages
+          path: ${{ runner.temp }}/outgoing
+          if-no-files-found: error
+
+  attach:
+    needs: qualify
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: packages
+          path: outgoing
+      # Without --clobber an asset name already present on the release fails the upload instead of replacing it.
+      - name: Attach the qualified archives to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd outgoing
+          sha256sum -c SHA256SUMS
+          gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" -- *.nupkg *.snupkg *.record SHA256SUMS
+
+  # NuGet publication belongs to the canonical repository only, whatever the automation variable says elsewhere.
+  canonical:
+    if: ${{ vars.REZULTAT_RELEASE_AUTOMATION_ENABLED == 'true' && !github.event.release.draft && !github.event.release.prerelease }}
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Require the canonical repository, event and workflow
+        run: |
+          set -euo pipefail
+          canonical=one-man-wolf-pack/Rezultat
+          [[ "$GITHUB_REPOSITORY" == "$canonical" ]] || { echo "NuGet publication is refused in $GITHUB_REPOSITORY"; exit 1; }
+          [[ "$GITHUB_EVENT_NAME" == release ]] || { echo "NuGet publication is refused for $GITHUB_EVENT_NAME"; exit 1; }
+          [[ "$GITHUB_WORKFLOW_REF" == "$canonical/.github/workflows/release.yml@refs/tags/$RELEASE_TAG" ]] \
+            || { echo "NuGet publication is refused for workflow $GITHUB_WORKFLOW_REF"; exit 1; }
+
+  publish:
+    needs: [qualify, attach, canonical]
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 15
+    environment: nuget-release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: packages
+          path: ${{ runner.temp }}/outgoing
+      - name: Verify the qualified archives
+        working-directory: ${{ runner.temp }}/outgoing
+        run: sha256sum -c SHA256SUMS
+      - uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        id: login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+      # No --skip-duplicate: an occupied ID/version must stop publication for inspection, not pass as success.
+      - name: Push the packages and their symbols
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          for id in Rezultat Rezultat.Testing.Xunit Rezultat.Analyzers; do
+            dotnet nuget push "$RUNNER_TEMP/outgoing/$id.$version.nupkg" --api-key "$NUGET_API_KEY" \
+              --source https://api.nuget.org/v3/index.json
+          done

@@ -78,14 +78,15 @@ number, such as `0.8.4.0`.
 
 ## Limits
 
-- `net10.0` only. Qualification runs in a Linux ARM64/glibc container with the SDK pinned in `global.json`,
-  including trimmed and Native AOT publication of a package consumer; other platforms are not qualified here.
+- `net10.0` only. CI qualifies on Linux x64/glibc (Ubuntu 24.04) with the SDK pinned in `global.json`, including
+  trimmed and Native AOT publication of a package consumer; `just linux` runs the same checks in a local Linux
+  ARM64/glibc container. Other platforms and architectures are not qualified here.
 - Source Link and the commit in package metadata are produced only by a release build of an exact commit; ordinary
   candidate packages name the repository but no commit. Download of the packages, symbols and sources from
   nuget.org, its symbol server and GitHub is not verified before the release.
 - The reference diamond (two separately packed libraries exchanging carriers in one app) is checked for libraries
-  built against the candidate version and for one built against the private 0.8.0 and run with the candidate.
-  That check is evidence, not a compatibility promise for `0.y.z`; other version pairs are not covered.
+  built against the candidate version; a separate local check runs one built against the private 0.8.0 with the
+  candidate. That check is evidence, not a compatibility promise for `0.y.z`; other version pairs are not covered.
 - There is no general zero-allocation claim; `just alloc` measures selected operations in warmed
   Release.
 
@@ -133,7 +134,8 @@ cache volume), which the lanes reset, and their resolved graphs are inspected.
   two SDK versions equal.
 - [Just](https://just.systems) for the commands below, plus Git and Bash. The release lane, `publish-local.sh` and
   the release controls also run `unzip`, `xmllint` and `sha256sum` on the host; the controls also need `zip`.
-- Docker with a native `linux/arm64` engine for the Linux qualification contour.
+- For `just publish linux-x64` on Linux, the Native AOT prerequisites (`clang` and `zlib1g-dev` on Ubuntu).
+- Docker for `just lint-workflows`, and with a native `linux/arm64` engine for the optional `just linux` contour.
 
 ## Commands
 
@@ -147,7 +149,8 @@ just fmt                    # whitespace and Just formatting only
 just fix --diagnostics IDE0011   # supported style/analyzer repairs, optionally scoped; review the diff
 just pack                   # artifacts/package/release: Rezultat and Rezultat.Testing.Xunit .nupkg/.snupkg, Rezultat.Analyzers .nupkg
 just consumers              # package consumers, compiler controls, README examples and recipes, reference diamond, package inspection
-just diamond                # only the reference diamond (needs the private Rezultat 0.8.0, see below)
+just diamond                # only the same-version reference diamond
+just diamond-historical     # the mixed-version diamond with the private Rezultat 0.8.0 (see below); not in qualify
 just assertions             # assertion package consumers, xUnit v2/v3 runner scenarios, package inspection
 just analyzers              # RZT0001 corpus in all severity modes, downstream isolation, README, package inspection
 just alloc                  # warmed Release allocation controls
@@ -155,8 +158,10 @@ just publish <rid>          # rooted and unrooted trimmed and Native AOT consume
 just qualify <rid>          # check, pack, every package lane and publish for the runtime
 just linux qualify linux-arm64   # the same recipes inside the Linux ARM64/glibc SDK container
 just linux pack analyzers   # any recipes inside the same container
-just release <commit> Rezultat   # source-bound package build with its source record (see Releases)
-just release-controls       # release/publish controls in a disposable Git fixture (host tools above and Docker)
+just release <commit> Rezultat   # source-bound package build with its source record on this host (see Releases)
+just linux release <commit> Rezultat   # the same build in the Linux ARM64/glibc container
+just release-controls       # release/publish controls in a disposable Git fixture (host tools above); `just linux release-controls` packs in the container
+just lint-workflows         # actionlint over .github/workflows in its pinned Docker image
 just gc                     # delete artifacts/ and its Linux cache volumes (not the local feed)
 ```
 
@@ -185,13 +190,14 @@ checked sources: `/*ID*/` expects the diagnostic at the following token (the nex
 stands alone), a trailing `// ID` anywhere on its line. Build logs are kept in `artifacts/qualification/analyzer-logs`.
 
 `diamond` packs `qualification/Diamond/Inventory` and `qualification/Diamond/Orders` separately and restores them as
-packages into `qualification/Diamond/App`, which passes `Result` and `Validation` values from one to the other. It
-runs twice in fresh package folders: with both libraries built against the candidate, and with Inventory built
-against the issued `Rezultat` 0.8.0 while Orders and the app use the candidate. The 0.8.0 archive is read from the
-local feed (`REZULTAT_LOCAL_FEED`, default below; `linux` mounts it read-only), must have the SHA-256 recorded at its
-issue and is copied into `artifacts/qualification/diamond`. `qualification/Diamond/Inspector` checks the restore
-inputs, resolved versions, sources and bytes of every case; results stay in `artifacts/qualification/diamond/<case>`,
-the restored packages of each case in its own `qualification/diamond/<case>/packages` under the restore root.
+packages into `qualification/Diamond/App`, which passes `Result` and `Validation` values from one to the other, in a
+fresh package folder with both libraries built against the candidate; `consumers` runs it. `diamond-historical` runs
+the same graph with Inventory built against the issued `Rezultat` 0.8.0 while Orders and the app use the candidate.
+The 0.8.0 archive is read from the local feed (`REZULTAT_LOCAL_FEED`, default below; `linux` mounts it read-only),
+must have the SHA-256 recorded at its issue and is copied into `artifacts/qualification/diamond`; without it the
+command fails. `qualification/Diamond/Inspector` checks the restore inputs, resolved versions, sources and bytes of
+every case; results stay in `artifacts/qualification/diamond/<case>`, the restored packages of each case in its own
+`qualification/diamond/<case>/packages` under the restore root.
 
 ## Releases
 
@@ -203,8 +209,10 @@ Packages have two kinds of origin, and the package metadata says which one:
 - A release from `just release <commit> <package-id>...` is built from that commit only. The lane clones this
   repository into `artifacts/release/<full-commit>`, sets the clone's `origin` to the `RepositoryUrl` of that commit
   (a credential-free GitHub URL, otherwise it refuses) and checks out the commit detached. The clone's own
-  `just linux pack-bound` refuses unless the checkout is exactly that commit, clean and with that origin, then packs
-  with the SDK's Git and GitHub Source Link support. The nuspec names the repository and commit, the informational
+  `just pack-bound` refuses unless the checkout is exactly that commit, clean and with that origin, then packs
+  with the SDK's Git and GitHub Source Link support. It restores into empty NuGet caches under the clone; with
+  `just linux release` it packs in the container instead, with a new cache volume, and its outputs are under
+  `artifacts/linux-arm64` of the clone. The nuspec names the repository and commit, the informational
   version is `<version>+<commit>`, and the PDB maps `/_/*` to `https://raw.githubusercontent.com/<owner>/<repo>/<commit>/*`.
   For each named package the lane checks that commit and URL in the nuspec and writes `<id>.<version>.record`:
   package ID, version, full commit and SHA-256 of the `.nupkg` and, when shipped, `.snupkg`.
@@ -213,6 +221,9 @@ Qualify a release with the clone's own lanes; they inspect the packages against 
 
 ```sh
 just release <commit> Rezultat Rezultat.Testing.Xunit Rezultat.Analyzers
+just --justfile artifacts/release/<full-commit>/justfile consumers assertions analyzers alloc publish linux-x64
+# or, in the Linux ARM64/glibc container:
+just linux release <commit> Rezultat Rezultat.Testing.Xunit Rezultat.Analyzers
 just --justfile artifacts/release/<full-commit>/justfile linux consumers assertions analyzers alloc publish linux-arm64
 ```
 
@@ -220,22 +231,13 @@ Generated sources (assembly attributes, global usings) are in the PDB with their
 repository, so Source Link cannot serve them. Running `release` again removes the clone with its cache volume, then
 rebuilds it and its archives from an empty cache.
 
-### Steps of the first public release
+### Versions and CI
 
-Source acceptance of this preparation leaves these steps, in order:
-
-1. Set `VersionPrefix` in `src/Directory.Build.props` to `1.0.0`, promote the accepted API (move the entries of
-   `PublicAPI.Unshipped.txt` into `PublicAPI.Shipped.txt` for `Rezultat` and `Rezultat.Testing.Xunit`) and review
-   the READMEs and release notes for the stable release.
-2. Review and commit that release source.
-3. Run `just release` for the commit and qualify the clone as above. Every later source change needs a new commit
-   and a new release build.
-4. Make the commit reachable at the repository URL with the agreed visibility.
-5. Transfer exactly those archives, without rebuilding or repacking, to the package feed, and keep them with their
-   records in the local feed below. CI, release automation and credentials are set up separately.
-6. Verify installation, symbols and Source Link source download as an anonymous consumer.
-7. After `1.0.0` is issued, later releases enable the SDK's package validation against it
-   (`EnablePackageValidation` with `PackageValidationBaselineVersion` `1.0.0`).
+`version.txt` holds the package version of all three packages; MSBuild reads it into `VersionPrefix`. Pull requests
+and pushes to `main` run `just lint-workflows`, `just qualify linux-x64` and `just release-controls` directly on a
+Linux x64 GitHub Actions runner. Public releases are prepared by release-please and built, qualified and published by
+`.github/workflows/release.yml` from the tagged commit; [.github/RELEASING.md](.github/RELEASING.md) lists the
+repository settings and the steps of the first public release.
 
 ### Local feed
 
@@ -244,7 +246,7 @@ caches. `REZULTAT_LOCAL_FEED` or the last command argument can select another di
 `0.y.z` packages and keeps released archives with their records.
 
 ```sh
-scripts/publish-local.sh <version> artifacts/release/<full-commit>/artifacts/linux-arm64/package/release
+scripts/publish-local.sh <version> artifacts/release/<full-commit>/artifacts/linux-arm64/package/release   # after `just linux release`
 # Other packages and explicit destination:
 scripts/publish-local.sh --package Rezultat.Analyzers <version> <package-directory> /absolute/path/to/rezultat-feed
 ```
@@ -255,8 +257,8 @@ package ID and version from the archives' nuspec, compares the hashes and refuse
 recorded commit: a nuspec without that commit or with another repository URL is refused. It copies without
 repacking, publishes the symbols archive, then the record into `records/`, then the package, as read-only files
 with atomic no-replace names. Publishing identical files again is a no-op; different bytes under an issued version
-fail. Changed package contents always receive a new version: change `VersionPrefix` in `src/Directory.Build.props`
-following the rules above. The packages of one `release` share that version; publish only the changed ones and keep
+fail. Changed package contents always receive a new private version: change `version.txt` following the rules
+above. The packages of one `release` share that version; publish only the changed ones and keep
 the issued versions of the others. Do not use `dotnet nuget push` directly to this directory: its local-folder path
 can overwrite a version. Keep this feed when cleaning build outputs. `Rezultat.Analyzers` has no `.snupkg`. The
 `symbols/` directory retains matching `.snupkg` files; it is an archive, not a symbol server. A record is not a
