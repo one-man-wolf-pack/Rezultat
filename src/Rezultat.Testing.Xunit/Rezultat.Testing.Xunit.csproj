@@ -4,8 +4,8 @@
     <PackageId>Rezultat.Testing.Xunit</PackageId>
     <AssemblyName>Rezultat.Testing.Xunit</AssemblyName>
     <RootNamespace>Rezultat.Testing.Xunit</RootNamespace>
-    <Description>Test-only extracting assertions for Rezultat Result and Validation: ShouldBeOk, ShouldBeError, ShouldBeValid and ShouldBeInvalid return the active payload or fail with an xUnit assertion failure, optionally without data in the message.</Description>
-    <PackageTags>result;validation;testing;assertions;xunit</PackageTags>
+    <Description>Test-only xUnit assertions for Rezultat Result, Validation and Maybe: ShouldBeOk, ShouldBeError, ShouldBeValid, ShouldBeInvalid and ShouldBeSome check the expected branch and return its payload; ShouldBeNone checks that a Maybe is None. A mismatch fails with an xUnit assertion failure, optionally without data in the message.</Description>
+    <PackageTags>result;validation;maybe;option;testing;assertions;xunit</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
